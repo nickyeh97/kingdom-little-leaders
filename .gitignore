@@ -1,0 +1,16 @@
+# 機密與環境設定
+.env
+.env.*
+!.env.example
+*.secret
+
+# 相依套件與建置產物
+node_modules/
+dist/
+.output/
+
+# 編輯器與系統
+.DS_Store
+.idea/
+.vscode/
+*.log
