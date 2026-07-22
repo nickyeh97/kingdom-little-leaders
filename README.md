@@ -2,6 +2,23 @@
 
 > 「這樣，信心若沒有行為就是死的。」— 雅各書 2:17
 
+## 開發
+
+```bash
+npm install
+cp .env.example .env.local   # 填入 Supabase 專案的 URL 與 anon key
+npm run dev                  # 開發伺服器 http://localhost:5173
+npm run build                # 型別檢查 + production build（含 PWA）
+```
+
+### 後端初始化（一次性）
+
+1. 到 [supabase.com](https://supabase.com) 建立免費專案（區域選 Tokyo 較近）。
+2. SQL Editor 依序執行 `supabase/schema.sql` → `supabase/rls.sql` →（開發環境）`supabase/seed.sql`。
+3. Authentication → Users → 建立自己的帳號，並在 `profiles` 表把 `role` 改為 `admin`。
+4. Project Settings → API 取得 URL 與 anon key，填入 `.env.local`。
+
+
 以單一 Web APP / PWA 整合兒童主日學的日常行政與「神國小領袖」文化養成：
 
 - 📋 **出席預先統計**：家長每週勾選孩子是否出席，自動統計人數
