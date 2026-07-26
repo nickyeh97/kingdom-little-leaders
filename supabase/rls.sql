@@ -8,25 +8,32 @@
 -- =========================================================
 
 -- ---- 輔助函式（security definer 繞過 RLS 讀 profiles，避免遞迴）----
-create or replace function public.my_role()
-returns user_role
+create or replace function public.my_roles()
+returns user_role[]
 language sql stable security definer set search_path = public
 as $$
-  select role from profiles where id = auth.uid()
+  select roles from profiles where id = auth.uid()
+$$;
+
+create or replace function public.has_role(r user_role)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select r = any (coalesce(public.my_roles(), '{}'))
 $$;
 
 create or replace function public.is_admin()
 returns boolean
 language sql stable security definer set search_path = public
 as $$
-  select public.my_role() = 'admin'
+  select public.has_role('admin')
 $$;
 
-create or replace function public.is_staff() -- 老師或管理者
+create or replace function public.is_staff() -- 具老師或管理者標籤
 returns boolean
 language sql stable security definer set search_path = public
 as $$
-  select public.my_role() in ('admin', 'teacher')
+  select public.has_role('admin') or public.has_role('teacher')
 $$;
 
 create or replace function public.my_child_ids()
@@ -58,8 +65,8 @@ create policy "profiles_update_self" on profiles
   for update to authenticated
   using (id = auth.uid() or public.is_admin())
   with check (
-    -- 非管理者不得改自己的 role（防止自我提權）
-    public.is_admin() or (id = auth.uid() and role = (select p.role from profiles p where p.id = auth.uid()))
+    -- 非管理者不得改自己的 roles（防止自我提權）
+    public.is_admin() or (id = auth.uid() and roles = (select p.roles from profiles p where p.id = auth.uid()))
   );
 
 -- ---- children：老師/管理者可讀全部；家長只讀自己綁定的；管理者可寫 ----

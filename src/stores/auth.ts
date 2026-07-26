@@ -9,8 +9,14 @@ export const useAuthStore = defineStore('auth', () => {
   const profile = ref<Profile | null>(null)
   const ready = ref(false)
 
-  const role = computed<UserRole | null>(() => profile.value?.role ?? null)
+  const roles = computed<UserRole[]>(() => profile.value?.roles ?? [])
+  const isAdmin = computed(() => roles.value.includes('admin'))
   const isLoggedIn = computed(() => session.value !== null)
+
+  /** 是否具備某角色標籤；admin 依規格可使用全部功能 */
+  function can(role: UserRole): boolean {
+    return isAdmin.value || roles.value.includes(role)
+  }
 
   async function loadProfile() {
     if (!supabase || !session.value) return
@@ -54,5 +60,5 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
   }
 
-  return { session, profile, ready, role, isLoggedIn, init, signIn, signOut, loadProfile }
+  return { session, profile, ready, roles, isAdmin, can, isLoggedIn, init, signIn, signOut, loadProfile }
 })

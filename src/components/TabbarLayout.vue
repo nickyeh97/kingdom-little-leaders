@@ -9,12 +9,9 @@ const router = useRouter()
 
 const tabs = computed(() => {
   const items = [{ name: 'home', label: '首頁', icon: 'wap-home-o' }]
-  if (auth.role === 'parent' || auth.role === 'admin')
-    items.push({ name: 'attendance', label: '出席', icon: 'todo-list-o' })
-  if (auth.role === 'teacher' || auth.role === 'admin')
-    items.push({ name: 'checkin', label: '點名', icon: 'checked' })
-  if (auth.role === 'admin')
-    items.push({ name: 'members', label: '名單', icon: 'friends-o' })
+  if (auth.can('parent')) items.push({ name: 'attendance', label: '出席', icon: 'todo-list-o' })
+  if (auth.can('teacher')) items.push({ name: 'checkin', label: '點名', icon: 'checked' })
+  if (auth.isAdmin) items.push({ name: 'members', label: '名單', icon: 'friends-o' })
   items.push({ name: 'me', label: '我的', icon: 'user-o' })
   return items
 })

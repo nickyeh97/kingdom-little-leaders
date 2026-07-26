@@ -4,7 +4,8 @@ export type AttendanceStatus = 'attending' | 'leave' | 'undecided'
 export interface Profile {
   id: string
   display_name: string
-  role: UserRole
+  /** 角色標籤集合：可同時為 admin + teacher + parent */
+  roles: UserRole[]
   auth_provider: string
   phone: string | null
   created_at: string

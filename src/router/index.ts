@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import type { UserRole } from '../types'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -15,13 +16,13 @@ const router = createRouter({
           path: 'attendance',
           name: 'attendance',
           component: () => import('../views/AttendanceView.vue'),
-          meta: { roles: ['parent', 'admin'] },
+          meta: { roles: ['parent'] },
         },
         {
           path: 'checkin',
           name: 'checkin',
           component: () => import('../views/CheckInView.vue'),
-          meta: { roles: ['teacher', 'admin'] },
+          meta: { roles: ['teacher'] },
         },
         {
           path: 'members',
@@ -39,8 +40,9 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isLoggedIn) return { name: 'login' }
   if (to.name === 'login' && auth.isLoggedIn) return { name: 'home' }
-  const roles = to.meta.roles as string[] | undefined
-  if (roles && auth.role && !roles.includes(auth.role)) return { name: 'home' }
+  // 標籤式權限：具備任一所需角色標籤即可進入（admin 於 can() 內放行）
+  const required = to.meta.roles as UserRole[] | undefined
+  if (required && auth.profile && !required.some((r) => auth.can(r))) return { name: 'home' }
   return true
 })
 

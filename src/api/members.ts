@@ -8,7 +8,8 @@ export async function listProfiles(): Promise<Profile[]> {
   return data as Profile[]
 }
 
-export async function updateRole(profileId: string, role: UserRole): Promise<void> {
-  const { error } = await db().from('profiles').update({ role }).eq('id', profileId)
+/** 管理端：整組覆寫成員的角色標籤 */
+export async function updateRoles(profileId: string, roles: UserRole[]): Promise<void> {
+  const { error } = await db().from('profiles').update({ roles }).eq('id', profileId)
   if (error) throw error
 }

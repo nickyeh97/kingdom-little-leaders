@@ -17,7 +17,7 @@ const sunday = upcomingSunday()
 onMounted(async () => {
   try {
     announcements.value = await listAnnouncements()
-    if (auth.role === 'parent' && isPlanOpen(sunday)) {
+    if (auth.can('parent') && isPlanOpen(sunday)) {
       const [children, plans] = await Promise.all([listMyChildren(), listPlans(sunday)])
       const planned = new Set(plans.map((p) => p.child_id))
       needPlan.value = children.some((c) => !planned.has(c.id))
@@ -41,9 +41,11 @@ function fmtDate(iso: string) {
         <h2>平安，{{ auth.profile?.display_name ?? '' }} 👋</h2>
         <p class="hint">{{ new Date().toLocaleDateString('zh-TW') }}</p>
       </div>
-      <van-tag round type="primary" size="medium">
-        {{ auth.role === 'admin' ? '管理者' : auth.role === 'teacher' ? '老師' : '家長' }}
-      </van-tag>
+      <div class="role-tags">
+        <van-tag v-for="r in auth.roles" :key="r" round type="primary" size="medium">
+          {{ r === 'admin' ? '管理者' : r === 'teacher' ? '老師' : '家長' }}
+        </van-tag>
+      </div>
     </header>
 
     <van-notice-bar
@@ -81,6 +83,10 @@ function fmtDate(iso: string) {
 .top h2 {
   margin: 0;
   font-size: 18px;
+}
+.role-tags {
+  display: flex;
+  gap: 6px;
 }
 .ann-head {
   display: flex;
