@@ -2,11 +2,18 @@
 import { computed, onMounted, ref } from 'vue'
 import { showFailToast, showSuccessToast } from 'vant'
 import { listMyChildren, listPlans, upsertPlans } from '../api/attendance'
-import { formatSunday, isPlanOpen, planDeadline, upcomingSunday } from '../lib/sunday'
+import {
+  formatGathering,
+  isPlanOpen,
+  planDeadline,
+  upcomingGathering,
+  weekdayName,
+} from '../lib/gathering'
 import type { AttendanceStatus, Child } from '../types'
 
-const sunday = upcomingSunday()
-const open = isPlanOpen(sunday)
+const gathering = upcomingGathering()
+const open = isPlanOpen(gathering)
+const deadline = planDeadline(gathering)
 
 const children = ref<Child[]>([])
 const statusMap = ref<Record<string, AttendanceStatus>>({})
@@ -26,7 +33,7 @@ const attendingCount = computed(
 
 onMounted(async () => {
   try {
-    const [kids, plans] = await Promise.all([listMyChildren(), listPlans(sunday)])
+    const [kids, plans] = await Promise.all([listMyChildren(), listPlans(gathering)])
     children.value = kids
     const byChild = new Map(plans.map((p) => [p.child_id, p]))
     for (const kid of kids) {
@@ -44,7 +51,7 @@ async function submit() {
   saving.value = true
   try {
     await upsertPlans(
-      sunday,
+      gathering,
       children.value.map((c) => ({
         child_id: c.id,
         status: statusMap.value[c.id],
@@ -64,8 +71,8 @@ async function submit() {
   <div class="page">
     <h2>本週出席勾選</h2>
     <p class="hint">
-      {{ formatSunday(sunday) }} ·
-      {{ open ? `${planDeadline(sunday).toLocaleDateString('zh-TW')}（週三）23:59 前可修改` : '本週已截止，如有變動請聯繫窗口' }}
+      {{ formatGathering(gathering) }} ·
+      {{ open ? `${deadline.toLocaleDateString('zh-TW')}（${weekdayName(deadline)}）23:59 前可修改` : '本週已截止，如有變動請聯繫窗口' }}
     </p>
 
     <van-skeleton v-if="loading" title :row="4" />

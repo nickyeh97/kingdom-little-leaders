@@ -12,10 +12,10 @@ import {
   upsertFeedback,
 } from '../api/checkin'
 import { MOOD_OPTIONS, moodKey } from '../lib/moods'
-import { formatSunday, upcomingSunday } from '../lib/sunday'
+import { formatGathering, upcomingGathering } from '../lib/gathering'
 import type { AttendancePlan, CheckIn, CheckInStatus, Child, ClassGroup } from '../types'
 
-const sunday = upcomingSunday()
+const gathering = upcomingGathering()
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
 const children = ref<Child[]>([])
@@ -47,9 +47,9 @@ async function loadClass() {
   try {
     const [kids, plans, checks, feedback] = await Promise.all([
       listClassChildren(activeGroup.value),
-      listPlans(sunday),
-      listCheckIns(sunday),
-      listFeedback(sunday),
+      listPlans(gathering),
+      listCheckIns(gathering),
+      listFeedback(gathering),
     ])
     children.value = kids
     planMap.value = new Map(plans.map((p) => [p.child_id, p]))
@@ -83,14 +83,14 @@ async function setStatus(child: Child, target: CheckInStatus) {
   const current = checkMap.value.get(child.id)
   try {
     if (current?.status === target) {
-      await removeCheckIn(child.id, sunday)
+      await removeCheckIn(child.id, gathering)
       const next = new Map(checkMap.value)
       next.delete(child.id)
       checkMap.value = next
     } else {
       const entry = {
         child_id: child.id,
-        sunday_date: sunday,
+        gathering_date: gathering,
         status: target,
         note: current?.note ?? null,
         is_walk_in: isWalkIn(child.id),
@@ -128,7 +128,7 @@ async function saveDetail() {
   if (!child) return
   savingDetail.value = true
   try {
-    await upsertFeedback(child.id, sunday, draftMoods.value)
+    await upsertFeedback(child.id, gathering, draftMoods.value)
     const nextMoods = new Map(moodsMap.value)
     nextMoods.set(child.id, [...draftMoods.value])
     moodsMap.value = nextMoods
@@ -138,7 +138,7 @@ async function saveDetail() {
     // 備註跟著當日紀錄走：尚未簽到/請假時，先以「出席」建立紀錄
     const entry = {
       child_id: child.id,
-      sunday_date: sunday,
+      gathering_date: gathering,
       status: current?.status ?? 'present',
       note,
       is_walk_in: current?.is_walk_in ?? isWalkIn(child.id),
@@ -162,7 +162,7 @@ async function saveDetail() {
   <div class="page">
     <header class="top">
       <h2>主日點名</h2>
-      <span class="hint">{{ formatSunday(sunday) }}</span>
+      <span class="hint">{{ formatGathering(gathering) }}</span>
     </header>
 
     <van-tabs v-model:active="activeGroup" type="card" class="tabs">

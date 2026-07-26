@@ -46,31 +46,31 @@ create table family_links (
   primary key (parent_id, child_id)
 );
 
--- 預先出席（每孩每主日一筆；note = 家長給老師的話）
+-- 預先出席（每孩每聚會日一筆；note = 家長給老師的話）
 create table attendance_plans (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references children (id) on delete cascade,
-  sunday_date date not null,
+  gathering_date date not null,
   status attendance_status not null default 'undecided',
   note text,
   updated_by uuid not null default auth.uid() references profiles (id),
   updated_at timestamptz not null default now(),
-  unique (child_id, sunday_date)
+  unique (child_id, gathering_date)
 );
 
--- 當日紀錄（每孩每主日一筆）：簽到/臨時請假＋課堂紀錄
+-- 當日紀錄（每孩每聚會日一筆）：簽到/臨時請假＋課堂紀錄
 -- note（課堂紀錄）為高敏感內容：僅老師可見、不對家長端顯示，
 -- 定位是老師間的關懷交接，不是行為評語簿（守則紅燈 #7）
 create table check_ins (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references children (id) on delete cascade,
-  sunday_date date not null,
+  gathering_date date not null,
   status checkin_status not null default 'present',
   note text,
   is_walk_in boolean not null default false,
   checked_by uuid not null default auth.uid() references profiles (id),
   created_at timestamptz not null default now(),
-  unique (child_id, sunday_date)
+  unique (child_id, gathering_date)
 );
 
 -- 課堂表現回饋：老師以「表情」向家長說明課堂情況（取代成績）
@@ -78,11 +78,11 @@ create table check_ins (
 create table session_feedback (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references children (id) on delete cascade,
-  sunday_date date not null,
+  gathering_date date not null,
   moods text[] not null default '{}',
   created_by uuid not null default auth.uid() references profiles (id),
   updated_at timestamptz not null default now(),
-  unique (child_id, sunday_date)
+  unique (child_id, gathering_date)
 );
 
 -- 公告（所有登入者可讀）
@@ -96,8 +96,8 @@ create table announcements (
   created_at timestamptz not null default now()
 );
 
-create index idx_plans_sunday on attendance_plans (sunday_date);
-create index idx_checkins_sunday on check_ins (sunday_date);
+create index idx_plans_gathering on attendance_plans (gathering_date);
+create index idx_checkins_gathering on check_ins (gathering_date);
 create index idx_children_class on children (class_group_id);
 
 -- 預先出席更新時自動刷新 updated_at / updated_by（upsert 的 update 分支不會套用 default）

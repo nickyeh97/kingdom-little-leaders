@@ -4,7 +4,13 @@ import { showFailToast } from 'vant'
 import { listAnnouncements } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
 import { listFeedback } from '../api/checkin'
-import { lastSunday, upcomingSunday, isPlanOpen } from '../lib/sunday'
+import {
+  lastGathering,
+  planDeadline,
+  upcomingGathering,
+  isPlanOpen,
+  weekdayName,
+} from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
 import type { Announcement, Child } from '../types'
 
@@ -15,7 +21,8 @@ const loading = ref(true)
 const needPlan = ref(false)
 /** 家長：上週各孩子的課堂表情回饋 */
 const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
-const sunday = upcomingSunday()
+const gathering = upcomingGathering()
+const deadline = planDeadline(gathering)
 
 onMounted(async () => {
   try {
@@ -23,10 +30,10 @@ onMounted(async () => {
     if (auth.can('parent')) {
       const [children, plans, feedback] = await Promise.all([
         listMyChildren(),
-        listPlans(sunday),
-        listFeedback(lastSunday()),
+        listPlans(gathering),
+        listFeedback(lastGathering()),
       ])
-      if (isPlanOpen(sunday)) {
+      if (isPlanOpen(gathering)) {
         const planned = new Set(plans.map((p) => p.child_id))
         needPlan.value = children.some((c) => !planned.has(c.id))
       }
@@ -65,7 +72,7 @@ function fmtDate(iso: string) {
       v-if="needPlan"
       left-icon="todo-list-o"
       mode="link"
-      text="本週出席還沒填喔——週三 23:59 前完成勾選"
+      :text="`本週出席還沒填喔——${weekdayName(deadline)} 23:59 前完成勾選`"
       @click="$router.push({ name: 'attendance' })"
     />
 

@@ -28,7 +28,7 @@ export interface Child {
 export interface AttendancePlan {
   id: string
   child_id: string
-  sunday_date: string
+  gathering_date: string
   status: AttendanceStatus
   /** 家長給老師的話（選填） */
   note: string | null
@@ -41,7 +41,7 @@ export type CheckInStatus = 'present' | 'leave'
 export interface CheckIn {
   id: string
   child_id: string
-  sunday_date: string
+  gathering_date: string
   status: CheckInStatus
   /** 老師交接備註：僅老師可見，不對家長端顯示 */
   note: string | null
@@ -53,7 +53,7 @@ export interface CheckIn {
 export interface SessionFeedback {
   id: string
   child_id: string
-  sunday_date: string
+  gathering_date: string
   moods: string[]
   created_by: string
 }
