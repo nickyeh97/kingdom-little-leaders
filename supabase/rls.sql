@@ -96,13 +96,26 @@ create policy "plans_update" on attendance_plans
 create policy "plans_delete" on attendance_plans
   for delete to authenticated using (public.is_admin());
 
--- ---- check_ins：僅老師/管理者（簽到是現場行政行為）----
+-- ---- check_ins：僅「老師標籤」（逐標籤授權：admin 需另具老師標籤才可點名；
+--      課堂紀錄不對家長開放）----
 create policy "check_ins_read" on check_ins
-  for select to authenticated using (public.is_staff());
+  for select to authenticated using (public.has_role('teacher'));
 create policy "check_ins_insert" on check_ins
-  for insert to authenticated with check (public.is_staff());
+  for insert to authenticated with check (public.has_role('teacher'));
+create policy "check_ins_update" on check_ins
+  for update to authenticated
+  using (public.has_role('teacher')) with check (public.has_role('teacher'));
 create policy "check_ins_delete" on check_ins
-  for delete to authenticated using (public.is_staff());
+  for delete to authenticated using (public.has_role('teacher'));
+
+-- ---- session_feedback：老師可寫；家長僅能讀自己孩子的回饋 ----
+alter table session_feedback enable row level security;
+create policy "feedback_read" on session_feedback
+  for select to authenticated
+  using (public.has_role('teacher') or child_id in (select public.my_child_ids()));
+create policy "feedback_write" on session_feedback
+  for all to authenticated
+  using (public.has_role('teacher')) with check (public.has_role('teacher'));
 
 -- ---- announcements：所有登入者可讀；管理者可寫 ----
 create policy "announcements_read" on announcements

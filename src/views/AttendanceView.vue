@@ -10,6 +10,7 @@ const open = isPlanOpen(sunday)
 
 const children = ref<Child[]>([])
 const statusMap = ref<Record<string, AttendanceStatus>>({})
+const noteMap = ref<Record<string, string>>({})
 const loading = ref(true)
 const saving = ref(false)
 
@@ -27,8 +28,11 @@ onMounted(async () => {
   try {
     const [kids, plans] = await Promise.all([listMyChildren(), listPlans(sunday)])
     children.value = kids
-    const byChild = new Map(plans.map((p) => [p.child_id, p.status]))
-    for (const kid of kids) statusMap.value[kid.id] = byChild.get(kid.id) ?? 'undecided'
+    const byChild = new Map(plans.map((p) => [p.child_id, p]))
+    for (const kid of kids) {
+      statusMap.value[kid.id] = byChild.get(kid.id)?.status ?? 'undecided'
+      noteMap.value[kid.id] = byChild.get(kid.id)?.note ?? ''
+    }
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -41,7 +45,11 @@ async function submit() {
   try {
     await upsertPlans(
       sunday,
-      children.value.map((c) => ({ child_id: c.id, status: statusMap.value[c.id] })),
+      children.value.map((c) => ({
+        child_id: c.id,
+        status: statusMap.value[c.id],
+        note: noteMap.value[c.id]?.trim() || null,
+      })),
     )
     showSuccessToast('已送出，感謝配合！')
   } catch (e) {
@@ -79,6 +87,16 @@ async function submit() {
             {{ o.label }}
           </van-button>
         </div>
+        <van-field
+          v-model="noteMap[c.id]"
+          class="note"
+          type="textarea"
+          rows="1"
+          autosize
+          maxlength="200"
+          placeholder="給老師的話（選填），例：這週會晚 15 分鐘到"
+          :disabled="!open"
+        />
       </div>
 
       <div v-if="children.length === 0" class="card hint">
@@ -117,5 +135,11 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
+}
+.note {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--kll-bg);
+  border-radius: 10px;
 }
 </style>

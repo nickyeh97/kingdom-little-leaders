@@ -21,12 +21,12 @@ export async function listPlans(sundayDate: string): Promise<AttendancePlan[]> {
   return data as AttendancePlan[]
 }
 
-/** 家長送出：一次 upsert 多個孩子的狀態 */
+/** 家長送出：一次 upsert 多個孩子的狀態＋給老師的話 */
 export async function upsertPlans(
   sundayDate: string,
-  statuses: { child_id: string; status: AttendanceStatus }[],
+  entries: { child_id: string; status: AttendanceStatus; note: string | null }[],
 ): Promise<void> {
-  const rows = statuses.map((s) => ({ ...s, sunday_date: sundayDate }))
+  const rows = entries.map((e) => ({ ...e, sunday_date: sundayDate }))
   const { error } = await db()
     .from('attendance_plans')
     .upsert(rows, { onConflict: 'child_id,sunday_date' })

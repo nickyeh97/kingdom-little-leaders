@@ -3,24 +3,37 @@ import { onMounted, ref } from 'vue'
 import { showFailToast } from 'vant'
 import { listAnnouncements } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
-import { upcomingSunday, isPlanOpen } from '../lib/sunday'
+import { listFeedback } from '../api/checkin'
+import { lastSunday, upcomingSunday, isPlanOpen } from '../lib/sunday'
 import { useAuthStore } from '../stores/auth'
-import type { Announcement } from '../types'
+import type { Announcement, Child } from '../types'
 
 const auth = useAuthStore()
 const announcements = ref<Announcement[]>([])
 const loading = ref(true)
 /** 家長：本週還有孩子未填預先出席 */
 const needPlan = ref(false)
+/** 家長：上週各孩子的課堂表情回饋 */
+const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 const sunday = upcomingSunday()
 
 onMounted(async () => {
   try {
     announcements.value = await listAnnouncements()
-    if (auth.can('parent') && isPlanOpen(sunday)) {
-      const [children, plans] = await Promise.all([listMyChildren(), listPlans(sunday)])
-      const planned = new Set(plans.map((p) => p.child_id))
-      needPlan.value = children.some((c) => !planned.has(c.id))
+    if (auth.can('parent')) {
+      const [children, plans, feedback] = await Promise.all([
+        listMyChildren(),
+        listPlans(sunday),
+        listFeedback(lastSunday()),
+      ])
+      if (isPlanOpen(sunday)) {
+        const planned = new Set(plans.map((p) => p.child_id))
+        needPlan.value = children.some((c) => !planned.has(c.id))
+      }
+      const byChild = new Map(feedback.map((f) => [f.child_id, f.moods]))
+      lastFeedback.value = children
+        .filter((c) => (byChild.get(c.id) ?? []).length > 0)
+        .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
     }
   } catch (e) {
     showFailToast((e as Error).message)
@@ -56,6 +69,18 @@ function fmtDate(iso: string) {
       @click="$router.push({ name: 'attendance' })"
     />
 
+    <template v-if="lastFeedback.length > 0">
+      <h3 class="section-title">上週課堂回饋</h3>
+      <div v-for="f in lastFeedback" :key="f.child.id" class="card">
+        <strong>{{ f.child.name }}</strong>
+        <div class="mood-tags">
+          <van-tag v-for="m in f.moods" :key="m" round type="primary" plain size="medium">
+            {{ m }}
+          </van-tag>
+        </div>
+      </div>
+    </template>
+
     <h3 class="section-title">兒主公告</h3>
     <van-skeleton v-if="loading" title :row="3" />
     <template v-else>
@@ -87,6 +112,12 @@ function fmtDate(iso: string) {
 .role-tags {
   display: flex;
   gap: 6px;
+}
+.mood-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
 }
 .ann-head {
   display: flex;

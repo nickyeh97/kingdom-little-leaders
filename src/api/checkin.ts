@@ -1,5 +1,5 @@
 import { db } from '../lib/supabase'
-import type { CheckIn, Child, ClassGroup } from '../types'
+import type { CheckIn, CheckInStatus, Child, ClassGroup, SessionFeedback } from '../types'
 
 export async function listClassGroups(): Promise<ClassGroup[]> {
   const { data, error } = await db().from('class_groups').select('*').order('sort_order')
@@ -27,18 +27,51 @@ export async function listCheckIns(sundayDate: string): Promise<CheckIn[]> {
   return data as CheckIn[]
 }
 
-export async function checkIn(childId: string, sundayDate: string, isWalkIn: boolean): Promise<void> {
+/** 建立/更新當日紀錄（簽到、臨時請假、老師交接備註） */
+export async function upsertCheckIn(entry: {
+  child_id: string
+  sunday_date: string
+  status: CheckInStatus
+  note: string | null
+  is_walk_in: boolean
+}): Promise<void> {
   const { error } = await db()
     .from('check_ins')
-    .insert({ child_id: childId, sunday_date: sundayDate, is_walk_in: isWalkIn })
+    .upsert(entry, { onConflict: 'child_id,sunday_date' })
   if (error) throw error
 }
 
-export async function undoCheckIn(childId: string, sundayDate: string): Promise<void> {
+/** 移除當日紀錄（回到「未處理」） */
+export async function removeCheckIn(childId: string, sundayDate: string): Promise<void> {
   const { error } = await db()
     .from('check_ins')
     .delete()
     .eq('child_id', childId)
     .eq('sunday_date', sundayDate)
+  if (error) throw error
+}
+
+// ---- 課堂表現回饋（表情，家長可見自己孩子的） ----
+
+export async function listFeedback(sundayDate: string): Promise<SessionFeedback[]> {
+  const { data, error } = await db()
+    .from('session_feedback')
+    .select('*')
+    .eq('sunday_date', sundayDate)
+  if (error) throw error
+  return data as SessionFeedback[]
+}
+
+export async function upsertFeedback(
+  childId: string,
+  sundayDate: string,
+  moods: string[],
+): Promise<void> {
+  const { error } = await db()
+    .from('session_feedback')
+    .upsert(
+      { child_id: childId, sunday_date: sundayDate, moods },
+      { onConflict: 'child_id,sunday_date' },
+    )
   if (error) throw error
 }

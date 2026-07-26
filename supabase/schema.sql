@@ -8,6 +8,7 @@
 
 create type user_role as enum ('admin', 'teacher', 'parent');
 create type attendance_status as enum ('attending', 'leave', 'undecided');
+create type checkin_status as enum ('present', 'leave'); -- 當日簽到/臨時請假
 
 -- 班別（兒童/幼童/幼幼）
 create table class_groups (
@@ -45,25 +46,42 @@ create table family_links (
   primary key (parent_id, child_id)
 );
 
--- 預先出席（每孩每主日一筆）
+-- 預先出席（每孩每主日一筆；note = 家長給老師的話）
 create table attendance_plans (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references children (id) on delete cascade,
   sunday_date date not null,
   status attendance_status not null default 'undecided',
+  note text,
   updated_by uuid not null default auth.uid() references profiles (id),
   updated_at timestamptz not null default now(),
   unique (child_id, sunday_date)
 );
 
--- 現場簽到（每孩每主日一筆；is_walk_in = 未預先報名的現場加入）
+-- 當日紀錄（每孩每主日一筆）：簽到/臨時請假＋課堂紀錄
+-- note（課堂紀錄）為高敏感內容：僅老師可見、不對家長端顯示，
+-- 定位是老師間的關懷交接，不是行為評語簿（守則紅燈 #7）
 create table check_ins (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references children (id) on delete cascade,
   sunday_date date not null,
+  status checkin_status not null default 'present',
+  note text,
   is_walk_in boolean not null default false,
   checked_by uuid not null default auth.uid() references profiles (id),
   created_at timestamptz not null default now(),
+  unique (child_id, sunday_date)
+);
+
+-- 課堂表現回饋：老師以「表情」向家長說明課堂情況（取代成績）
+-- 家長僅能看到自己孩子的回饋（RLS）；表情選項於前端維護（正向/關懷取向）
+create table session_feedback (
+  id uuid primary key default gen_random_uuid(),
+  child_id uuid not null references children (id) on delete cascade,
+  sunday_date date not null,
+  moods text[] not null default '{}',
+  created_by uuid not null default auth.uid() references profiles (id),
+  updated_at timestamptz not null default now(),
   unique (child_id, sunday_date)
 );
 

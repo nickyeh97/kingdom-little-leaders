@@ -14,6 +14,13 @@ export function upcomingSunday(from = new Date()): string {
   return toDateString(d)
 }
 
+/** 上一個主日（若今天是週日，回傳今天）— 供家長端查看課堂回饋 */
+export function lastSunday(from = new Date()): string {
+  const d = new Date(from)
+  d.setDate(d.getDate() - d.getDay())
+  return toDateString(d)
+}
+
 /** 該主日的填寫截止時間：主日前的週三 23:59:59 */
 export function planDeadline(sundayDate: string): Date {
   const d = new Date(`${sundayDate}T23:59:59`)

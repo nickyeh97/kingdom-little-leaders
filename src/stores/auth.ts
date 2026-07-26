@@ -13,9 +13,9 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => roles.value.includes('admin'))
   const isLoggedIn = computed(() => session.value !== null)
 
-  /** 是否具備某角色標籤；admin 依規格可使用全部功能 */
+  /** 是否具備某角色標籤（嚴格逐標籤授權：admin 不自動涵蓋其他角色功能） */
   function can(role: UserRole): boolean {
-    return isAdmin.value || roles.value.includes(role)
+    return roles.value.includes(role)
   }
 
   async function loadProfile() {
