@@ -7,7 +7,7 @@
 /** 聚會日（0=週日、1=週一 ⋯ 6=週六）。目前：週六 */
 export const GATHERING_WEEKDAY = 6
 
-/** 預先出席截止：聚會日前 N 天的 23:59:59。目前：前 3 天（週六聚會 → 週三截止） */
-export const PLAN_DEADLINE_DAYS_BEFORE = 3
+/** 預先出席截止：聚會日前 N 天的 23:59:59。目前：前 1 天（週六聚會 → 週五截止） */
+export const PLAN_DEADLINE_DAYS_BEFORE = 1
 
 export const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'] as const
