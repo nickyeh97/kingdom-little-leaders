@@ -7,7 +7,11 @@ const auth = useAuthStore()
 const router = useRouter()
 
 async function logout() {
-  await showConfirmDialog({ title: '登出', message: '確定要登出嗎？' })
+  try {
+    await showConfirmDialog({ title: '登出', message: '確定要登出嗎？' })
+  } catch {
+    return // 使用者按取消
+  }
   await auth.signOut()
   router.replace({ name: 'login' })
 }
