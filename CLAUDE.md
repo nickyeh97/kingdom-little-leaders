@@ -107,6 +107,7 @@ docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md    # 需求規格書（需求基準）
 
 ## 工作流程慣例
 
+- **測試**：框架為 Vitest；測試檔放在 `src/**/__tests__/*.test.ts`。新增或修改功能時**必須**同步新增/更新單元與邊際測試（日期邏輯、權限判斷尤其必要），送 PR 前跑 `npm test` 與 `npm run build` 確認全綠；CI 會於 push/PR 自動執行。
 - **分支**：功能開發在 `claude/*` 或 feature 分支進行，不直接 push `main`。
 - **Commit**：訊息以繁體中文為主，清楚描述「做了什麼、為什麼」。
 - **機密**：`.env`、`*.secret` 一律 gitignore；任何金鑰、Supabase service key、Webhook、兒童個資都不得進版控。

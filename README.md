@@ -9,7 +9,19 @@ npm install
 cp .env.example .env.local   # 填入 Supabase 專案的 URL 與 anon key
 npm run dev                  # 開發伺服器 http://localhost:5173
 npm run build                # 型別檢查 + production build（含 PWA）
+npm test                     # 單元與邊際測試（Vitest）
+npm run test:watch           # 開發時監看模式
 ```
+
+### 測試
+
+- 框架：Vitest ＋ Vue Test Utils（元件）＋ jsdom
+- 測試位置：`src/**/__tests__/*.test.ts`，與被測程式碼相鄰
+- 涵蓋重點：主日/截止日日期邏輯（含跨月、跨年、截止瞬間等邊際）、
+  標籤式權限（`can()` 嚴格逐標籤）、路由守衛、Tabbar 角色顯示、表情選項守則檢核
+- CI：push / PR 會自動執行 build 與測試（`.github/workflows/ci.yml`）
+- 慣例：**新增功能時一併新增對應測試**；資料層權限以 Supabase RLS 為準，
+  端對端流程測試（Playwright）待功能穩定後導入
 
 ### 後端初始化（一次性）
 

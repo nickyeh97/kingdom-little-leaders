@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -24,5 +25,10 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+  },
+  test: {
+    // 預設 node 環境（純邏輯測試）；元件/路由測試於檔頭以
+    // `// @vitest-environment jsdom` 個別切換
+    environment: 'node',
   },
 })
