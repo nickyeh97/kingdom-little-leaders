@@ -162,8 +162,8 @@ create trigger on_attendance_plan_update
   before update on attendance_plans
   for each row execute function public.touch_attendance_plan();
 
--- 新使用者註冊時自動建立 profile
--- display_name 取自邀請時的 user_metadata，否則以 email 前綴代替
+-- 新使用者註冊時自動建立 profile（預設角色：家長）
+-- display_name 優先序：註冊表單 display_name → Google 的 full_name/name → email 前綴
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -173,7 +173,12 @@ begin
   insert into public.profiles (id, display_name, auth_provider)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1)),
+    coalesce(
+      new.raw_user_meta_data ->> 'display_name',
+      new.raw_user_meta_data ->> 'full_name',
+      new.raw_user_meta_data ->> 'name',
+      split_part(new.email, '@', 1)
+    ),
     coalesce(new.raw_app_meta_data ->> 'provider', 'email')
   );
   return new;

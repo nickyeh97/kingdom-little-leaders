@@ -36,6 +36,20 @@ npm run test:watch           # 開發時監看模式
 
 之後每次 push `main`，Vercel 會自動重新部署；PR 也會有預覽網址。
 
+### Google 登入設定（一次性，約 10 分鐘）
+
+1. 到 [console.cloud.google.com](https://console.cloud.google.com) 建立專案（名稱隨意，如 `kingdom-little-leaders`）。
+2. **APIs & Services → OAuth consent screen**：User Type 選 External，填 App 名稱與聯絡信箱即可（不需額外 scope）。
+3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**：
+   - Application type：**Web application**
+   - Authorized JavaScript origins：`https://kingdom-little-leaders.vercel.app` 與 `http://localhost:5173`
+   - Authorized redirect URIs：`https://bazvzaqetvjpnanabkox.supabase.co/auth/v1/callback`
+4. 複製產生的 **Client ID** 與 **Client Secret**。
+5. Supabase → **Authentication → Sign In / Providers → Google**：啟用並貼上 Client ID / Secret。
+6. Supabase → **Authentication → URL Configuration**：Site URL 為正式網址；**Redirect URLs** 加入 `http://localhost:5173`（本機開發用）。
+
+完成後登入頁的「使用 Google 登入」即可運作；Google 首次登入視同註冊，預設為家長身分。
+
 ### 後端初始化（一次性）
 
 1. 到 [supabase.com](https://supabase.com) 建立免費專案（區域選 Tokyo 較近）。

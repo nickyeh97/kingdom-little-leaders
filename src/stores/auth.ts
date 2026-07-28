@@ -39,7 +39,13 @@ export const useAuthStore = defineStore('auth', () => {
     if (session.value) await loadProfile()
     supabase.auth.onAuthStateChange((_event, newSession) => {
       session.value = newSession
-      if (!newSession) profile.value = null
+      if (!newSession) {
+        profile.value = null
+      } else if (!profile.value) {
+        // OAuth 轉址回來的登入在 init 之後才觸發，需在此補載 profile
+        // （setTimeout 避開 supabase-js 在 callback 內 await 的死鎖問題）
+        setTimeout(() => void loadProfile(), 0)
+      }
     })
     ready.value = true
   }
@@ -53,6 +59,31 @@ export const useAuthStore = defineStore('auth', () => {
     await loadProfile()
   }
 
+  /** Email 註冊；display_name 由資料庫觸發器寫入 profiles（預設角色：家長） */
+  async function signUp(displayName: string, email: string, password: string) {
+    if (!supabase) throw new Error('Supabase 尚未設定')
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: displayName } },
+    })
+    if (error) throw error
+    // 若專案關閉「Confirm email」會直接取得 session；否則需收確認信
+    session.value = data.session
+    if (data.session) await loadProfile()
+    return data.session !== null
+  }
+
+  /** Google 登入/註冊（轉址流程；回來後由 onAuthStateChange 接手） */
+  async function signInWithGoogle() {
+    if (!supabase) throw new Error('Supabase 尚未設定')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
+    if (error) throw error
+  }
+
   async function signOut() {
     if (!supabase) return
     await supabase.auth.signOut()
@@ -60,5 +91,19 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
   }
 
-  return { session, profile, ready, roles, isAdmin, can, isLoggedIn, init, signIn, signOut, loadProfile }
+  return {
+    session,
+    profile,
+    ready,
+    roles,
+    isAdmin,
+    can,
+    isLoggedIn,
+    init,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signOut,
+    loadProfile,
+  }
 })
