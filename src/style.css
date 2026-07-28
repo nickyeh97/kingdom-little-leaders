@@ -1,0 +1,51 @@
+:root {
+  /* 對齊 Figma 初稿的色票 */
+  --kll-primary: #1f8a70;
+  --kll-primary-dark: #176b57;
+  --kll-primary-soft: #e0f1ec;
+  --kll-bg: #f6f8f7;
+  --kll-text: #1f2933;
+  --kll-sub: #6b7280;
+  --kll-amber: #f5a623;
+  --kll-amber-soft: #fef1d9;
+
+  /* 覆寫 Vant 主題色 */
+  --van-primary-color: var(--kll-primary);
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--kll-bg);
+  color: var(--kll-text);
+  font-family:
+    'Noto Sans TC',
+    -apple-system,
+    'PingFang TC',
+    'Microsoft JhengHei',
+    sans-serif;
+}
+
+.page {
+  padding: 16px 16px 76px; /* 底部留 tabbar 空間 */
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 16px 0 10px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--kll-sub);
+}
