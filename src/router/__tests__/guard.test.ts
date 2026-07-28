@@ -71,9 +71,15 @@ describe('路由守衛：登入與標籤式授權', () => {
     expect(router.currentRoute.value.name).toBe('home')
   })
 
+  it('詩歌頁：任何已登入角色皆可進入', async () => {
+    loginAs(['parent'])
+    await router.push({ name: 'songs' })
+    expect(router.currentRoute.value.name).toBe('songs')
+  })
+
   it('組長情境：三標籤齊全可進所有頁面', async () => {
     loginAs(['admin', 'teacher', 'parent'])
-    for (const name of ['attendance', 'checkin', 'members', 'me'] as const) {
+    for (const name of ['attendance', 'checkin', 'songs', 'members', 'me'] as const) {
       await router.push({ name })
       expect(router.currentRoute.value.name).toBe(name)
     }

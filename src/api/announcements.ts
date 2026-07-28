@@ -11,12 +11,24 @@ export async function listAnnouncements(): Promise<Announcement[]> {
   return data as Announcement[]
 }
 
-export async function createAnnouncement(input: {
+export interface AnnouncementInput {
   title: string
   body: string
   tag: string
   pinned: boolean
-}): Promise<void> {
+}
+
+export async function createAnnouncement(input: AnnouncementInput): Promise<void> {
   const { error } = await db().from('announcements').insert(input)
+  if (error) throw error
+}
+
+export async function updateAnnouncement(id: string, patch: AnnouncementInput): Promise<void> {
+  const { error } = await db().from('announcements').update(patch).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteAnnouncement(id: string): Promise<void> {
+  const { error } = await db().from('announcements').delete().eq('id', id)
   if (error) throw error
 }

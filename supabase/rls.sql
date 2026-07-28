@@ -131,6 +131,14 @@ create policy "session_logs_write" on session_logs
   for all to authenticated
   using (public.has_role('teacher')) with check (public.has_role('teacher'));
 
+-- ---- songs：所有登入者可讀（家長預習/老師預備）；管理者可寫 ----
+alter table songs enable row level security;
+create policy "songs_read" on songs
+  for select to authenticated using (true);
+create policy "songs_write" on songs
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
 -- ---- announcements：所有登入者可讀；管理者可寫 ----
 create policy "announcements_read" on announcements
   for select to authenticated using (true);
