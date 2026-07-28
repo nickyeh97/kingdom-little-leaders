@@ -85,6 +85,38 @@ create table session_feedback (
   unique (child_id, gathering_date)
 );
 
+-- 課堂紀錄（每班每聚會日一筆）：日期、老師、教學內容、詩歌進度、課後反饋
+-- teacher_name 為填寫當下快照（供匯出顯示，避免老師互查 profiles 的權限問題）
+create table session_logs (
+  id uuid primary key default gen_random_uuid(),
+  class_group_id uuid not null references class_groups (id),
+  gathering_date date not null,
+  teacher_id uuid not null default auth.uid() references profiles (id),
+  teacher_name text not null default '',
+  content text not null default '',        -- 教學內容
+  song_progress text not null default '',  -- 詩歌進度
+  feedback text not null default '',       -- 課後反饋（給下一堂的老師）
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (class_group_id, gathering_date)
+);
+
+create index idx_session_logs_date on session_logs (gathering_date);
+
+create or replace function public.touch_session_log()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger on_session_log_update
+  before update on session_logs
+  for each row execute function public.touch_session_log();
+
 -- 公告（所有登入者可讀）
 create table announcements (
   id uuid primary key default gen_random_uuid(),

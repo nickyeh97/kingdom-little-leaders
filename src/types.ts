@@ -58,6 +58,19 @@ export interface SessionFeedback {
   created_by: string
 }
 
+/** 課堂紀錄：每班每聚會日一筆（日期、老師、教學內容、詩歌進度、課後反饋） */
+export interface SessionLog {
+  id: string
+  class_group_id: string
+  gathering_date: string
+  teacher_id: string
+  teacher_name: string
+  content: string
+  song_progress: string
+  feedback: string
+  updated_at: string
+}
+
 export interface Announcement {
   id: string
   title: string

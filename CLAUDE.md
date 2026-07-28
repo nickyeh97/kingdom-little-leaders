@@ -98,7 +98,9 @@
 
 ## 核心資料實體（建模時參考）
 
-`User`（含角色、`auth_provider`、聯絡欄位最小化）、`Child`（含班別、階級）、`Family`（家長-孩子關聯）、`ClassGroup`（班別：兒童/幼童/幼幼）、`TeacherAssignment`（老師-班別關聯）、`AttendancePlan`（預先出席）、`CheckIn`（現場簽到）、`Lesson`（每週教材/討論問題/帶領提示/教案連結）、`Song`／`Playlist`（敬拜歌單）、`SongFamiliarity`（班級 × 詩歌熟悉指數）、`ServiceSignup`（服事報名）、`ServiceRecord`（服事經歷＋狀態）、`TeacherSchedule`（老師服事排班）、`MeetingNote`（開會決議，可分班別）、`ClassSessionNote`（當週課後特別狀況紀錄，高敏感）、`Announcement`／`Reply`（公告與回覆）。
+`User`（含角色、`auth_provider`、聯絡欄位最小化）、`Child`（含班別、階級）、`Family`（家長-孩子關聯）、`ClassGroup`（班別：兒童/幼童/幼幼）、`TeacherAssignment`（老師-班別關聯）、`AttendancePlan`（預先出席＋家長給老師的話）、`CheckIn`（當日紀錄：簽到/臨時請假＋老師交接備註）、`SessionFeedback`（課堂表現表情，家長可見自己孩子）、`SessionLog`（課堂紀錄：日期/老師/教學內容/詩歌進度/課後反饋，兩天內填寫、全年連貫呈現、可匯出）、`Lesson`（每週教材/討論問題/帶領提示/教案連結）、`Song`／`Playlist`（敬拜歌單）、`SongFamiliarity`（班級 × 詩歌熟悉指數）、`ServiceSignup`（服事報名）、`ServiceRecord`（服事經歷＋狀態）、`TeacherSchedule`（老師服事排班）、`MeetingNote`（開會決議，可分班別）、`Announcement`／`Reply`（公告與回覆）。
+
+**紀錄保存**：出席/簽到/學生狀況與課堂紀錄於「我的 → 出席紀錄」可查近半年並匯出 CSV（UTF-8＋BOM），供存放教會 NAS 與匯入教會 Google Sheet；Google Sheet 全自動同步待教會 Google 授權後以 Edge Function 實作。
 
 ## Repo 結構
 

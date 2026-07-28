@@ -30,6 +30,18 @@ const router = createRouter({
           component: () => import('../views/MembersView.vue'),
           meta: { roles: ['admin'] },
         },
+        {
+          path: 'records',
+          name: 'records',
+          component: () => import('../views/RecordsView.vue'),
+          meta: { roles: ['teacher', 'admin'] },
+        },
+        {
+          path: 'class-log',
+          name: 'class-log',
+          component: () => import('../views/ClassLogView.vue'),
+          meta: { roles: ['teacher', 'admin'] },
+        },
         { path: 'me', name: 'me', component: () => import('../views/ProfileView.vue') },
       ],
     },

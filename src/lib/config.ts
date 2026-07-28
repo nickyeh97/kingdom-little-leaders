@@ -10,4 +10,10 @@ export const GATHERING_WEEKDAY = 6
 /** 預先出席截止：聚會日前 N 天的 23:59:59。目前：前 1 天（週六聚會 → 週五截止） */
 export const PLAN_DEADLINE_DAYS_BEFORE = 1
 
+/** 老師課後反饋填寫期限：上完課後 N 天內（當天起算，含當天，至第 N 天 23:59:59） */
+export const FEEDBACK_DUE_DAYS = 2
+
+/** 出席紀錄查詢範圍：近 N 個月 */
+export const RECORDS_MONTHS = 6
+
 export const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'] as const

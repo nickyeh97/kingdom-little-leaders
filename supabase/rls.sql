@@ -96,10 +96,11 @@ create policy "plans_update" on attendance_plans
 create policy "plans_delete" on attendance_plans
   for delete to authenticated using (public.is_admin());
 
--- ---- check_ins：僅「老師標籤」（逐標籤授權：admin 需另具老師標籤才可點名；
---      課堂紀錄不對家長開放）----
+-- ---- check_ins：老師可寫；老師與同工（admin）可讀（出席紀錄查詢）；
+--      老師備註不對家長開放 ----
 create policy "check_ins_read" on check_ins
-  for select to authenticated using (public.has_role('teacher'));
+  for select to authenticated
+  using (public.has_role('teacher') or public.has_role('admin'));
 create policy "check_ins_insert" on check_ins
   for insert to authenticated with check (public.has_role('teacher'));
 create policy "check_ins_update" on check_ins
@@ -108,12 +109,25 @@ create policy "check_ins_update" on check_ins
 create policy "check_ins_delete" on check_ins
   for delete to authenticated using (public.has_role('teacher'));
 
--- ---- session_feedback：老師可寫；家長僅能讀自己孩子的回饋 ----
+-- ---- session_feedback：老師可寫；老師/同工與孩子的家長可讀 ----
 alter table session_feedback enable row level security;
 create policy "feedback_read" on session_feedback
   for select to authenticated
-  using (public.has_role('teacher') or child_id in (select public.my_child_ids()));
+  using (
+    public.has_role('teacher')
+    or public.has_role('admin')
+    or child_id in (select public.my_child_ids())
+  );
 create policy "feedback_write" on session_feedback
+  for all to authenticated
+  using (public.has_role('teacher')) with check (public.has_role('teacher'));
+
+-- ---- session_logs：老師與同工可讀（全年反饋連貫呈現）；老師可寫 ----
+alter table session_logs enable row level security;
+create policy "session_logs_read" on session_logs
+  for select to authenticated
+  using (public.has_role('teacher') or public.has_role('admin'));
+create policy "session_logs_write" on session_logs
   for all to authenticated
   using (public.has_role('teacher')) with check (public.has_role('teacher'));
 

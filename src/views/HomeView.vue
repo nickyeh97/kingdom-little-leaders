@@ -3,8 +3,11 @@ import { onMounted, ref } from 'vue'
 import { showFailToast } from 'vant'
 import { listAnnouncements } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
-import { listFeedback } from '../api/checkin'
+import { listCheckIns, listFeedback } from '../api/checkin'
+import { listAllChildren, listSessionLogsRange } from '../api/records'
 import {
+  feedbackDeadline,
+  isFeedbackOpen,
   lastGathering,
   planDeadline,
   upcomingGathering,
@@ -23,6 +26,10 @@ const needPlan = ref(false)
 const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 const gathering = upcomingGathering()
 const deadline = planDeadline(gathering)
+/** 老師：上堂課的課堂紀錄尚未填寫（兩天內提醒） */
+const needClassLog = ref(false)
+const lastG = lastGathering()
+const feedbackDue = feedbackDeadline(lastG)
 
 onMounted(async () => {
   try {
@@ -41,6 +48,24 @@ onMounted(async () => {
       lastFeedback.value = children
         .filter((c) => (byChild.get(c.id) ?? []).length > 0)
         .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
+    }
+    // 老師：上堂課（兩天內）若有自己點名過的班別還沒填課堂紀錄 → 提醒
+    if (auth.can('teacher') && isFeedbackOpen(lastG)) {
+      const me = auth.session?.user.id
+      const [checks, kids, logs] = await Promise.all([
+        listCheckIns(lastG),
+        listAllChildren(),
+        listSessionLogsRange(lastG, lastG),
+      ])
+      const kidClass = new Map(kids.map((k) => [k.id, String(k.class_group_id)]))
+      const myClasses = new Set(
+        checks
+          .filter((c) => c.checked_by === me)
+          .map((c) => kidClass.get(c.child_id))
+          .filter((x): x is string => Boolean(x)),
+      )
+      const logged = new Set(logs.map((l) => l.class_group_id))
+      needClassLog.value = [...myClasses].some((id) => !logged.has(id))
     }
   } catch (e) {
     showFailToast((e as Error).message)
@@ -67,6 +92,16 @@ function fmtDate(iso: string) {
         </van-tag>
       </div>
     </header>
+
+    <van-notice-bar
+      v-if="needClassLog"
+      left-icon="edit"
+      mode="link"
+      color="#7a5300"
+      background="#fef1d9"
+      :text="`上堂課（${lastG}）的課堂紀錄還沒填——${feedbackDue.toLocaleDateString('zh-TW')}（${weekdayName(feedbackDue)}）23:59 前完成`"
+      @click="$router.push({ name: 'class-log' })"
+    />
 
     <van-notice-bar
       v-if="needPlan"

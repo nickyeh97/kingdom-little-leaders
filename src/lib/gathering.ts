@@ -2,7 +2,13 @@
  * 聚會日與預先出席截止時間的計算工具。
  * 聚會日不寫死週幾（見 config.ts），全部使用瀏覽器本地時區（台灣使用情境）。
  */
-import { GATHERING_WEEKDAY, PLAN_DEADLINE_DAYS_BEFORE, WEEKDAY_NAMES } from './config'
+import {
+  FEEDBACK_DUE_DAYS,
+  GATHERING_WEEKDAY,
+  PLAN_DEADLINE_DAYS_BEFORE,
+  RECORDS_MONTHS,
+  WEEKDAY_NAMES,
+} from './config'
 
 function toDateString(d: Date): string {
   const y = d.getFullYear()
@@ -38,6 +44,25 @@ export function planDeadline(
 /** 預先出席是否仍開放填寫 */
 export function isPlanOpen(gatheringDate: string, now = new Date()): boolean {
   return now <= planDeadline(gatheringDate)
+}
+
+/** 課後反饋截止時間：聚會日後 N 天的 23:59:59 */
+export function feedbackDeadline(gatheringDate: string, dueDays = FEEDBACK_DUE_DAYS): Date {
+  const d = new Date(`${gatheringDate}T23:59:59`)
+  d.setDate(d.getDate() + dueDays)
+  return d
+}
+
+/** 課後反饋是否仍在填寫期限內 */
+export function isFeedbackOpen(gatheringDate: string, now = new Date()): boolean {
+  return now <= feedbackDeadline(gatheringDate)
+}
+
+/** 出席紀錄查詢起點：N 個月前的今天（YYYY-MM-DD） */
+export function recordsRangeStart(from = new Date(), months = RECORDS_MONTHS): string {
+  const d = new Date(from)
+  d.setMonth(d.getMonth() - months)
+  return toDateString(d)
 }
 
 export function formatGathering(gatheringDate: string): string {

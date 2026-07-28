@@ -25,6 +25,20 @@ async function logout() {
       <strong>{{ auth.profile?.display_name }}</strong>
       <p class="hint">{{ auth.session?.user.email }}</p>
     </div>
+    <van-cell-group inset v-if="auth.can('teacher') || auth.can('admin')">
+      <van-cell
+        title="出席紀錄（近半年）"
+        label="可匯出 CSV 存 NAS / Google Sheet"
+        is-link
+        @click="$router.push({ name: 'records' })"
+      />
+      <van-cell
+        title="課堂紀錄（本年）"
+        label="教學內容、詩歌進度、課後反饋"
+        is-link
+        @click="$router.push({ name: 'class-log' })"
+      />
+    </van-cell-group>
     <van-cell-group inset>
       <van-cell title="版本" value="0.1.0（開發中）" />
       <van-cell title="登出" is-link @click="logout" />

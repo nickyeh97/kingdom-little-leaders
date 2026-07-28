@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  feedbackDeadline,
   formatGathering,
+  isFeedbackOpen,
   isPlanOpen,
   lastGathering,
   planDeadline,
+  recordsRangeStart,
   upcomingGathering,
   weekdayName,
 } from '../gathering'
@@ -105,6 +108,49 @@ describe('isPlanOpen（是否仍可填寫）', () => {
 
   it('聚會日當天已關閉', () => {
     expect(isPlanOpen('2026-07-25', new Date(2026, 6, 25, 9, 0, 0))).toBe(false)
+  })
+})
+
+describe('feedbackDeadline / isFeedbackOpen（課後反饋：上完課兩天內填寫）', () => {
+  it('截止為聚會日後 2 天的 23:59:59（週六上課 → 週一截止）', () => {
+    const d = feedbackDeadline('2026-07-25')
+    expect([d.getMonth(), d.getDate()]).toEqual([6, 27])
+    expect(d.getDay()).toBe(1) // 週一
+    expect([d.getHours(), d.getMinutes(), d.getSeconds()]).toEqual([23, 59, 59])
+  })
+
+  it('上課當天與隔天皆可填', () => {
+    expect(isFeedbackOpen('2026-07-25', new Date(2026, 6, 25, 15, 0, 0))).toBe(true)
+    expect(isFeedbackOpen('2026-07-25', new Date(2026, 6, 26, 10, 0, 0))).toBe(true)
+  })
+
+  it('邊際：截止瞬間（第 2 天 23:59:59）仍可填，後一秒關閉', () => {
+    expect(isFeedbackOpen('2026-07-25', new Date(2026, 6, 27, 23, 59, 59))).toBe(true)
+    expect(isFeedbackOpen('2026-07-25', new Date(2026, 6, 28, 0, 0, 0))).toBe(false)
+  })
+
+  it('邊際：聚會日在月底 → 截止跨月', () => {
+    const d = feedbackDeadline('2026-07-31')
+    expect([d.getMonth(), d.getDate()]).toEqual([7, 2]) // 8/2
+  })
+
+  it('期限天數可設定', () => {
+    const d = feedbackDeadline('2026-07-25', 5)
+    expect([d.getMonth(), d.getDate()]).toEqual([6, 30])
+  })
+})
+
+describe('recordsRangeStart（出席紀錄查詢起點：近半年）', () => {
+  it('回傳 6 個月前的日期', () => {
+    expect(recordsRangeStart(D(2026, 7, 28))).toBe('2026-01-28')
+  })
+
+  it('邊際：跨年', () => {
+    expect(recordsRangeStart(D(2026, 3, 15))).toBe('2025-09-15')
+  })
+
+  it('月數可設定', () => {
+    expect(recordsRangeStart(D(2026, 7, 28), 1)).toBe('2026-06-28')
   })
 })
 
