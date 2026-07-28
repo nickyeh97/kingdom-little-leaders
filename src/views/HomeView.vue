@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { showFailToast } from 'vant'
-import { listAnnouncements } from '../api/announcements'
+import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
+import {
+  createAnnouncement,
+  deleteAnnouncement,
+  listAnnouncements,
+  updateAnnouncement,
+} from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
 import { listCheckIns, listFeedback } from '../api/checkin'
 import { listAllChildren, listSessionLogsRange } from '../api/records'
@@ -77,6 +82,56 @@ onMounted(async () => {
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('zh-TW')
 }
+
+// ---- 管理端：公告發布/編輯/刪除 ----
+const editingAnn = ref<Announcement | 'new' | null>(null)
+const annDraft = ref({ title: '', body: '', tag: '公告', pinned: false })
+const annSaving = ref(false)
+
+function openAnnEditor(a: Announcement | null) {
+  if (!auth.can('admin')) return
+  editingAnn.value = a ?? 'new'
+  annDraft.value = a
+    ? { title: a.title, body: a.body, tag: a.tag, pinned: a.pinned }
+    : { title: '', body: '', tag: '公告', pinned: false }
+}
+
+async function saveAnn() {
+  if (!annDraft.value.title.trim() || !annDraft.value.body.trim()) {
+    showFailToast('標題與內容為必填')
+    return
+  }
+  annSaving.value = true
+  try {
+    if (editingAnn.value === 'new') await createAnnouncement(annDraft.value)
+    else if (editingAnn.value) await updateAnnouncement(editingAnn.value.id, annDraft.value)
+    announcements.value = await listAnnouncements()
+    showSuccessToast('已發布')
+    editingAnn.value = null
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    annSaving.value = false
+  }
+}
+
+async function removeAnn() {
+  const target = editingAnn.value
+  if (!target || target === 'new') return
+  try {
+    await showConfirmDialog({ title: '刪除公告', message: `確定刪除「${target.title}」？` })
+  } catch {
+    return
+  }
+  try {
+    await deleteAnnouncement(target.id)
+    announcements.value = await listAnnouncements()
+    showSuccessToast('已刪除')
+    editingAnn.value = null
+  } catch (e) {
+    showFailToast((e as Error).message)
+  }
+}
 </script>
 
 <template>
@@ -123,11 +178,22 @@ function fmtDate(iso: string) {
       </div>
     </template>
 
-    <h3 class="section-title">兒主公告</h3>
+    <div class="section-row">
+      <h3 class="section-title">兒主公告</h3>
+      <van-button v-if="auth.can('admin')" size="small" type="primary" plain @click="openAnnEditor(null)">
+        ＋發布
+      </van-button>
+    </div>
     <van-skeleton v-if="loading" title :row="3" />
     <template v-else>
       <div v-if="announcements.length === 0" class="card hint">目前沒有公告</div>
-      <div v-for="a in announcements" :key="a.id" class="card">
+      <div
+        v-for="a in announcements"
+        :key="a.id"
+        class="card"
+        :class="{ clickable: auth.can('admin') }"
+        @click="openAnnEditor(a)"
+      >
         <div class="ann-head">
           <van-tag :type="a.tag === '重要' ? 'warning' : 'primary'" plain>{{ a.tag }}</van-tag>
           <strong class="ann-title">{{ a.title }}</strong>
@@ -137,6 +203,53 @@ function fmtDate(iso: string) {
         <p class="hint">{{ fmtDate(a.created_at) }}</p>
       </div>
     </template>
+
+    <van-popup
+      :show="editingAnn !== null"
+      round
+      position="bottom"
+      @update:show="(v: boolean) => !v && (editingAnn = null)"
+    >
+      <div class="ann-editor">
+        <h3>{{ editingAnn === 'new' ? '發布公告' : '編輯公告' }}</h3>
+        <van-field v-model="annDraft.title" label="標題" maxlength="60" placeholder="例：下主日合班敬拜通知" />
+        <van-field v-model="annDraft.body" label="內容" type="textarea" rows="3" autosize maxlength="1000"
+          placeholder="公告內容" />
+        <van-cell title="標籤" center>
+          <template #value>
+            <van-tag
+              v-for="t in ['公告', '重要']"
+              :key="t"
+              round
+              size="large"
+              class="tag-opt"
+              :type="annDraft.tag === t ? (t === '重要' ? 'warning' : 'primary') : 'default'"
+              :plain="annDraft.tag !== t"
+              @click="annDraft.tag = t"
+            >
+              {{ t }}
+            </van-tag>
+          </template>
+        </van-cell>
+        <van-cell title="置頂" center>
+          <template #value><van-switch v-model="annDraft.pinned" size="20" /></template>
+        </van-cell>
+        <van-button round block type="primary" :loading="annSaving" class="save-btn" @click="saveAnn">
+          {{ editingAnn === 'new' ? '發布' : '儲存' }}
+        </van-button>
+        <van-button
+          v-if="editingAnn !== 'new'"
+          round
+          block
+          plain
+          type="danger"
+          class="del-btn"
+          @click="removeAnn"
+        >
+          刪除
+        </van-button>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -159,6 +272,31 @@ function fmtDate(iso: string) {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: 8px;
+}
+.section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.clickable {
+  cursor: pointer;
+}
+.ann-editor {
+  padding: 20px 16px 28px;
+}
+.ann-editor h3 {
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 16px;
+}
+.tag-opt {
+  margin-left: 8px;
+}
+.save-btn {
+  margin-top: 14px;
+}
+.del-btn {
   margin-top: 8px;
 }
 .ann-head {

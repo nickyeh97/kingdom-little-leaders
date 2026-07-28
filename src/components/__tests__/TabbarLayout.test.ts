@@ -16,6 +16,7 @@ function makeRouter() {
       { path: '/', name: 'home', component: Empty },
       { path: '/attendance', name: 'attendance', component: Empty },
       { path: '/checkin', name: 'checkin', component: Empty },
+      { path: '/songs', name: 'songs', component: Empty },
       { path: '/members', name: 'members', component: Empty },
       { path: '/me', name: 'me', component: Empty },
     ],
@@ -53,31 +54,31 @@ function tabLabels(wrapper: Awaited<ReturnType<typeof mountWithRoles>>) {
   return wrapper.findAll('.tab').map((t) => t.text())
 }
 
-describe('TabbarLayout：分頁依角色標籤顯示', () => {
+describe('TabbarLayout：分頁依角色標籤顯示（詩歌全員可見；名單移入「我的」）', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('家長標籤：首頁／出席／我的', async () => {
+  it('家長標籤：首頁／出席／詩歌／我的', async () => {
     const w = await mountWithRoles(['parent'])
-    expect(tabLabels(w)).toEqual(['首頁', '出席', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '出席', '詩歌', '我的'])
   })
 
-  it('老師標籤：首頁／點名／我的', async () => {
+  it('老師標籤：首頁／點名／詩歌／我的', async () => {
     const w = await mountWithRoles(['teacher'])
-    expect(tabLabels(w)).toEqual(['首頁', '點名', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '點名', '詩歌', '我的'])
   })
 
-  it('邊際：純 admin 只多出名單，不含點名/出席（逐標籤授權）', async () => {
+  it('邊際：純 admin 不含點名/出席（逐標籤授權），名單入口在「我的」', async () => {
     const w = await mountWithRoles(['admin'])
-    expect(tabLabels(w)).toEqual(['首頁', '名單', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '詩歌', '我的'])
   })
 
-  it('組長（三標籤）：五個分頁全開', async () => {
+  it('組長（三標籤）：五個分頁', async () => {
     const w = await mountWithRoles(['admin', 'teacher', 'parent'])
-    expect(tabLabels(w)).toEqual(['首頁', '出席', '點名', '名單', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '出席', '點名', '詩歌', '我的'])
   })
 
-  it('邊際：無任何標籤仍保有首頁與我的', async () => {
+  it('邊際：無任何標籤仍保有首頁／詩歌／我的', async () => {
     const w = await mountWithRoles([])
-    expect(tabLabels(w)).toEqual(['首頁', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '詩歌', '我的'])
   })
 })

@@ -23,6 +23,19 @@ npm run test:watch           # 開發時監看模式
 - 慣例：**新增功能時一併新增對應測試**；資料層權限以 Supabase RLS 為準，
   端對端流程測試（Playwright）待功能穩定後導入
 
+### 部署（Vercel，一次性設定約 5 分鐘）
+
+1. 到 [vercel.com](https://vercel.com) 以 GitHub 帳號登入 → **Add New → Project** → 選 `kingdom-little-leaders` repo（首次需授權 Vercel 存取此 repo）。
+2. Framework 會自動偵測為 **Vite**，Build 設定不用改（`vercel.json` 已含 SPA 路由設定）。
+3. 展開 **Environment Variables**，加入兩個變數（值同 `.env.local`）：
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. 按 **Deploy**，完成後會得到 `https://<專案名>.vercel.app` 網址。
+5. 回 Supabase → **Authentication → URL Configuration**，把 **Site URL** 改為上述網址。
+6. 手機瀏覽器開啟網址 → 分享選單 → **加入主畫面**，即可像 App 一樣使用（PWA）。
+
+之後每次 push `main`，Vercel 會自動重新部署；PR 也會有預覽網址。
+
 ### 後端初始化（一次性）
 
 1. 到 [supabase.com](https://supabase.com) 建立免費專案（區域選 Tokyo 較近）。

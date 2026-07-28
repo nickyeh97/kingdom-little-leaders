@@ -30,6 +30,7 @@ const router = createRouter({
           component: () => import('../views/MembersView.vue'),
           meta: { roles: ['admin'] },
         },
+        { path: 'songs', name: 'songs', component: () => import('../views/SongsView.vue') },
         {
           path: 'records',
           name: 'records',

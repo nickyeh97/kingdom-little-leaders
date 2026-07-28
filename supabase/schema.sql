@@ -117,6 +117,20 @@ create trigger on_session_log_update
   before update on session_logs
   for each row execute function public.touch_session_log();
 
+-- 敬拜歌單：每聚會日一組（約 4 首）；影音一律外連 YouTube
+create table songs (
+  id uuid primary key default gen_random_uuid(),
+  gathering_date date not null,
+  title text not null,
+  youtube_url text,
+  lyrics text,
+  sort_order int not null default 0,
+  created_by uuid not null default auth.uid() references profiles (id),
+  created_at timestamptz not null default now()
+);
+
+create index idx_songs_date on songs (gathering_date);
+
 -- 公告（所有登入者可讀）
 create table announcements (
   id uuid primary key default gen_random_uuid(),

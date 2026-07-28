@@ -71,6 +71,16 @@ export interface SessionLog {
   updated_at: string
 }
 
+/** 敬拜歌單的歌曲：每聚會日一組，影音外連 YouTube */
+export interface Song {
+  id: string
+  gathering_date: string
+  title: string
+  youtube_url: string | null
+  lyrics: string | null
+  sort_order: number
+}
+
 export interface Announcement {
   id: string
   title: string

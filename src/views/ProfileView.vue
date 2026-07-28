@@ -25,6 +25,14 @@ async function logout() {
       <strong>{{ auth.profile?.display_name }}</strong>
       <p class="hint">{{ auth.session?.user.email }}</p>
     </div>
+    <van-cell-group inset v-if="auth.can('admin')">
+      <van-cell
+        title="名單與權限"
+        label="成員角色標籤、孩子與家庭綁定"
+        is-link
+        @click="$router.push({ name: 'members' })"
+      />
+    </van-cell-group>
     <van-cell-group inset v-if="auth.can('teacher') || auth.can('admin')">
       <van-cell
         title="出席紀錄（近半年）"
