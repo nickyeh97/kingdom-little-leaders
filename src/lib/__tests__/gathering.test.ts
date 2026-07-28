@@ -10,7 +10,7 @@ import {
   upcomingGathering,
   weekdayName,
 } from '../gathering'
-import { GATHERING_WEEKDAY } from '../config'
+import { GATHERING_WEEKDAY, PLAN_DEADLINE_DAYS_BEFORE } from '../config'
 
 // 基準：2026-07-25 為週六（目前的聚會日）、2026-07-26 為週日
 const D = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12, 0, 0)
@@ -65,11 +65,12 @@ describe('lastGathering（上一個聚會日）', () => {
   })
 })
 
-describe('planDeadline（截止：聚會日前 3 天 23:59:59，週六聚會 → 週三截止）', () => {
-  it('落在聚會日前 3 天且為週三', () => {
+describe('planDeadline（截止：聚會日前 N 天 23:59:59，N 由 config 設定）', () => {
+  it('預設跟隨 config 設定值（目前：前 1 天）', () => {
     const d = planDeadline('2026-07-25')
-    expect(d.getDay()).toBe(3)
-    expect([d.getMonth(), d.getDate()]).toEqual([6, 22])
+    const expected = new Date(2026, 6, 25)
+    expected.setDate(expected.getDate() - PLAN_DEADLINE_DAYS_BEFORE)
+    expect([d.getMonth(), d.getDate()]).toEqual([expected.getMonth(), expected.getDate()])
   })
 
   it('時間為 23:59:59', () => {
@@ -77,33 +78,37 @@ describe('planDeadline（截止：聚會日前 3 天 23:59:59，週六聚會 →
     expect([d.getHours(), d.getMinutes(), d.getSeconds()]).toEqual([23, 59, 59])
   })
 
+  it('截止提前天數可設定：前 1 天（週五）／前 3 天（週三）', () => {
+    const fri = planDeadline('2026-07-25', 1)
+    expect([fri.getDay(), fri.getMonth(), fri.getDate()]).toEqual([5, 6, 24])
+    const wed = planDeadline('2026-07-25', 3)
+    expect([wed.getDay(), wed.getMonth(), wed.getDate()]).toEqual([3, 6, 22])
+  })
+
   it('邊際：聚會日在月初 → 截止日跨回上個月', () => {
-    const d = planDeadline('2026-08-01')
+    const d = planDeadline('2026-08-01', 3)
     expect([d.getMonth(), d.getDate()]).toEqual([6, 29])
   })
 
   it('邊際：聚會日在年初 → 截止日跨回去年', () => {
-    const d = planDeadline('2027-01-02')
+    const d = planDeadline('2027-01-02', 3)
     expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2026, 11, 30])
-  })
-
-  it('截止提前天數可設定', () => {
-    const d = planDeadline('2026-07-25', 1)
-    expect([d.getMonth(), d.getDate()]).toEqual([6, 24]) // 前一天（週五）
   })
 })
 
 describe('isPlanOpen（是否仍可填寫）', () => {
+  const deadline = planDeadline('2026-07-25') // 跟隨 config
+
   it('截止前可填', () => {
     expect(isPlanOpen('2026-07-25', new Date(2026, 6, 20, 8, 0, 0))).toBe(true)
   })
 
-  it('邊際：剛好在截止時刻（週三 23:59:59）仍可填', () => {
-    expect(isPlanOpen('2026-07-25', new Date(2026, 6, 22, 23, 59, 59))).toBe(true)
+  it('邊際：剛好在截止時刻仍可填', () => {
+    expect(isPlanOpen('2026-07-25', deadline)).toBe(true)
   })
 
   it('邊際：截止後一秒即關閉', () => {
-    expect(isPlanOpen('2026-07-25', new Date(2026, 6, 23, 0, 0, 0))).toBe(false)
+    expect(isPlanOpen('2026-07-25', new Date(deadline.getTime() + 1000))).toBe(false)
   })
 
   it('聚會日當天已關閉', () => {
