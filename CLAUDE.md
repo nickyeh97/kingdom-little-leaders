@@ -109,16 +109,20 @@
 2. **「有上課的老師」判定**：暫以「當天有點名動作」為代理判斷（首頁課後反饋提醒用）；待排班表功能上線後改為正式判定。
 3. **Google Sheet 全自動同步：暫緩**——需等**組長通知**取得教會 Google 雲端授權（Service Account）後，才以 Supabase Edge Function 串接；在此之前一律以 CSV 手動匯出→存 NAS／匯入 Google Sheet。
 
-## Repo 結構
+## Repo 結構與文件慣例
 
 ```
-README.md                              # 平台簡介
+README.md                              # 平台簡介與必讀文件索引（不放開發設定）
 CLAUDE.md                              # 本文件
 docs/DESIGN_PRINCIPLES.md              # 最高守則（設計檢核，必讀）
 docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md    # 需求規格書（需求基準）
+docs/DEVELOPMENT.md                    # 開發指南：開發/測試/後端初始化/部署/第三方登入設定
+docs/SPRINT_*.md                       # 各階段開發範圍與回顧
+src/                                   # 前端（views/api/stores/lib/components）
+supabase/                              # schema.sql、rls.sql、seed.sql 與 migrations/
 ```
 
-（程式碼結構於開發啟動時建立，屆時更新本節。）
+**文件慣例（已確認）**：最外層 `README.md` **不放開發設定**——開發、測試、部署、第三方登入、後端設定一律寫在 `docs/DEVELOPMENT.md`，README 只放專案簡介與必讀文件連結。
 
 ## 工作流程慣例
 
