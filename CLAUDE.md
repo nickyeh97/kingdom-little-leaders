@@ -88,7 +88,7 @@
 ### 登入策略
 
 - **已實作**：Email 註冊/登入＋**Google OAuth 註冊/登入**（設定步驟見 README「Google 登入設定」）；session 由 supabase-js 持久化於 localStorage，回訪免重登。
-- **註冊即家長**：任何管道註冊的新使用者預設角色為 `parent`；老師/管理者標籤由管理者於名單頁開通。「邀請成員」＝分享平台網址給對方自行註冊。
+- **註冊即家長＋審核制**：任何管道註冊的新使用者預設角色 `parent`、`approved=false`（待審核）。**未審核者僅能看公告與帳號設定**——`my_roles()` 對未審核者回空陣列，所有角色權限在資料庫層自動失效；審核與取消核准、刪除成員皆於名單頁操作（防自我審核已入 RLS）。「邀請成員」＝分享平台網址給對方自行註冊。
 - **未來擴充**：Apple（Supabase 內建）、LINE（透過 Edge Function 自訂接入）。
 - `auth_provider` 欄位由 `handle_new_user` 觸發器自動寫入（email / google / …）。
 

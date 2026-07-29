@@ -24,6 +24,7 @@ create table profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null,
   roles user_role[] not null default array['parent']::user_role[],
+  approved boolean not null default false, -- 審核制：管理者核准後才開通角色功能
   auth_provider text not null default 'email', -- 預留：google / line / apple
   phone text,                                   -- 預留：通訊錄（Phase 2，最小化蒐集）
   created_at timestamptz not null default now()

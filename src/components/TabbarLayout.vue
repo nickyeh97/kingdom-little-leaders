@@ -11,7 +11,8 @@ const tabs = computed(() => {
   const items = [{ name: 'home', label: '首頁', icon: 'wap-home-o' }]
   if (auth.can('parent')) items.push({ name: 'attendance', label: '出席', icon: 'todo-list-o' })
   if (auth.can('teacher')) items.push({ name: 'checkin', label: '點名', icon: 'checked' })
-  items.push({ name: 'songs', label: '詩歌', icon: 'music-o' })
+  // 審核制：未審核者僅有首頁（公告）與我的（帳號設定）
+  if (auth.isApproved) items.push({ name: 'songs', label: '詩歌', icon: 'music-o' })
   // 「名單」管理入口在「我的」頁面內（避免分頁過多）
   items.push({ name: 'me', label: '我的', icon: 'user-o' })
   return items

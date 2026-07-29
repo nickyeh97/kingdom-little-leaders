@@ -6,6 +6,8 @@ export interface Profile {
   display_name: string
   /** 角色標籤集合：可同時為 admin + teacher + parent */
   roles: UserRole[]
+  /** 審核制：管理者核准後才開通角色功能；未審核僅能看公告與帳號設定 */
+  approved: boolean
   auth_provider: string
   phone: string | null
   created_at: string

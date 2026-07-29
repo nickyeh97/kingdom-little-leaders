@@ -23,7 +23,7 @@ function makeRouter() {
   })
 }
 
-async function mountWithRoles(roles: UserRole[]) {
+async function mountWithRoles(roles: UserRole[], approved = true) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const auth = useAuthStore()
@@ -31,6 +31,7 @@ async function mountWithRoles(roles: UserRole[]) {
     id: 'u1',
     display_name: '測試使用者',
     roles,
+    approved,
     auth_provider: 'email',
     phone: null,
     created_at: '2026-07-26T00:00:00Z',
@@ -75,6 +76,11 @@ describe('TabbarLayout：分頁依角色標籤顯示（詩歌全員可見；名�
   it('組長（三標籤）：五個分頁', async () => {
     const w = await mountWithRoles(['admin', 'teacher', 'parent'])
     expect(tabLabels(w)).toEqual(['首頁', '出席', '點名', '詩歌', '我的'])
+  })
+
+  it('審核制：未審核者僅有首頁與我的', async () => {
+    const w = await mountWithRoles(['parent', 'teacher'], false)
+    expect(tabLabels(w)).toEqual(['首頁', '我的'])
   })
 
   it('邊際：無任何標籤仍保有首頁／詩歌／我的', async () => {

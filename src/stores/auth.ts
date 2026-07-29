@@ -10,12 +10,16 @@ export const useAuthStore = defineStore('auth', () => {
   const ready = ref(false)
 
   const roles = computed<UserRole[]>(() => profile.value?.roles ?? [])
-  const isAdmin = computed(() => roles.value.includes('admin'))
+  const isApproved = computed(() => profile.value?.approved ?? false)
+  const isAdmin = computed(() => isApproved.value && roles.value.includes('admin'))
   const isLoggedIn = computed(() => session.value !== null)
 
-  /** 是否具備某角色標籤（嚴格逐標籤授權：admin 不自動涵蓋其他角色功能） */
+  /**
+   * 是否具備某角色標籤（嚴格逐標籤授權：admin 不自動涵蓋其他角色功能）。
+   * 未審核（approved=false）一律 false——僅能使用公告與帳號設定。
+   */
   function can(role: UserRole): boolean {
-    return roles.value.includes(role)
+    return isApproved.value && roles.value.includes(role)
   }
 
   async function loadProfile() {
@@ -96,6 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
     profile,
     ready,
     roles,
+    isApproved,
     isAdmin,
     can,
     isLoggedIn,

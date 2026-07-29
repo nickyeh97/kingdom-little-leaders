@@ -54,7 +54,7 @@ npm run test:watch           # 開發時監看模式
 
 1. 到 [supabase.com](https://supabase.com) 建立免費專案（區域選 Tokyo 較近）。
 2. SQL Editor 依序執行 `supabase/schema.sql` → `supabase/rls.sql` →（開發環境）`supabase/seed.sql`。
-3. Authentication → Users → 建立自己的帳號，並在 `profiles` 表把 `role` 改為 `admin`。
+3. Authentication → Users → 建立自己的帳號，並在 `profiles` 表把 `roles` 改為 `{admin,teacher,parent}`、`approved` 設為 `true`（第一位管理者需手動核准）。
 4. Project Settings → API 取得 URL 與 anon key，填入 `.env.local`。
 
 

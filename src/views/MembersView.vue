@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
-import { listProfiles, updateRoles } from '../api/members'
+import { deleteProfile, listProfiles, updateApproved, updateRoles } from '../api/members'
 import { listAllChildren } from '../api/records'
 import {
   createChild,
@@ -19,8 +19,10 @@ const children = ref<Child[]>([])
 const links = ref<FamilyLink[]>([])
 const classGroups = ref<ClassGroup[]>([])
 const keyword = ref('')
-const filter = ref<'all' | UserRole | 'children'>('all')
+const filter = ref<'all' | UserRole | 'children' | 'pending'>('all')
 const loading = ref(true)
+
+const pendingCount = computed(() => members.value.filter((m) => !m.approved).length)
 
 const roleLabel: Record<UserRole, string> = {
   admin: '管理者',
@@ -34,19 +36,24 @@ const roleTagType: Record<UserRole, 'warning' | 'primary' | 'success'> = {
 }
 const allRoles: UserRole[] = ['admin', 'teacher', 'parent']
 
-/** Figma 05：全部 / 家長 n / 老師 n / 管理者 n / 孩子 n 篩選膠囊 */
-const pills = computed(() => [
-  { key: 'all' as const, label: `全部 ${members.value.length}` },
-  { key: 'parent' as const, label: `家長 ${members.value.filter((m) => m.roles.includes('parent')).length}` },
-  { key: 'teacher' as const, label: `老師 ${members.value.filter((m) => m.roles.includes('teacher')).length}` },
-  { key: 'admin' as const, label: `管理者 ${members.value.filter((m) => m.roles.includes('admin')).length}` },
-  { key: 'children' as const, label: `孩子 ${children.value.length}` },
-])
+/** Figma 05：全部 / 家長 n / 老師 n / 管理者 n / 孩子 n 篩選膠囊（＋待審核） */
+const pills = computed(() => {
+  const items: { key: typeof filter.value; label: string }[] = [
+    { key: 'all', label: `全部 ${members.value.length}` },
+    { key: 'parent', label: `家長 ${members.value.filter((m) => m.roles.includes('parent')).length}` },
+    { key: 'teacher', label: `老師 ${members.value.filter((m) => m.roles.includes('teacher')).length}` },
+    { key: 'admin', label: `管理者 ${members.value.filter((m) => m.roles.includes('admin')).length}` },
+    { key: 'children', label: `孩子 ${children.value.length}` },
+  ]
+  if (pendingCount.value > 0) items.splice(1, 0, { key: 'pending', label: `待審核 ${pendingCount.value}` })
+  return items
+})
 
 const filteredMembers = computed(() =>
   members.value.filter(
     (m) =>
-      (filter.value === 'all' || m.roles.includes(filter.value as UserRole)) &&
+      (filter.value === 'all' ||
+        (filter.value === 'pending' ? !m.approved : m.roles.includes(filter.value as UserRole))) &&
       (keyword.value === '' || m.display_name.includes(keyword.value)),
   ),
 )
@@ -130,6 +137,41 @@ async function saveMember() {
     showFailToast((e as Error).message)
   } finally {
     savingMember.value = false
+  }
+}
+
+/** 核准或取消核准（未審核者僅能看公告與帳號設定） */
+async function setApproved(approved: boolean) {
+  const target = editingMember.value
+  if (!target) return
+  try {
+    await updateApproved(target.id, approved)
+    target.approved = approved
+    showSuccessToast(approved ? '已核准加入' : '已取消核准')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  }
+}
+
+async function removeMember() {
+  const target = editingMember.value
+  if (!target) return
+  try {
+    await showConfirmDialog({
+      title: '刪除成員',
+      message: `確定刪除「${target.display_name}」？其家庭綁定將一併移除；對方將無法再使用平台功能。`,
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteProfile(target.id)
+    members.value = members.value.filter((m) => m.id !== target.id)
+    links.value = links.value.filter((l) => l.parent_id !== target.id)
+    showSuccessToast('已刪除成員')
+    editingMember.value = null
+  } catch (e) {
+    showFailToast((e as Error).message)
   }
 }
 
@@ -242,7 +284,8 @@ async function removeChild() {
           <span class="hint detail">{{ memberDetail(m) }}</span>
         </div>
         <div class="tags">
-          <van-tag v-for="r in m.roles" :key="r" :type="roleTagType[r]" round>
+          <van-tag v-if="!m.approved" type="danger" plain round>待審核</van-tag>
+          <van-tag v-for="r in m.roles" :key="r" :type="roleTagType[r]" round :class="{ dim: !m.approved }">
             {{ roleLabel[r] }}
           </van-tag>
         </div>
@@ -297,7 +340,19 @@ async function removeChild() {
       @update:show="(v: boolean) => !v && (editingMember = null)"
     >
       <div class="editor" v-if="editingMember">
-        <h3>編輯「{{ editingMember.display_name }}」的角色標籤</h3>
+        <h3>編輯「{{ editingMember.display_name }}」</h3>
+
+        <van-button
+          v-if="!editingMember.approved"
+          round
+          block
+          type="success"
+          class="approve-btn"
+          @click="setApproved(true)"
+        >
+          ✓ 核准加入（開通角色功能）
+        </van-button>
+
         <van-cell-group inset>
           <van-cell
             v-for="r in allRoles"
@@ -315,9 +370,22 @@ async function removeChild() {
             </template>
           </van-cell>
         </van-cell-group>
-        <p class="hint center">擁有標籤即開通對應功能（嚴格逐標籤授權）</p>
+        <p class="hint center">擁有標籤即開通對應功能（嚴格逐標籤授權）；未審核者僅能看公告</p>
         <van-button round block type="primary" :loading="savingMember" @click="saveMember">
           儲存
+        </van-button>
+        <van-button
+          v-if="editingMember.approved"
+          round
+          block
+          plain
+          class="del-btn"
+          @click="setApproved(false)"
+        >
+          取消核准（暫停使用）
+        </van-button>
+        <van-button round block plain type="danger" class="del-btn" @click="removeMember">
+          刪除成員
         </van-button>
       </div>
     </van-popup>
@@ -481,5 +549,11 @@ async function removeChild() {
 }
 .del-btn {
   margin-top: 8px;
+}
+.approve-btn {
+  margin-bottom: 14px;
+}
+.dim {
+  opacity: 0.45;
 }
 </style>

@@ -30,7 +30,12 @@ const router = createRouter({
           component: () => import('../views/MembersView.vue'),
           meta: { roles: ['admin'] },
         },
-        { path: 'songs', name: 'songs', component: () => import('../views/SongsView.vue') },
+        {
+          path: 'songs',
+          name: 'songs',
+          component: () => import('../views/SongsView.vue'),
+          meta: { requiresApproval: true },
+        },
         {
           path: 'records',
           name: 'records',
@@ -53,7 +58,9 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isLoggedIn) return { name: 'login' }
   if (to.name === 'login' && auth.isLoggedIn) return { name: 'home' }
-  // 標籤式權限：具備任一所需角色標籤即可進入（admin 於 can() 內放行）
+  // 審核制：未審核者僅能使用首頁（公告）與我的（帳號設定）
+  if (to.meta.requiresApproval && auth.profile && !auth.isApproved) return { name: 'home' }
+  // 標籤式權限：具備任一所需角色標籤即可進入（can() 內含審核檢查）
   const required = to.meta.roles as UserRole[] | undefined
   if (required && auth.profile && !required.some((r) => auth.can(r))) return { name: 'home' }
   return true
