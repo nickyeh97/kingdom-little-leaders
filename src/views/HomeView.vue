@@ -149,6 +149,12 @@ async function removeAnn() {
     </header>
 
     <van-notice-bar
+      v-if="auth.profile && !auth.isApproved"
+      left-icon="clock-o"
+      text="帳號審核中——請通知兒主同工核准，通過後即可使用完整功能"
+    />
+
+    <van-notice-bar
       v-if="needClassLog"
       left-icon="edit"
       mode="link"

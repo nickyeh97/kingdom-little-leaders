@@ -2,64 +2,28 @@
 
 > 「這樣，信心若沒有行為就是死的。」— 雅各書 2:17
 
-## 開發
-
-```bash
-npm install
-cp .env.example .env.local   # 填入 Supabase 專案的 URL 與 anon key
-npm run dev                  # 開發伺服器 http://localhost:5173
-npm run build                # 型別檢查 + production build（含 PWA）
-npm test                     # 單元與邊際測試（Vitest）
-npm run test:watch           # 開發時監看模式
-```
-
-### 測試
-
-- 框架：Vitest ＋ Vue Test Utils（元件）＋ jsdom
-- 測試位置：`src/**/__tests__/*.test.ts`，與被測程式碼相鄰
-- 涵蓋重點：主日/截止日日期邏輯（含跨月、跨年、截止瞬間等邊際）、
-  標籤式權限（`can()` 嚴格逐標籤）、路由守衛、Tabbar 角色顯示、表情選項守則檢核
-- CI：push / PR 會自動執行 build 與測試（`.github/workflows/ci.yml`）
-- 慣例：**新增功能時一併新增對應測試**；資料層權限以 Supabase RLS 為準，
-  端對端流程測試（Playwright）待功能穩定後導入
-
-### 部署（Vercel，一次性設定約 5 分鐘）
-
-1. 到 [vercel.com](https://vercel.com) 以 GitHub 帳號登入 → **Add New → Project** → 選 `kingdom-little-leaders` repo（首次需授權 Vercel 存取此 repo）。
-2. Framework 會自動偵測為 **Vite**，Build 設定不用改（`vercel.json` 已含 SPA 路由設定）。
-3. 展開 **Environment Variables**，加入兩個變數（值同 `.env.local`）：
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-4. 按 **Deploy**，完成後會得到 `https://<專案名>.vercel.app` 網址。
-5. 回 Supabase → **Authentication → URL Configuration**，把 **Site URL** 改為上述網址。
-6. 手機瀏覽器開啟網址 → 分享選單 → **加入主畫面**，即可像 App 一樣使用（PWA）。
-
-之後每次 push `main`，Vercel 會自動重新部署；PR 也會有預覽網址。
-
-### 後端初始化（一次性）
-
-1. 到 [supabase.com](https://supabase.com) 建立免費專案（區域選 Tokyo 較近）。
-2. SQL Editor 依序執行 `supabase/schema.sql` → `supabase/rls.sql` →（開發環境）`supabase/seed.sql`。
-3. Authentication → Users → 建立自己的帳號，並在 `profiles` 表把 `role` 改為 `admin`。
-4. Project Settings → API 取得 URL 與 anon key，填入 `.env.local`。
-
-
 以單一 Web APP / PWA 整合兒童主日學的日常行政與「神國小領袖」文化養成：
 
-- 📋 **出席預先統計**：家長每週勾選孩子是否出席，自動統計人數
-- ✅ **現場簽到**：老師主日現場點名，取代紙本/表單
-- 📖 **老師備課資源**：每週教材影音、討論問題、帶領提示、舞蹈教學影片
-- 🎵 **敬拜歌單佈達**：家長主日後可預習下週歌曲與影片
-- 🌱 **服事經歷卡**：記錄孩子自己的服事成長軌跡（不做排行、不做比較）
-- 📢 **家長公告**：公告發布與雙向互動
+- 📋 **出席預先統計**：家長每週勾選孩子是否出席（可留言給老師），自動統計人數
+- ✅ **現場簽到**：老師主日現場點名、臨時請假、課堂表情回饋與交接備註
+- 🎵 **敬拜歌單佈達**：每週歌單與 YouTube 連結，家長與孩子一起預習
+- 📢 **兒主公告**：管理者發布公告（置頂/標籤），所有人首頁可見
+- 📒 **課堂紀錄**：教學內容、詩歌進度、課後反饋，全年連貫呈現、可匯出 CSV
+- 👥 **名單與權限**：標籤式多角色（管理者/老師/家長）＋會員審核制，家長僅能看到自己綁定的孩子（資料庫層 RLS 強制）
+- 🌱 **服事經歷卡**（規劃中）：記錄孩子自己的服事成長軌跡（不做排行、不做比較）
 
 本專案隸屬於 [TBOJ（The Book of James）](https://github.com/nickyeh97/TBOJ) 信仰實踐計畫。
+
+## 線上版本
+
+📱 https://kingdom-little-leaders.vercel.app （手機瀏覽器開啟後可「加入主畫面」作為 App 使用）
 
 ## 技術棧
 
 - 前端：Vue 3 + Vite + Vant（mobile-first PWA）
 - 後端：Supabase（Postgres + Auth + Row Level Security）
 - 影音：外連 / 嵌入 YouTube
+- 部署：Vercel（push `main` 自動部署）
 
 ## 必讀文件
 
@@ -67,4 +31,6 @@ npm run test:watch           # 開發時監看模式
 | --- | --- |
 | [`docs/DESIGN_PRINCIPLES.md`](docs/DESIGN_PRINCIPLES.md) | **最高守則**——任何設計必須先通過檢核 |
 | [`docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md`](docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md) | 需求規格書（需求基準） |
-| [`CLAUDE.md`](CLAUDE.md) | AI 協作指引（角色權限、Roadmap、技術選型） |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 開發指南：開發/測試/後端初始化/部署/第三方登入設定 |
+| [`CLAUDE.md`](CLAUDE.md) | AI 協作指引（角色權限、Roadmap、技術選型、設計決議） |
+| [`docs/SPRINT_01.md`](docs/SPRINT_01.md)、[`docs/SPRINT_02.md`](docs/SPRINT_02.md) | 各階段開發範圍與回顧 |

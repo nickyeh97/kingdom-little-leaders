@@ -8,11 +8,20 @@
 -- =========================================================
 
 -- ---- 輔助函式（security definer 繞過 RLS 讀 profiles，避免遞迴）----
+create or replace function public.is_approved()
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select coalesce((select approved from profiles where id = auth.uid()), false)
+$$;
+
+-- 未審核者視同無任何角色標籤（審核機制：僅能看公告與帳號設定）
 create or replace function public.my_roles()
 returns user_role[]
 language sql stable security definer set search_path = public
 as $$
-  select roles from profiles where id = auth.uid()
+  select case when approved then roles else '{}'::user_role[] end
+  from profiles where id = auth.uid()
 $$;
 
 create or replace function public.has_role(r user_role)
@@ -40,7 +49,8 @@ create or replace function public.my_child_ids()
 returns setof uuid
 language sql stable security definer set search_path = public
 as $$
-  select child_id from family_links where parent_id = auth.uid()
+  select child_id from family_links
+  where parent_id = auth.uid() and public.is_approved()
 $$;
 
 -- ---- 啟用 RLS ----
@@ -65,9 +75,19 @@ create policy "profiles_update_self" on profiles
   for update to authenticated
   using (id = auth.uid() or public.is_admin())
   with check (
-    -- 非管理者不得改自己的 roles（防止自我提權）
-    public.is_admin() or (id = auth.uid() and roles = (select p.roles from profiles p where p.id = auth.uid()))
+    -- 非管理者不得改自己的 roles 與 approved（防止自我提權/自我審核）
+    public.is_admin()
+    or (
+      id = auth.uid()
+      and roles = (select p.roles from profiles p where p.id = auth.uid())
+      and approved = (select p.approved from profiles p where p.id = auth.uid())
+    )
   );
+
+-- 刪除成員：僅管理者、且不得刪除自己
+create policy "profiles_delete_admin" on profiles
+  for delete to authenticated
+  using (public.is_admin() and id <> auth.uid());
 
 -- ---- children：老師/管理者可讀全部；家長只讀自己綁定的；管理者可寫 ----
 create policy "children_read" on children
@@ -134,7 +154,7 @@ create policy "session_logs_write" on session_logs
 -- ---- songs：所有登入者可讀（家長預習/老師預備）；管理者可寫 ----
 alter table songs enable row level security;
 create policy "songs_read" on songs
-  for select to authenticated using (true);
+  for select to authenticated using (public.is_approved()); -- 未審核者僅剩公告
 create policy "songs_write" on songs
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());

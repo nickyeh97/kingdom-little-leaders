@@ -3,11 +3,12 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from '../auth'
 import type { Profile, UserRole } from '../../types'
 
-function profileWith(roles: UserRole[]): Profile {
+function profileWith(roles: UserRole[], approved = true): Profile {
   return {
     id: 'u1',
     display_name: '測試使用者',
     roles,
+    approved,
     auth_provider: 'email',
     phone: null,
     created_at: '2026-07-26T00:00:00Z',
@@ -52,6 +53,16 @@ describe('auth store：標籤式多角色權限', () => {
     expect(auth.can('admin')).toBe(true)
     expect(auth.can('teacher')).toBe(true)
     expect(auth.can('parent')).toBe(true)
+  })
+
+  it('審核制：未審核者即使具備標籤也無任何角色權限', () => {
+    const auth = useAuthStore()
+    auth.profile = profileWith(['admin', 'teacher', 'parent'], false)
+    expect(auth.isApproved).toBe(false)
+    expect(auth.isAdmin).toBe(false)
+    expect(auth.can('admin')).toBe(false)
+    expect(auth.can('teacher')).toBe(false)
+    expect(auth.can('parent')).toBe(false)
   })
 
   it('邊際：空標籤陣列視同無任何權限', () => {

@@ -87,9 +87,10 @@
 
 ### 登入策略
 
-- **Phase 1**：最簡單實作——邀請連結＋Email 簡易帳號（Supabase Auth email）。
-- **未來擴充**：Google、Apple（Supabase 內建 OAuth）、LINE（透過 Edge Function 自訂接入）。
-- 資料表設計時預留 `auth_provider` 等欄位，第三方登入接入時**不需改資料結構**。
+- **已實作**：Email 註冊/登入＋**Google OAuth 註冊/登入**（設定步驟見 README「Google 登入設定」）；session 由 supabase-js 持久化於 localStorage，回訪免重登。
+- **註冊即家長＋審核制**：任何管道註冊的新使用者預設角色 `parent`、`approved=false`（待審核）。**未審核者僅能看公告與帳號設定**——`my_roles()` 對未審核者回空陣列，所有角色權限在資料庫層自動失效；審核與取消核准、刪除成員皆於名單頁操作（防自我審核已入 RLS）。「邀請成員」＝分享平台網址給對方自行註冊。
+- **未來擴充**：Apple（Supabase 內建）、LINE（透過 Edge Function 自訂接入）。
+- `auth_provider` 欄位由 `handle_new_user` 觸發器自動寫入（email / google / …）。
 
 ### 注意事項
 
@@ -108,16 +109,20 @@
 2. **「有上課的老師」判定**：暫以「當天有點名動作」為代理判斷（首頁課後反饋提醒用）；待排班表功能上線後改為正式判定。
 3. **Google Sheet 全自動同步：暫緩**——需等**組長通知**取得教會 Google 雲端授權（Service Account）後，才以 Supabase Edge Function 串接；在此之前一律以 CSV 手動匯出→存 NAS／匯入 Google Sheet。
 
-## Repo 結構
+## Repo 結構與文件慣例
 
 ```
-README.md                              # 平台簡介
+README.md                              # 平台簡介與必讀文件索引（不放開發設定）
 CLAUDE.md                              # 本文件
 docs/DESIGN_PRINCIPLES.md              # 最高守則（設計檢核，必讀）
 docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md    # 需求規格書（需求基準）
+docs/DEVELOPMENT.md                    # 開發指南：開發/測試/後端初始化/部署/第三方登入設定
+docs/SPRINT_*.md                       # 各階段開發範圍與回顧
+src/                                   # 前端（views/api/stores/lib/components）
+supabase/                              # schema.sql、rls.sql、seed.sql 與 migrations/
 ```
 
-（程式碼結構於開發啟動時建立，屆時更新本節。）
+**文件慣例（已確認）**：最外層 `README.md` **不放開發設定**——開發、測試、部署、第三方登入、後端設定一律寫在 `docs/DEVELOPMENT.md`，README 只放專案簡介與必讀文件連結。
 
 ## 工作流程慣例
 

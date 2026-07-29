@@ -6,13 +6,14 @@ import { useAuthStore } from '../../stores/auth'
 import type { Profile, UserRole } from '../../types'
 import type { Session } from '@supabase/supabase-js'
 
-function loginAs(roles: UserRole[]) {
+function loginAs(roles: UserRole[], approved = true) {
   const auth = useAuthStore()
   auth.session = { user: { id: 'u1' } } as unknown as Session
   auth.profile = {
     id: 'u1',
     display_name: '測試使用者',
     roles,
+    approved,
     auth_provider: 'email',
     phone: null,
     created_at: '2026-07-26T00:00:00Z',
@@ -75,6 +76,16 @@ describe('路由守衛：登入與標籤式授權', () => {
     loginAs(['parent'])
     await router.push({ name: 'songs' })
     expect(router.currentRoute.value.name).toBe('songs')
+  })
+
+  it('審核制：未審核者即使有標籤也僅能停留首頁與我的', async () => {
+    loginAs(['parent', 'teacher'], false)
+    for (const name of ['attendance', 'checkin', 'songs', 'members'] as const) {
+      await router.push({ name })
+      expect(router.currentRoute.value.name).toBe('home')
+    }
+    await router.push({ name: 'me' })
+    expect(router.currentRoute.value.name).toBe('me')
   })
 
   it('組長情境：三標籤齊全可進所有頁面', async () => {
