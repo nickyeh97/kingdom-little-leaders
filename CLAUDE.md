@@ -114,6 +114,8 @@
 ```
 README.md                              # 平台簡介與必讀文件索引（不放開發設定）
 CLAUDE.md                              # 本文件
+.claude/skills/karpathy-guidelines/    # 程式撰寫行為守則 skill（先想再寫、簡單優先、
+                                       # 外科手術式修改、目標驅動；寫/改程式時遵循）
 docs/DESIGN_PRINCIPLES.md              # 最高守則（設計檢核，必讀）
 docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md    # 需求規格書（需求基準）
 docs/DEVELOPMENT.md                    # 開發指南：開發/測試/後端初始化/部署/第三方登入設定
