@@ -117,6 +117,7 @@ CLAUDE.md                              # 本文件
 docs/DESIGN_PRINCIPLES.md              # 最高守則（設計檢核，必讀）
 docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md    # 需求規格書（需求基準）
 docs/DEVELOPMENT.md                    # 開發指南：開發/測試/後端初始化/部署/第三方登入設定
+docs/PROGRESS.md                       # 進度總覽（單一事實來源；每個 Sprint 結束必更新）
 docs/SPRINT_*.md                       # 各階段開發範圍與回顧
 src/                                   # 前端（views/api/stores/lib/components）
 supabase/                              # schema.sql、rls.sql、seed.sql 與 migrations/
@@ -126,6 +127,7 @@ supabase/                              # schema.sql、rls.sql、seed.sql 與 mig
 
 ## 工作流程慣例
 
+- **進度文件（必遵守）**：`docs/PROGRESS.md` 是跨 session／跨協作者的**進度單一事實來源**。**每完成一次 Sprint（或外部設定完成、需求異動時）必須更新它**——已實作打勾、尚未實作調整、外部依賴與 Sprint 歷程表同步；任何新 session 開工前應先讀它掌握現況。
 - **測試**：框架為 Vitest；測試檔放在 `src/**/__tests__/*.test.ts`。新增或修改功能時**必須**同步新增/更新單元與邊際測試（日期邏輯、權限判斷尤其必要），送 PR 前跑 `npm test` 與 `npm run build` 確認全綠；CI 會於 push/PR 自動執行。
 - **分支**：功能開發在 `claude/*` 或 feature 分支進行，不直接 push `main`。
 - **Commit**：訊息以繁體中文為主，清楚描述「做了什麼、為什麼」。
