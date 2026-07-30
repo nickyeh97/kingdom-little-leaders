@@ -143,6 +143,12 @@ function openMemberEditor(m: Profile) {
   draftClasses.value = classesOf(m.id).map((g) => g.id)
 }
 
+function toggleRole(r: UserRole) {
+  draftRoles.value = draftRoles.value.includes(r)
+    ? draftRoles.value.filter((x) => x !== r)
+    : [...draftRoles.value, r]
+}
+
 function toggleClass(id: string) {
   draftClasses.value = draftClasses.value.includes(id)
     ? draftClasses.value.filter((x) => x !== id)
@@ -408,14 +414,10 @@ async function removeChild() {
             :key="r"
             clickable
             :title="roleLabel[r]"
-            @click="
-              draftRoles.includes(r)
-                ? (draftRoles = draftRoles.filter((x) => x !== r))
-                : draftRoles.push(r)
-            "
+            @click="toggleRole(r)"
           >
             <template #right-icon>
-              <van-checkbox :model-value="draftRoles.includes(r)" @click.stop />
+              <van-checkbox :model-value="draftRoles.includes(r)" @click.stop="toggleRole(r)" />
             </template>
           </van-cell>
         </van-cell-group>
@@ -430,7 +432,10 @@ async function removeChild() {
               @click="toggleClass(g.id)"
             >
               <template #right-icon>
-                <van-checkbox :model-value="draftClasses.includes(g.id)" @click.stop />
+                <van-checkbox
+                  :model-value="draftClasses.includes(g.id)"
+                  @click.stop="toggleClass(g.id)"
+                />
               </template>
             </van-cell>
           </van-cell-group>
@@ -491,7 +496,10 @@ async function removeChild() {
             @click="toggleParent(p.id)"
           >
             <template #right-icon>
-              <van-checkbox :model-value="childDraft.parentIds.includes(p.id)" @click.stop />
+              <van-checkbox
+                :model-value="childDraft.parentIds.includes(p.id)"
+                @click.stop="toggleParent(p.id)"
+              />
             </template>
           </van-cell>
           <van-cell v-if="parentMembers.length === 0" title="尚無具家長標籤的成員" />
@@ -578,6 +586,7 @@ async function removeChild() {
 }
 .editor {
   padding: 20px 16px 28px;
+  user-select: none; /* 快速點擊勾選時避免反白選字 */
 }
 .editor h3 {
   margin: 0 0 12px;

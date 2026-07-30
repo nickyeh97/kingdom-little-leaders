@@ -117,6 +117,7 @@ async function submit() {
         round
         block
         type="primary"
+        class="submit-btn"
         :loading="saving"
         :disabled="!open"
         @click="submit"
@@ -128,25 +129,50 @@ async function submit() {
 </template>
 
 <style scoped>
+/* 出席頁字級整體放大 1.4 倍（使用者回饋） */
 h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: 25px;
+}
+.hint {
+  font-size: 17px;
 }
 .kid {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.kid strong {
+  font-size: 22px;
+}
+.kid :deep(.van-tag) {
+  font-size: 15px;
+  padding: 3px 10px;
 }
 .seg {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
+.seg :deep(.van-button--small) {
+  height: 46px;
+  font-size: 20px;
+}
 .note {
-  margin-top: 10px;
-  padding: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
   background: var(--kll-bg);
   border-radius: 10px;
+}
+.note :deep(.van-field__control) {
+  font-size: 18px;
+}
+.card.hint {
+  font-size: 17px;
+}
+.submit-btn {
+  height: 54px;
+  font-size: 22px;
 }
 </style>
