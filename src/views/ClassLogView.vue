@@ -163,7 +163,7 @@ async function save() {
 <style scoped>
 h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: 25px;
 }
 .tabs {
   margin: 12px 0;
@@ -179,11 +179,11 @@ h2 {
 }
 .card p {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: 18px;
 }
 .label {
   color: var(--kll-sub);
-  font-size: 12px;
+  font-size: 17px;
   margin-right: 8px;
 }
 .fb {
@@ -197,7 +197,7 @@ h2 {
 .editor h3 {
   margin: 0 0 4px;
   text-align: center;
-  font-size: 16px;
+  font-size: 22px;
 }
 .editor .hint {
   text-align: center;

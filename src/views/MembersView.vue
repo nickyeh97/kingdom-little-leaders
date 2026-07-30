@@ -532,7 +532,7 @@ async function removeChild() {
 }
 .head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 25px;
 }
 .filters {
   display: flex;
@@ -546,8 +546,8 @@ async function removeChild() {
   gap: 12px;
 }
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: #e8eaed;
   flex-shrink: 0;
@@ -590,11 +590,11 @@ async function removeChild() {
 }
 .editor h3 {
   margin: 0 0 12px;
-  font-size: 16px;
+  font-size: 22px;
   text-align: center;
 }
 .invite-desc {
-  font-size: 13px;
+  font-size: 18px;
   color: var(--kll-sub);
   line-height: 1.7;
   margin: 0 0 14px;
@@ -603,7 +603,7 @@ async function removeChild() {
   background: var(--kll-bg);
   border-radius: 10px;
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: 17px;
   word-break: break-all;
   margin-bottom: 14px;
   text-align: center;

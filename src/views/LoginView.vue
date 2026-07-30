@@ -134,7 +134,7 @@ async function onGoogle() {
   text-align: center;
 }
 .brand h1 {
-  font-size: 22px;
+  font-size: 28px;
   margin: 12px 0 4px;
 }
 .logo {
@@ -149,7 +149,7 @@ async function onGoogle() {
 }
 .switch-mode {
   text-align: center;
-  font-size: 13px;
+  font-size: 18px;
   color: var(--kll-primary-dark);
   cursor: pointer;
   margin: 0 0 4px;
@@ -160,7 +160,7 @@ async function onGoogle() {
   gap: 12px;
   margin: 14px 16px;
   color: var(--kll-sub);
-  font-size: 12px;
+  font-size: 16px;
 }
 .divider::before,
 .divider::after {

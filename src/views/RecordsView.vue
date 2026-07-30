@@ -193,7 +193,7 @@ function exportLogs() {
 <style scoped>
 h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: 25px;
 }
 .export-row {
   display: flex;

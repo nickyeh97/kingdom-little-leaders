@@ -268,7 +268,7 @@ async function removeAnn() {
 }
 .top h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 25px;
 }
 .role-tags {
   display: flex;
@@ -294,7 +294,7 @@ async function removeAnn() {
 .ann-editor h3 {
   margin: 0 0 12px;
   text-align: center;
-  font-size: 16px;
+  font-size: 22px;
 }
 .tag-opt {
   margin-left: 8px;
@@ -312,10 +312,10 @@ async function removeAnn() {
 }
 .ann-title {
   flex: 1;
-  font-size: 15px;
+  font-size: 21px;
 }
 .ann-body {
-  font-size: 13px;
+  font-size: 18px;
   color: var(--kll-sub);
   margin: 8px 0;
   white-space: pre-wrap;

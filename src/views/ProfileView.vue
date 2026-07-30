@@ -57,7 +57,7 @@ async function logout() {
 <style scoped>
 h2 {
   margin: 0 0 12px;
-  font-size: 18px;
+  font-size: 25px;
 }
 .center {
   display: flex;

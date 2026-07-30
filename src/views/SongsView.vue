@@ -164,7 +164,7 @@ async function remove() {
 <style scoped>
 h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: 25px;
 }
 .section-row {
   display: flex;
@@ -178,12 +178,12 @@ h2 {
   gap: 10px;
 }
 .num {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--kll-primary-soft);
   color: var(--kll-primary);
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -192,7 +192,7 @@ h2 {
 }
 .title {
   flex: 1;
-  font-size: 15px;
+  font-size: 21px;
 }
 .song-actions {
   display: flex;
@@ -204,7 +204,7 @@ h2 {
   padding: 10px 12px;
   background: var(--kll-bg);
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 18px;
   white-space: pre-wrap;
   color: var(--kll-text);
 }
@@ -214,7 +214,7 @@ h2 {
 .editor h3 {
   margin: 0 0 4px;
   text-align: center;
-  font-size: 16px;
+  font-size: 22px;
 }
 .center {
   text-align: center;

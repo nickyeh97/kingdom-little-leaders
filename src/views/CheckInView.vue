@@ -273,7 +273,7 @@ async function saveDetail() {
 }
 .top h2 {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: 25px;
 }
 .tabs {
   margin-bottom: 12px;
@@ -290,7 +290,7 @@ async function saveDetail() {
   gap: 2px;
 }
 .stat strong {
-  font-size: 20px;
+  font-size: 28px;
 }
 .kid-main {
   display: flex;
@@ -316,7 +316,7 @@ async function saveDetail() {
 .moods,
 .teacher-note {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 17px;
   border-radius: 8px;
   padding: 6px 10px;
 }
@@ -335,7 +335,7 @@ async function saveDetail() {
 }
 .editor h3 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: 22px;
   text-align: center;
 }
 .editor .hint {
