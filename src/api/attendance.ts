@@ -29,6 +29,17 @@ export async function listPlans(gatheringDate: string): Promise<AttendancePlan[]
   return data as AttendancePlan[]
 }
 
+/** 取得日期區間的預先出席（出席行事曆用；RLS：家長只拿得到自己孩子的） */
+export async function listPlansRange(from: string, to: string): Promise<AttendancePlan[]> {
+  const { data, error } = await db()
+    .from('attendance_plans')
+    .select('*')
+    .gte('gathering_date', from)
+    .lte('gathering_date', to)
+  if (error) throw error
+  return data as AttendancePlan[]
+}
+
 /** 家長送出：一次 upsert 多個孩子的狀態＋給老師的話 */
 export async function upsertPlans(
   gatheringDate: string,
