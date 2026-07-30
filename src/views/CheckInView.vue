@@ -13,8 +13,10 @@ import {
 } from '../api/checkin'
 import { MOOD_OPTIONS, moodKey } from '../lib/moods'
 import { formatGathering, upcomingGathering } from '../lib/gathering'
+import { useAuthStore } from '../stores/auth'
 import type { AttendancePlan, CheckIn, CheckInStatus, Child, ClassGroup } from '../types'
 
+const auth = useAuthStore()
 const gathering = upcomingGathering()
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
@@ -64,8 +66,10 @@ async function loadClass() {
 
 onMounted(async () => {
   try {
-    groups.value = await listClassGroups()
+    // 老師標籤班別化：只顯示自己被指派的班別
+    groups.value = (await listClassGroups()).filter((g) => auth.canClass(g.id))
     activeGroup.value = groups.value[0]?.id ?? ''
+    if (!activeGroup.value) loading.value = false
   } catch (e) {
     showFailToast((e as Error).message)
     loading.value = false
@@ -175,7 +179,10 @@ async function saveDetail() {
       <div class="stat card"><strong>{{ stats.leave }}</strong><span class="hint">臨時請假</span></div>
     </div>
 
-    <van-skeleton v-if="loading" title :row="5" />
+    <div v-if="groups.length === 0" class="card hint">
+      您尚未被指派任何班別，請聯繫核心同工於名單頁設定
+    </div>
+    <van-skeleton v-else-if="loading" title :row="5" />
     <template v-else>
       <div v-if="children.length === 0" class="card hint">此班別尚無孩子名單</div>
       <div v-for="c in sortedChildren" :key="c.id" class="card kid-card">

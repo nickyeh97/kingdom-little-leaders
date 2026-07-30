@@ -45,6 +45,28 @@ as $$
   select public.has_role('admin') or public.has_role('teacher')
 $$;
 
+-- 是否為某班別的老師（老師標籤班別化）
+create or replace function public.has_class_role(cg uuid)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select public.has_role('teacher')
+     and exists (
+       select 1 from teacher_class_assignments
+       where teacher_id = auth.uid() and class_group_id = cg
+     )
+$$;
+
+create or replace function public.child_in_my_class(cid uuid)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select exists (
+    select 1 from children c
+    where c.id = cid and public.has_class_role(c.class_group_id)
+  )
+$$;
+
 create or replace function public.my_child_ids()
 returns setof uuid
 language sql stable security definer set search_path = public
@@ -61,6 +83,14 @@ alter table family_links enable row level security;
 alter table attendance_plans enable row level security;
 alter table check_ins enable row level security;
 alter table announcements enable row level security;
+
+-- ---- teacher_class_assignments：登入者可讀（顯示班別老師標籤）；管理者可寫 ----
+alter table teacher_class_assignments enable row level security;
+create policy "tca_read" on teacher_class_assignments
+  for select to authenticated using (true);
+create policy "tca_write" on teacher_class_assignments
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 -- ---- class_groups：登入者可讀，管理者可寫 ----
 create policy "class_groups_read" on class_groups
@@ -122,12 +152,12 @@ create policy "check_ins_read" on check_ins
   for select to authenticated
   using (public.has_role('teacher') or public.has_role('admin'));
 create policy "check_ins_insert" on check_ins
-  for insert to authenticated with check (public.has_role('teacher'));
+  for insert to authenticated with check (public.child_in_my_class(child_id));
 create policy "check_ins_update" on check_ins
   for update to authenticated
-  using (public.has_role('teacher')) with check (public.has_role('teacher'));
+  using (public.child_in_my_class(child_id)) with check (public.child_in_my_class(child_id));
 create policy "check_ins_delete" on check_ins
-  for delete to authenticated using (public.has_role('teacher'));
+  for delete to authenticated using (public.child_in_my_class(child_id));
 
 -- ---- session_feedback：老師可寫；老師/同工與孩子的家長可讀 ----
 alter table session_feedback enable row level security;
@@ -140,7 +170,7 @@ create policy "feedback_read" on session_feedback
   );
 create policy "feedback_write" on session_feedback
   for all to authenticated
-  using (public.has_role('teacher')) with check (public.has_role('teacher'));
+  using (public.child_in_my_class(child_id)) with check (public.child_in_my_class(child_id));
 
 -- ---- session_logs：老師與同工可讀（全年反饋連貫呈現）；老師可寫 ----
 alter table session_logs enable row level security;
@@ -149,7 +179,7 @@ create policy "session_logs_read" on session_logs
   using (public.has_role('teacher') or public.has_role('admin'));
 create policy "session_logs_write" on session_logs
   for all to authenticated
-  using (public.has_role('teacher')) with check (public.has_role('teacher'));
+  using (public.has_class_role(class_group_id)) with check (public.has_class_role(class_group_id));
 
 -- ---- songs：所有登入者可讀（家長預習/老師預備）；管理者可寫 ----
 alter table songs enable row level security;

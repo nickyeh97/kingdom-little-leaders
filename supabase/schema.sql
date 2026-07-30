@@ -30,6 +30,13 @@ create table profiles (
   created_at timestamptz not null default now()
 );
 
+-- 老師×班別 指派（老師標籤班別化：點名/日誌等依班別授權）
+create table teacher_class_assignments (
+  teacher_id uuid not null references profiles (id) on delete cascade,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  primary key (teacher_id, class_group_id)
+);
+
 -- 孩子（不建帳號；由家長/老師代操作）
 create table children (
   id uuid primary key default gen_random_uuid(),

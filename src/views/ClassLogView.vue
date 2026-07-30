@@ -101,13 +101,14 @@ async function save() {
     </van-tabs>
 
     <van-notice-bar
-      v-if="auth.can('teacher') && withinDue && !currentLog"
+      v-if="auth.canClass(activeGroup) && withinDue && !currentLog"
       left-icon="edit"
       :text="`本堂（${today}）尚未填寫，請於 ${dueDate.toLocaleDateString('zh-TW')}（${weekdayName(dueDate)}）23:59 前完成`"
     />
 
+    <!-- 老師標籤班別化：僅能填寫/編輯自己被指派的班別；其他班別可閱讀 -->
     <van-button
-      v-if="auth.can('teacher')"
+      v-if="auth.canClass(activeGroup)"
       round
       block
       type="primary"
@@ -124,7 +125,7 @@ async function save() {
         v-for="l in classLogs"
         :key="l.id"
         class="card"
-        @click="auth.can('teacher') && openEditor(l)"
+        @click="auth.canClass(activeGroup) && openEditor(l)"
       >
         <div class="log-head">
           <strong>{{ l.gathering_date }}</strong>
