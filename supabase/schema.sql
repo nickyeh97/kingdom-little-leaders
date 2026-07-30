@@ -128,12 +128,14 @@ create trigger on_session_log_update
   before update on session_logs
   for each row execute function public.touch_session_log();
 
--- 敬拜歌單：每聚會日一組（約 4 首）；影音一律外連 YouTube
+-- 敬拜詩歌「曲庫」（v3 決議 5）：可一次上傳整學期、越新越上面；
+-- 影音一律外連 YouTube（youtube_url＝詩歌、dance_url＝詩歌舞蹈）
 create table songs (
   id uuid primary key default gen_random_uuid(),
-  gathering_date date not null,
+  gathering_date date, -- 舊「每週歌單」時期欄位；曲庫化後由 song_schedule 排程
   title text not null,
   youtube_url text,
+  dance_url text,
   lyrics text,
   sort_order int not null default 0,
   created_by uuid not null default auth.uid() references profiles (id),
@@ -142,12 +144,45 @@ create table songs (
 
 create index idx_songs_date on songs (gathering_date);
 
--- 公告（所有登入者可讀）
+-- 歌單排程（班別 × 聚會日）：「本週＊＊班的詩歌」「下週＊＊班的詩歌」由日期推導
+create table song_schedule (
+  id uuid primary key default gen_random_uuid(),
+  song_id uuid not null references songs (id) on delete cascade,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  gathering_date date not null,
+  unique (song_id, class_group_id, gathering_date)
+);
+create index idx_song_schedule_date on song_schedule (gathering_date);
+
+-- 兩維熟悉度（班別 × 歌曲；「歌曲」與「動作」各 1–3：陌生/練習中/熟悉）
+-- 是班級整體的練習進度，不評比個別孩子；幼幼班老師不需填寫（前端不顯示）
+create table song_familiarity (
+  song_id uuid not null references songs (id) on delete cascade,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  song_level smallint check (song_level between 1 and 3),
+  motion_level smallint check (motion_level between 1 and 3),
+  updated_by uuid not null default auth.uid() references profiles (id),
+  updated_at timestamptz not null default now(),
+  primary key (song_id, class_group_id)
+);
+
+create or replace function public.touch_song_familiarity()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  new.updated_by := auth.uid();
+  return new;
+end $$;
+create trigger trg_touch_song_familiarity before update on song_familiarity
+  for each row execute function public.touch_song_familiarity();
+
+-- 公告（所有登入者可讀）；class_group_id：null＝全體公告，其餘為班別公告（v3 決議 4）
 create table announcements (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   body text not null,
   tag text not null default '公告',
+  class_group_id uuid references class_groups (id),
   pinned boolean not null default false,
   created_by uuid not null default auth.uid() references profiles (id),
   created_at timestamptz not null default now()

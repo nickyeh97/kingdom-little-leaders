@@ -189,11 +189,31 @@ create policy "songs_write" on songs
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
--- ---- announcements：所有登入者可讀；管理者可寫 ----
+-- ---- announcements：所有登入者可讀；同工可寫全部、各班老師僅能寫自己班別（v3 決議 4）----
 create policy "announcements_read" on announcements
   for select to authenticated using (true);
-create policy "announcements_write" on announcements
+create policy "announcements_admin_write" on announcements
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "announcements_teacher_write" on announcements
+  for all to authenticated
+  using (class_group_id is not null and public.has_class_role(class_group_id))
+  with check (class_group_id is not null and public.has_class_role(class_group_id));
+
+-- ---- song_schedule / song_familiarity（v3 決議 5）----
+alter table song_schedule enable row level security;
+create policy "song_schedule_read" on song_schedule
+  for select to authenticated using (public.is_approved());
+create policy "song_schedule_write" on song_schedule
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table song_familiarity enable row level security;
+create policy "song_familiarity_read" on song_familiarity
+  for select to authenticated using (public.is_approved());
+create policy "song_familiarity_write" on song_familiarity
+  for all to authenticated
+  using (public.is_admin() or public.has_class_role(class_group_id))
+  with check (public.is_admin() or public.has_class_role(class_group_id));
 
 -- ---- 家長端「出席勾勾」（v3 決議 2 / Figma S3 幼幼班走勢）----
 -- 只回傳自己綁定孩子的簽到「狀態」；check_ins 的 note（老師交接備註）

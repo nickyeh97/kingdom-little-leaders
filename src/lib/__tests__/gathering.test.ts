@@ -9,6 +9,7 @@ import {
   recordsRangeStart,
   upcomingGathering,
   weekdayName,
+  nextGathering,
   recentGatherings,
   shortDate,
 } from '../gathering'
@@ -198,5 +199,17 @@ describe('shortDate', () => {
     expect(shortDate('2026-07-18')).toBe('7/18')
     expect(shortDate('2026-08-01')).toBe('8/1')
     expect(shortDate('2026-12-25')).toBe('12/25')
+  })
+})
+
+describe('nextGathering（歌單「下週」標籤用）', () => {
+  const D = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12)
+
+  it('回傳本週聚會日 + 7 天', () => {
+    expect(nextGathering(D(2026, 8, 5), 6)).toBe('2026-08-15') // 本週 8/8 → 下週 8/15
+  })
+
+  it('邊際：當天就是聚會日時，下週＝當天 + 7', () => {
+    expect(nextGathering(D(2026, 8, 1), 6)).toBe('2026-08-08')
   })
 })

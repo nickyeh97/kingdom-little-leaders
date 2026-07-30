@@ -65,6 +65,14 @@ export function recordsRangeStart(from = new Date(), months = RECORDS_MONTHS): s
   return toDateString(d)
 }
 
+/** 下下次之前的「下週」聚會日（本週聚會日 + 7 天）— 供歌單「下週＊＊班」標籤 */
+export function nextGathering(from = new Date(), weekday = GATHERING_WEEKDAY): string {
+  const up = upcomingGathering(from, weekday)
+  const d = new Date(`${up}T00:00:00`)
+  d.setDate(d.getDate() + 7)
+  return toDateString(d)
+}
+
 /** 近 N 次聚會日（舊 → 新，最後一筆＝最近一次聚會）— 供家長端近三週走勢 */
 export function recentGatherings(
   count: number,

@@ -82,14 +82,33 @@ export interface SessionLog {
   updated_at: string
 }
 
-/** 敬拜歌單的歌曲：每聚會日一組，影音外連 YouTube */
+/** 敬拜詩歌曲庫（v3 決議 5）：影音外連 YouTube（youtube_url＝詩歌、dance_url＝詩歌舞蹈） */
 export interface Song {
   id: string
-  gathering_date: string
   title: string
   youtube_url: string | null
+  dance_url: string | null
   lyrics: string | null
-  sort_order: number
+  created_at: string
+  /** 巢狀查詢帶回的排程與熟悉度 */
+  song_schedule?: SongSchedule[]
+  song_familiarity?: SongFamiliarity[]
+}
+
+/** 歌單排程：班別 × 聚會日（「本週＊＊班」「下週＊＊班」由日期推導） */
+export interface SongSchedule {
+  id: string
+  song_id: string
+  class_group_id: string
+  gathering_date: string
+}
+
+/** 兩維熟悉度（班別 × 歌曲；1–3：陌生/練習中/熟悉；不評比個別孩子） */
+export interface SongFamiliarity {
+  song_id: string
+  class_group_id: string
+  song_level: number | null
+  motion_level: number | null
 }
 
 export interface Announcement {
@@ -97,6 +116,9 @@ export interface Announcement {
   title: string
   body: string
   tag: string
+  /** 班別歸屬：null＝全體公告（v3 決議 4） */
+  class_group_id: string | null
+  class_groups?: { name: string } | null
   pinned: boolean
   created_by: string
   created_at: string
