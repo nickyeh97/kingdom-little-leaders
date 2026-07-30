@@ -9,6 +9,7 @@ import {
   listSessionLogsRange,
 } from '../api/records'
 import { downloadCsv } from '../lib/csv'
+import { engagementOf } from '../lib/engagement'
 import { recordsRangeStart, upcomingGathering } from '../lib/gathering'
 import type { AttendancePlan, CheckIn, Child, SessionFeedback, SessionLog } from '../types'
 
@@ -36,6 +37,7 @@ interface DateGroup {
     plan?: AttendancePlan
     check?: CheckIn
     moods: string[]
+    engagement: number | null
   }[]
 }
 
@@ -52,7 +54,7 @@ const groups = computed<DateGroup[]>(() => {
     if (!row) {
       const child = childMap.value.get(childId)
       if (!child) return null
-      row = { child, moods: [] }
+      row = { child, moods: [], engagement: null }
       g.rows.push(row)
     }
     return row
@@ -67,7 +69,10 @@ const groups = computed<DateGroup[]>(() => {
   }
   for (const f of feedback.value) {
     const row = rowFor(f.gathering_date, f.child_id)
-    if (row) row.moods = f.moods
+    if (row) {
+      row.moods = f.moods
+      row.engagement = f.engagement
+    }
   }
   for (const g of byDate.values()) {
     g.planned = g.rows.filter((r) => r.plan?.status === 'attending').length
@@ -101,7 +106,7 @@ const checkLabel = { present: '簽到', leave: '臨時請假' } as const
 /** 匯出「出席與學生狀況」：出席統計＋簽到＋表情＋備註整合於同一份表 */
 function exportAttendance() {
   const rows: string[][] = [
-    ['日期', '班別', '孩子', '預先出席', '家長備註', '當日狀態', '現場加入', '課堂表情', '老師備註'],
+    ['日期', '班別', '孩子', '預先出席', '家長備註', '當日狀態', '現場加入', '專心/配合', '課堂表情', '老師備註'],
   ]
   for (const g of [...groups.value].reverse()) {
     for (const r of g.rows) {
@@ -113,6 +118,7 @@ function exportAttendance() {
         r.plan?.note ?? '',
         r.check ? checkLabel[r.check.status] : '未紀錄',
         r.check?.is_walk_in ? '是' : '',
+        engagementOf(r.engagement)?.label ?? '',
         r.moods.join('、'),
         r.check?.note ?? '',
       ])
@@ -177,6 +183,9 @@ function exportLogs() {
               </van-tag>
             </div>
             <p v-if="r.plan?.note" class="hint">💬 家長：{{ r.plan.note }}</p>
+            <p v-if="r.engagement" class="hint">
+              {{ engagementOf(r.engagement)?.emoji }} 專心/配合：{{ engagementOf(r.engagement)?.label }}
+            </p>
             <p v-if="r.moods.length" class="hint">{{ r.moods.join('、') }}</p>
             <p v-if="r.check?.note" class="hint">📝 {{ r.check.note }}</p>
           </div>

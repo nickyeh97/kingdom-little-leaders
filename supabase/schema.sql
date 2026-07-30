@@ -88,6 +88,9 @@ create table session_feedback (
   child_id uuid not null references children (id) on delete cascade,
   gathering_date date not null,
   moods text[] not null default '{}',
+  -- 專心/配合指數（v3 決議 2）：4=😍 非常投入、3=🙂 投入、2=😐 普通、1=🥱 需要休息；
+  -- 「狀態」而非「成績」語彙；null＝未評（幼幼班一律不評）
+  engagement smallint check (engagement between 1 and 4),
   created_by uuid not null default auth.uid() references profiles (id),
   updated_at timestamptz not null default now(),
   unique (child_id, gathering_date)

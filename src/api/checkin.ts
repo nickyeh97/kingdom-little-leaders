@@ -1,5 +1,12 @@
 import { db } from '../lib/supabase'
-import type { CheckIn, CheckInStatus, Child, ClassGroup, SessionFeedback } from '../types'
+import type {
+  CheckIn,
+  CheckInMark,
+  CheckInStatus,
+  Child,
+  ClassGroup,
+  SessionFeedback,
+} from '../types'
 
 export async function listClassGroups(): Promise<ClassGroup[]> {
   const { data, error } = await db().from('class_groups').select('*').order('sort_order')
@@ -74,4 +81,29 @@ export async function upsertFeedback(
       { onConflict: 'child_id,gathering_date' },
     )
   if (error) throw error
+}
+
+/** 老師點名列：標記/取消專心配合指數（null＝取消；moods 維持不動） */
+export async function setEngagement(
+  childId: string,
+  gatheringDate: string,
+  engagement: number | null,
+): Promise<void> {
+  const { error } = await db()
+    .from('session_feedback')
+    .upsert(
+      { child_id: childId, gathering_date: gatheringDate, engagement },
+      { onConflict: 'child_id,gathering_date' },
+    )
+  if (error) throw error
+}
+
+/** 家長端出席勾勾（S3 幼幼班走勢）：僅回傳自己孩子的簽到狀態，不含老師備註 */
+export async function listMyCheckinMarks(from: string, to: string): Promise<CheckInMark[]> {
+  const { data, error } = await db().rpc('parent_checkin_marks', {
+    from_date: from,
+    to_date: to,
+  })
+  if (error) throw error
+  return (data ?? []) as CheckInMark[]
 }

@@ -65,6 +65,29 @@ export function recordsRangeStart(from = new Date(), months = RECORDS_MONTHS): s
   return toDateString(d)
 }
 
+/** 近 N 次聚會日（舊 → 新，最後一筆＝最近一次聚會）— 供家長端近三週走勢 */
+export function recentGatherings(
+  count: number,
+  from = new Date(),
+  weekday = GATHERING_WEEKDAY,
+): string[] {
+  const last = lastGathering(from, weekday)
+  const d = new Date(`${last}T00:00:00`)
+  d.setDate(d.getDate() - 7 * (count - 1))
+  const dates: string[] = []
+  for (let i = 0; i < count; i++) {
+    dates.push(toDateString(d))
+    d.setDate(d.getDate() + 7)
+  }
+  return dates
+}
+
+/** 「M/D」短日期（走勢軸標籤用） */
+export function shortDate(date: string): string {
+  const [, m, d] = date.split('-')
+  return `${Number(m)}/${Number(d)}`
+}
+
 export function formatGathering(gatheringDate: string): string {
   const [y, m, d] = gatheringDate.split('-')
   return `${y}/${m}/${d}（主日）`

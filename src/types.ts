@@ -57,7 +57,16 @@ export interface SessionFeedback {
   child_id: string
   gathering_date: string
   moods: string[]
+  /** 專心/配合指數 1–4（4 最投入）；null＝未評（幼幼班一律不評） */
+  engagement: number | null
   created_by: string
+}
+
+/** 家長端出席勾勾（parent_checkin_marks RPC 回傳；不含老師備註） */
+export interface CheckInMark {
+  child_id: string
+  gathering_date: string
+  status: CheckInStatus
 }
 
 /** 課堂紀錄：每班每聚會日一筆（日期、老師、教學內容、詩歌進度、課後反饋） */

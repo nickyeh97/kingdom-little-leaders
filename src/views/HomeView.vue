@@ -8,29 +8,42 @@ import {
   updateAnnouncement,
 } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
-import { listCheckIns, listFeedback } from '../api/checkin'
-import { listAllChildren, listSessionLogsRange } from '../api/records'
+import { listCheckIns, listMyCheckinMarks } from '../api/checkin'
+import { listAllChildren, listFeedbackRange, listSessionLogsRange } from '../api/records'
+import { classHasIndex, engagementOf } from '../lib/engagement'
 import {
   feedbackDeadline,
   isFeedbackOpen,
   lastGathering,
   planDeadline,
+  recentGatherings,
+  shortDate,
   upcomingGathering,
   isPlanOpen,
   weekdayName,
 } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
-import type { Announcement, Child } from '../types'
+import type { Announcement, Child, SessionFeedback } from '../types'
 
 const auth = useAuthStore()
 const announcements = ref<Announcement[]>([])
 const loading = ref(true)
 /** 家長：本週還有孩子未填預先出席 */
 const needPlan = ref(false)
-/** 家長：上週各孩子的課堂表情回饋 */
-const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 const gathering = upcomingGathering()
 const deadline = planDeadline(gathering)
+
+/** 家長：課堂回饋（本週指數＋近三週走勢＋表情標籤；S3） */
+const trendDates = recentGatherings(3) // 舊 → 新，最後一筆＝最近一次聚會
+interface FeedbackCard {
+  child: Child
+  hasIndex: boolean
+  /** 本週（最近一次聚會）的回饋 */
+  thisWeek?: SessionFeedback
+  /** 走勢：依 trendDates 序，每格為指數值（評指數班）或是否出席（幼幼班） */
+  trend: { date: string; engagement: number | null; present: boolean }[]
+}
+const feedbackCards = ref<FeedbackCard[]>([])
 /** 老師：上堂課的課堂紀錄尚未填寫（兩天內提醒） */
 const needClassLog = ref(false)
 const lastG = lastGathering()
@@ -40,19 +53,31 @@ onMounted(async () => {
   try {
     announcements.value = await listAnnouncements()
     if (auth.can('parent')) {
-      const [children, plans, feedback] = await Promise.all([
+      const [children, plans, feedback, marks] = await Promise.all([
         listMyChildren(),
         listPlans(gathering),
-        listFeedback(lastGathering()),
+        listFeedbackRange(trendDates[0], trendDates[trendDates.length - 1]),
+        listMyCheckinMarks(trendDates[0], trendDates[trendDates.length - 1]),
       ])
       if (isPlanOpen(gathering)) {
         const planned = new Set(plans.map((p) => p.child_id))
         needPlan.value = children.some((c) => !planned.has(c.id))
       }
-      const byChild = new Map(feedback.map((f) => [f.child_id, f.moods]))
-      lastFeedback.value = children
-        .filter((c) => (byChild.get(c.id) ?? []).length > 0)
-        .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
+      const fbKey = new Map(feedback.map((f) => [`${f.gathering_date}|${f.child_id}`, f]))
+      const presentKey = new Set(
+        marks.filter((m) => m.status === 'present').map((m) => `${m.gathering_date}|${m.child_id}`),
+      )
+      const latest = trendDates[trendDates.length - 1]
+      feedbackCards.value = children.map((c) => ({
+        child: c,
+        hasIndex: classHasIndex(c.class_groups?.name),
+        thisWeek: fbKey.get(`${latest}|${c.id}`),
+        trend: trendDates.map((date) => ({
+          date,
+          engagement: fbKey.get(`${date}|${c.id}`)?.engagement ?? null,
+          present: presentKey.has(`${date}|${c.id}`),
+        })),
+      }))
     }
     // 老師：上堂課（兩天內）若有自己點名過的班別還沒填課堂紀錄 → 提醒
     if (auth.can('teacher') && isFeedbackOpen(lastG)) {
@@ -172,12 +197,40 @@ async function removeAnn() {
       @click="$router.push({ name: 'attendance' })"
     />
 
-    <template v-if="lastFeedback.length > 0">
-      <h3 class="section-title">上週課堂回饋</h3>
-      <div v-for="f in lastFeedback" :key="f.child.id" class="card">
-        <strong>{{ f.child.name }}</strong>
-        <div class="mood-tags">
-          <van-tag v-for="m in f.moods" :key="m" round type="primary" plain size="medium">
+    <template v-if="feedbackCards.length > 0">
+      <h3 class="section-title">課堂回饋</h3>
+      <p class="hint fb-hint">僅您能看到自己孩子的回饋與指數</p>
+      <div v-for="f in feedbackCards" :key="f.child.id" class="card">
+        <div class="fb-head">
+          <strong>{{ f.child.name }}</strong>
+          <span class="hint">{{ f.child.class_groups?.name ?? '' }}</span>
+        </div>
+        <div class="fb-week">
+          <span class="fb-emoji">
+            {{ f.hasIndex ? (engagementOf(f.thisWeek?.engagement)?.emoji ?? '—') : '—' }}
+          </span>
+          <div>
+            <p class="hint fb-label">本週（{{ shortDate(trendDates[trendDates.length - 1]) }}）專心/配合</p>
+            <strong class="fb-status">
+              {{ f.hasIndex
+                ? (engagementOf(f.thisWeek?.engagement)?.label ?? '本週尚無紀錄')
+                : '幼幼班不評指數' }}
+            </strong>
+          </div>
+        </div>
+        <p class="hint fb-label">近三週</p>
+        <div class="fb-trend">
+          <div v-for="t in f.trend" :key="t.date" class="fb-cell">
+            <span class="fb-mark">
+              {{ f.hasIndex
+                ? (engagementOf(t.engagement)?.emoji ?? '–')
+                : (t.present ? '✓' : '–') }}
+            </span>
+            <span class="hint">{{ shortDate(t.date) }}</span>
+          </div>
+        </div>
+        <div v-if="(f.thisWeek?.moods ?? []).length" class="mood-tags">
+          <van-tag v-for="m in f.thisWeek!.moods" :key="m" round type="primary" plain size="medium">
             {{ m }}
           </van-tag>
         </div>
@@ -279,6 +332,56 @@ async function removeAnn() {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+.fb-hint {
+  margin: -6px 0 10px;
+}
+.fb-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.fb-week {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--kll-bg);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.fb-emoji {
+  font-size: 34px;
+  line-height: 1;
+}
+.fb-label {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+.fb-status {
+  font-size: 20px;
+}
+.fb-week + .fb-label {
+  margin-top: 12px;
+}
+.fb-trend {
+  display: flex;
+  gap: 18px;
+  margin-top: 4px;
+}
+.fb-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.fb-mark {
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--kll-primary-dark);
+}
+.fb-cell .hint {
+  font-size: 14px;
 }
 .section-row {
   display: flex;

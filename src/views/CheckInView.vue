@@ -8,9 +8,11 @@ import {
   listClassGroups,
   listFeedback,
   removeCheckIn,
+  setEngagement,
   upsertCheckIn,
   upsertFeedback,
 } from '../api/checkin'
+import { ENGAGEMENT_LEVELS, classHasIndex } from '../lib/engagement'
 import { MOOD_OPTIONS, moodKey } from '../lib/moods'
 import { formatGathering, upcomingGathering } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
@@ -24,7 +26,13 @@ const children = ref<Child[]>([])
 const planMap = ref(new Map<string, AttendancePlan>())
 const checkMap = ref(new Map<string, CheckIn>())
 const moodsMap = ref(new Map<string, string[]>())
+const engagementMap = ref(new Map<string, number | null>())
 const loading = ref(true)
+
+/** 幼幼班點名不顯示指數列（v3 決議 2） */
+const showIndex = computed(() =>
+  classHasIndex(groups.value.find((g) => g.id === activeGroup.value)?.name),
+)
 
 const stats = computed(() => {
   const ids = children.value.map((c) => c.id)
@@ -57,6 +65,7 @@ async function loadClass() {
     planMap.value = new Map(plans.map((p) => [p.child_id, p]))
     checkMap.value = new Map(checks.map((c) => [c.child_id, c]))
     moodsMap.value = new Map(feedback.map((f) => [f.child_id, f.moods]))
+    engagementMap.value = new Map(feedback.map((f) => [f.child_id, f.engagement]))
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -104,6 +113,20 @@ async function setStatus(child: Child, target: CheckInStatus) {
       next.set(child.id, { ...(current ?? { id: '', checked_by: '' }), ...entry } as CheckIn)
       checkMap.value = next
     }
+  } catch (e) {
+    showFailToast((e as Error).message)
+  }
+}
+
+/** 點名列指數：點同一顆＝取消，點另一顆＝改標（即存） */
+async function markEngagement(child: Child, value: number) {
+  const current = engagementMap.value.get(child.id) ?? null
+  const next = current === value ? null : value
+  try {
+    await setEngagement(child.id, gathering, next)
+    const map = new Map(engagementMap.value)
+    map.set(child.id, next)
+    engagementMap.value = map
   } catch (e) {
     showFailToast((e as Error).message)
   }
@@ -213,6 +236,23 @@ async function saveDetail() {
             <van-button size="small" plain type="primary" @click="openDetail(c)">紀錄</van-button>
           </div>
         </div>
+        <div v-if="showIndex" class="engage-row">
+          <span class="engage-label">專心/配合</span>
+          <button
+            v-for="lv in ENGAGEMENT_LEVELS"
+            :key="lv.value"
+            type="button"
+            class="engage-btn"
+            :class="{ on: engagementMap.get(c.id) === lv.value }"
+            :aria-label="lv.label"
+            @click="markEngagement(c, lv.value)"
+          >
+            {{ lv.emoji }}
+          </button>
+          <span v-if="engagementMap.get(c.id)" class="engage-current hint">
+            {{ ENGAGEMENT_LEVELS.find((l) => l.value === engagementMap.get(c.id))?.label }}
+          </span>
+        </div>
         <p v-if="planMap.get(c.id)?.note" class="parent-note">
           💬 家長：{{ planMap.get(c.id)?.note }}
         </p>
@@ -223,6 +263,10 @@ async function saveDetail() {
           📝 {{ checkMap.get(c.id)?.note }}
         </p>
       </div>
+      <p v-if="children.length > 0" class="hint idx-note">
+        ※ 指數與表情標籤會顯示給該孩子的家長；「紀錄」內的文字備註僅老師可見。
+        {{ showIndex ? '' : '幼幼班不評指數。' }}
+      </p>
     </template>
 
     <van-popup
@@ -311,6 +355,35 @@ async function saveDetail() {
 }
 .walkin {
   color: var(--kll-amber);
+}
+.engage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.engage-label {
+  font-size: 15px;
+  color: var(--kll-sub);
+}
+.engage-btn {
+  width: 46px;
+  height: 42px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--kll-bg);
+  font-size: 22px;
+  line-height: 1;
+}
+.engage-btn.on {
+  background: var(--kll-primary-soft);
+  border-color: var(--kll-primary);
+}
+.engage-current {
+  font-size: 14px;
+}
+.idx-note {
+  margin-top: 12px;
 }
 .parent-note,
 .moods,
