@@ -31,6 +31,7 @@
 | --- | --- |
 | [`docs/DESIGN_PRINCIPLES.md`](docs/DESIGN_PRINCIPLES.md) | **最高守則**——任何設計必須先通過檢核 |
 | [`docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md`](docs/SUNDAY_SCHOOL_PLATFORM_SPEC.md) | 需求規格書（需求基準） |
+| [`docs/PROGRESS.md`](docs/PROGRESS.md) | **進度總覽**（已實作/未實作/外部依賴，每個 Sprint 更新） |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | 開發指南：開發/測試/後端初始化/部署/第三方登入設定 |
 | [`CLAUDE.md`](CLAUDE.md) | AI 協作指引（角色權限、Roadmap、技術選型、設計決議） |
 | [`docs/SPRINT_01.md`](docs/SPRINT_01.md)、[`docs/SPRINT_02.md`](docs/SPRINT_02.md) | 各階段開發範圍與回顧 |
