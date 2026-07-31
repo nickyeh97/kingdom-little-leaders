@@ -151,13 +151,14 @@ create policy "plans_delete" on attendance_plans
 create policy "check_ins_read" on check_ins
   for select to authenticated
   using (public.has_role('teacher') or public.has_role('admin'));
+-- 寫入依「點名所屬班別」：本班老師可將全校名冊上的孩子加入本班當日（現場加入）
 create policy "check_ins_insert" on check_ins
-  for insert to authenticated with check (public.child_in_my_class(child_id));
+  for insert to authenticated with check (public.has_class_role(class_group_id));
 create policy "check_ins_update" on check_ins
   for update to authenticated
-  using (public.child_in_my_class(child_id)) with check (public.child_in_my_class(child_id));
+  using (public.has_class_role(class_group_id)) with check (public.has_class_role(class_group_id));
 create policy "check_ins_delete" on check_ins
-  for delete to authenticated using (public.child_in_my_class(child_id));
+  for delete to authenticated using (public.has_class_role(class_group_id));
 
 -- ---- session_feedback：老師可寫；老師/同工與孩子的家長可讀 ----
 alter table session_feedback enable row level security;

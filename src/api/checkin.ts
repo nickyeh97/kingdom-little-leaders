@@ -35,9 +35,10 @@ export async function listCheckIns(gatheringDate: string): Promise<CheckIn[]> {
   return data as CheckIn[]
 }
 
-/** 建立/更新當日紀錄（簽到、臨時請假、老師交接備註） */
+/** 建立/更新當日紀錄（簽到、臨時請假、老師交接備註）；class_group_id＝點名所屬班別 */
 export async function upsertCheckIn(entry: {
   child_id: string
+  class_group_id: string
   gathering_date: string
   status: CheckInStatus
   note: string | null

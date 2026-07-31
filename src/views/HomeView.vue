@@ -9,7 +9,7 @@ import {
 } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
 import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
-import { listAllChildren, listSessionLogsRange } from '../api/records'
+import { listSessionLogsRange } from '../api/records'
 import {
   feedbackDeadline,
   isFeedbackOpen,
@@ -80,17 +80,13 @@ onMounted(async () => {
     // 老師：上堂課（兩天內）若有自己點名過的班別還沒填課堂紀錄 → 提醒
     if (auth.can('teacher') && isFeedbackOpen(lastG)) {
       const me = auth.session?.user.id
-      const [checks, kids, logs] = await Promise.all([
+      const [checks, logs] = await Promise.all([
         listCheckIns(lastG),
-        listAllChildren(),
         listSessionLogsRange(lastG, lastG),
       ])
-      const kidClass = new Map(kids.map((k) => [k.id, String(k.class_group_id)]))
+      // 點名紀錄自帶「點名所屬班別」（含跨班現場加入）
       const myClasses = new Set(
-        checks
-          .filter((c) => c.checked_by === me)
-          .map((c) => kidClass.get(c.child_id))
-          .filter((x): x is string => Boolean(x)),
+        checks.filter((c) => c.checked_by === me).map((c) => c.class_group_id),
       )
       const logged = new Set(logs.map((l) => l.class_group_id))
       needClassLog.value = [...myClasses].some((id) => !logged.has(id))

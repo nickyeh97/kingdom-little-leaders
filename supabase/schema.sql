@@ -72,6 +72,8 @@ create table attendance_plans (
 create table check_ins (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references children (id) on delete cascade,
+  -- 點名所屬班別：跨班現場加入時＝加入的班（非孩子所屬班）
+  class_group_id uuid not null references class_groups (id),
   gathering_date date not null,
   status checkin_status not null default 'present',
   note text,

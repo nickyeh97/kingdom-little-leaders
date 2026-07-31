@@ -43,6 +43,8 @@ export type CheckInStatus = 'present' | 'leave'
 export interface CheckIn {
   id: string
   child_id: string
+  /** 點名所屬班別（跨班現場加入時＝加入的班） */
+  class_group_id: string
   gathering_date: string
   status: CheckInStatus
   /** 老師交接備註：僅老師可見，不對家長端顯示 */

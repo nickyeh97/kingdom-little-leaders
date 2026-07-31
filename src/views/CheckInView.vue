@@ -34,8 +34,8 @@ const gathering = upcomingGathering()
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
 const children = ref<Child[]>([])
-/** 現場加入的名冊外孩子（本次點名 session 顯示用） */
-const extras = ref<Child[]>([])
+/** 全校名冊（現場加入挑人＋跨班加入者顯示姓名用） */
+const allChildren = ref<Child[]>([])
 const planMap = ref(new Map<string, AttendancePlan>())
 const checkMap = ref(new Map<string, CheckIn>())
 const moodsMap = ref(new Map<string, string[]>())
@@ -46,6 +46,20 @@ const loading = ref(true)
 const showIndex = computed(() =>
   classHasIndex(groups.value.find((g) => g.id === activeGroup.value)?.name),
 )
+
+/** 跨班現場加入者：當日簽到記在本班、但不在本班名冊 → 由資料推導，重載不消失 */
+const extras = computed<Child[]>(() => {
+  const inRoster = new Set(children.value.map((c) => c.id))
+  const byId = new Map(allChildren.value.map((c) => [c.id, c]))
+  const list: Child[] = []
+  for (const [childId, check] of checkMap.value) {
+    if (check.class_group_id === activeGroup.value && !inRoster.has(childId)) {
+      const child = byId.get(childId)
+      if (child) list.push(child)
+    }
+  }
+  return list
+})
 
 const displayChildren = computed(() => [...children.value, ...extras.value])
 
@@ -72,7 +86,6 @@ const sortedChildren = computed(() => {
 async function loadClass() {
   if (!activeGroup.value) return
   loading.value = true
-  extras.value = []
   try {
     const [kids, plans, checks, feedback, scores] = await Promise.all([
       listClassChildren(activeGroup.value),
@@ -98,7 +111,9 @@ async function loadClass() {
 onMounted(async () => {
   try {
     // 老師標籤班別化：只顯示自己被指派的班別
-    groups.value = (await listClassGroups()).filter((g) => auth.canClass(g.id))
+    const [allGroups, kids] = await Promise.all([listClassGroups(), listAllChildren()])
+    groups.value = allGroups.filter((g) => auth.canClass(g.id))
+    allChildren.value = kids
     activeGroup.value = groups.value[0]?.id ?? ''
     if (!activeGroup.value) loading.value = false
   } catch (e) {
@@ -125,6 +140,7 @@ async function setStatus(child: Child, target: CheckInStatus) {
     } else {
       const entry = {
         child_id: child.id,
+        class_group_id: current?.class_group_id ?? activeGroup.value,
         gathering_date: gathering,
         status: target,
         note: current?.note ?? null,
@@ -193,6 +209,7 @@ async function saveDetail() {
     // 備註跟著當日紀錄走：尚未簽到/請假時，先以「出席」建立紀錄
     const entry = {
       child_id: child.id,
+      class_group_id: current?.class_group_id ?? activeGroup.value,
       gathering_date: gathering,
       status: current?.status ?? 'present',
       note,
@@ -247,18 +264,10 @@ async function openHistory(child: Child) {
 // ---- 現場加入：僅能從全校名冊挑人（v4 決議 5：不開放老師新增建檔）----
 const picking = ref(false)
 const pickKeyword = ref('')
-const allChildren = ref<Child[]>([])
 
-async function openPicker() {
+function openPicker() {
   picking.value = true
   pickKeyword.value = ''
-  if (allChildren.value.length === 0) {
-    try {
-      allChildren.value = await listAllChildren()
-    } catch (e) {
-      showFailToast((e as Error).message)
-    }
-  }
 }
 
 const pickCandidates = computed(() => {
@@ -273,6 +282,7 @@ async function pickChild(child: Child) {
   try {
     await upsertCheckIn({
       child_id: child.id,
+      class_group_id: activeGroup.value, // 點名記在「加入的班」，重載後仍顯示於此班
       gathering_date: gathering,
       status: 'present',
       note: null,
@@ -283,17 +293,16 @@ async function pickChild(child: Child) {
       id: '',
       checked_by: '',
       child_id: child.id,
+      class_group_id: activeGroup.value,
       gathering_date: gathering,
       status: 'present',
       note: null,
       is_walk_in: true,
     } as CheckIn)
     checkMap.value = next
-    extras.value = [...extras.value, child]
     picking.value = false
-    showSuccessToast(`${child.name} 已加入本日點名`)
+    showSuccessToast(`${child.name} 已加入本日點名，並寫入出席紀錄`)
   } catch (e) {
-    // 跨班孩子受班別權限管制（RLS）：需該班老師或於名單頁調整班別
     showFailToast((e as Error).message)
   }
 }
@@ -325,7 +334,13 @@ async function pickChild(child: Child) {
       <div v-for="c in sortedChildren" :key="c.id" class="card kid-card">
         <div class="kid-main">
           <div class="info">
-            <strong class="kid-name" @click="openHistory(c)">{{ c.name }} ›</strong>
+            <strong class="kid-name" @click="openHistory(c)">
+              {{ c.name }}
+              <van-tag v-if="c.class_group_id !== activeGroup" plain type="warning" class="cross-tag">
+                {{ c.class_groups?.name ?? '他班' }}
+              </van-tag>
+              ›
+            </strong>
             <span class="hint" :class="{ walkin: isWalkIn(c.id) }">
               {{ planMap.get(c.id)?.status === 'attending' ? '家長已預先勾選出席'
                 : planMap.get(c.id)?.status === 'leave' ? '家長已請假'
@@ -526,6 +541,10 @@ async function pickChild(child: Child) {
 }
 .kid-name {
   cursor: pointer;
+}
+.cross-tag {
+  margin-left: 4px;
+  vertical-align: 2px;
 }
 .actions {
   display: flex;
