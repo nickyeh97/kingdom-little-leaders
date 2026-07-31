@@ -1,14 +1,22 @@
 import { db } from '../lib/supabase'
 import type { AttendancePlan, AttendanceStatus, Child } from '../types'
 
-/** 家長端：取得自己綁定的孩子（RLS 已限制只回自己的） */
+/**
+ * 出席頁專用：嚴格只取「自己綁定」的孩子（走 family_links 明確過濾本人）。
+ * 老師/同工雖可讀全部孩子（點名用），但出席頁不得顯示未綁定的孩子——
+ * 預約狀況請至點名（簽到）頁查看（規格書 v3 決議 1）。
+ */
 export async function listMyChildren(): Promise<Child[]> {
-  const { data, error } = await db()
-    .from('children')
-    .select('*, class_groups(*)')
-    .order('name')
+  const client = db()
+  const uid = (await client.auth.getSession()).data.session?.user.id
+  if (!uid) return []
+  const { data, error } = await client
+    .from('family_links')
+    .select('children(*, class_groups(*))')
+    .eq('parent_id', uid)
   if (error) throw error
-  return data as Child[]
+  const kids = (data ?? []).map((r) => r.children as unknown as Child)
+  return kids.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'))
 }
 
 /** 取得某主日的預先出席（RLS：家長只拿得到自己孩子的） */
@@ -17,6 +25,17 @@ export async function listPlans(gatheringDate: string): Promise<AttendancePlan[]
     .from('attendance_plans')
     .select('*')
     .eq('gathering_date', gatheringDate)
+  if (error) throw error
+  return data as AttendancePlan[]
+}
+
+/** 取得日期區間的預先出席（出席行事曆用；RLS：家長只拿得到自己孩子的） */
+export async function listPlansRange(from: string, to: string): Promise<AttendancePlan[]> {
+  const { data, error } = await db()
+    .from('attendance_plans')
+    .select('*')
+    .gte('gathering_date', from)
+    .lte('gathering_date', to)
   if (error) throw error
   return data as AttendancePlan[]
 }

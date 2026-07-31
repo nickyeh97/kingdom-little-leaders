@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import {
   createAnnouncement,
@@ -8,8 +8,8 @@ import {
   updateAnnouncement,
 } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
-import { listCheckIns, listFeedback } from '../api/checkin'
-import { listAllChildren, listSessionLogsRange } from '../api/records'
+import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
+import { listSessionLogsRange } from '../api/records'
 import {
   feedbackDeadline,
   isFeedbackOpen,
@@ -20,17 +20,39 @@ import {
   weekdayName,
 } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
-import type { Announcement, Child } from '../types'
+import type { Announcement, Child, ClassGroup } from '../types'
 
 const auth = useAuthStore()
 const announcements = ref<Announcement[]>([])
+const classGroups = ref<ClassGroup[]>([])
 const loading = ref(true)
+
+/** 公告發布權（v3 決議 4）：同工可發全部；各班老師可發自己班別 */
+const canPostAnn = computed(
+  () => auth.can('admin') || (auth.can('teacher') && auth.teacherClassIds.length > 0),
+)
+/** 這則公告我可否編輯 */
+function canEditAnn(a: Announcement): boolean {
+  if (auth.can('admin')) return true
+  return (
+    auth.can('teacher') && !!a.class_group_id && auth.teacherClassIds.includes(a.class_group_id)
+  )
+}
+/** 編輯視窗可選的班別：同工含「全體」；老師僅自己被指派的班別 */
+const annClassOptions = computed<{ id: string | null; name: string }[]>(() => {
+  if (auth.can('admin'))
+    return [{ id: null, name: '全體' }, ...classGroups.value.map((g) => ({ id: g.id, name: g.name }))]
+  return classGroups.value
+    .filter((g) => auth.teacherClassIds.includes(g.id))
+    .map((g) => ({ id: g.id, name: g.name }))
+})
 /** 家長：本週還有孩子未填預先出席 */
 const needPlan = ref(false)
-/** 家長：上週各孩子的課堂表情回饋 */
-const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 const gathering = upcomingGathering()
 const deadline = planDeadline(gathering)
+
+/** 家長：上週各孩子的課堂表情回饋（指數僅老師/同工可見——v4 決議 2） */
+const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 /** 老師：上堂課的課堂紀錄尚未填寫（兩天內提醒） */
 const needClassLog = ref(false)
 const lastG = lastGathering()
@@ -39,6 +61,7 @@ const feedbackDue = feedbackDeadline(lastG)
 onMounted(async () => {
   try {
     announcements.value = await listAnnouncements()
+    if (canPostAnn.value) classGroups.value = await listClassGroups()
     if (auth.can('parent')) {
       const [children, plans, feedback] = await Promise.all([
         listMyChildren(),
@@ -57,17 +80,13 @@ onMounted(async () => {
     // 老師：上堂課（兩天內）若有自己點名過的班別還沒填課堂紀錄 → 提醒
     if (auth.can('teacher') && isFeedbackOpen(lastG)) {
       const me = auth.session?.user.id
-      const [checks, kids, logs] = await Promise.all([
+      const [checks, logs] = await Promise.all([
         listCheckIns(lastG),
-        listAllChildren(),
         listSessionLogsRange(lastG, lastG),
       ])
-      const kidClass = new Map(kids.map((k) => [k.id, String(k.class_group_id)]))
+      // 點名紀錄自帶「點名所屬班別」（含跨班現場加入）
       const myClasses = new Set(
-        checks
-          .filter((c) => c.checked_by === me)
-          .map((c) => kidClass.get(c.child_id))
-          .filter((x): x is string => Boolean(x)),
+        checks.filter((c) => c.checked_by === me).map((c) => c.class_group_id),
       )
       const logged = new Set(logs.map((l) => l.class_group_id))
       needClassLog.value = [...myClasses].some((id) => !logged.has(id))
@@ -85,15 +104,28 @@ function fmtDate(iso: string) {
 
 // ---- 管理端：公告發布/編輯/刪除 ----
 const editingAnn = ref<Announcement | 'new' | null>(null)
-const annDraft = ref({ title: '', body: '', tag: '公告', pinned: false })
+const annDraft = ref<{
+  title: string
+  body: string
+  tag: string
+  class_group_id: string | null
+  pinned: boolean
+}>({ title: '', body: '', tag: '公告', class_group_id: null, pinned: false })
 const annSaving = ref(false)
 
 function openAnnEditor(a: Announcement | null) {
-  if (!auth.can('admin')) return
+  if (a ? !canEditAnn(a) : !canPostAnn.value) return
   editingAnn.value = a ?? 'new'
   annDraft.value = a
-    ? { title: a.title, body: a.body, tag: a.tag, pinned: a.pinned }
-    : { title: '', body: '', tag: '公告', pinned: false }
+    ? { title: a.title, body: a.body, tag: a.tag, class_group_id: a.class_group_id, pinned: a.pinned }
+    : {
+        title: '',
+        body: '',
+        tag: '公告',
+        // 老師沒有「全體」選項：預設帶入自己的第一個班別
+        class_group_id: annClassOptions.value[0]?.id ?? null,
+        pinned: false,
+      }
 }
 
 async function saveAnn() {
@@ -174,8 +206,12 @@ async function removeAnn() {
 
     <template v-if="lastFeedback.length > 0">
       <h3 class="section-title">上週課堂回饋</h3>
+      <p class="hint fb-hint">僅您能看到自己孩子的回饋</p>
       <div v-for="f in lastFeedback" :key="f.child.id" class="card">
-        <strong>{{ f.child.name }}</strong>
+        <div class="fb-head">
+          <strong>{{ f.child.name }}</strong>
+          <span class="hint">{{ f.child.class_groups?.name ?? '' }}</span>
+        </div>
         <div class="mood-tags">
           <van-tag v-for="m in f.moods" :key="m" round type="primary" plain size="medium">
             {{ m }}
@@ -186,7 +222,7 @@ async function removeAnn() {
 
     <div class="section-row">
       <h3 class="section-title">兒主公告</h3>
-      <van-button v-if="auth.can('admin')" size="small" type="primary" plain @click="openAnnEditor(null)">
+      <van-button v-if="canPostAnn" size="small" type="primary" plain @click="openAnnEditor(null)">
         ＋發布
       </van-button>
     </div>
@@ -197,11 +233,14 @@ async function removeAnn() {
         v-for="a in announcements"
         :key="a.id"
         class="card"
-        :class="{ clickable: auth.can('admin') }"
+        :class="{ clickable: canEditAnn(a) }"
         @click="openAnnEditor(a)"
       >
         <div class="ann-head">
           <van-tag :type="a.tag === '重要' ? 'warning' : 'primary'" plain>{{ a.tag }}</van-tag>
+          <van-tag v-if="a.class_group_id" type="success" plain>
+            {{ a.class_groups?.name ?? '班別' }}
+          </van-tag>
           <strong class="ann-title">{{ a.title }}</strong>
           <span v-if="a.pinned">📌</span>
         </div>
@@ -221,6 +260,22 @@ async function removeAnn() {
         <van-field v-model="annDraft.title" label="標題" maxlength="60" placeholder="例：下主日合班敬拜通知" />
         <van-field v-model="annDraft.body" label="內容" type="textarea" rows="3" autosize maxlength="1000"
           placeholder="公告內容" />
+        <van-cell title="對象" center>
+          <template #value>
+            <van-tag
+              v-for="opt in annClassOptions"
+              :key="opt.id ?? 'all'"
+              round
+              size="large"
+              class="tag-opt"
+              :type="annDraft.class_group_id === opt.id ? 'success' : 'default'"
+              :plain="annDraft.class_group_id !== opt.id"
+              @click="annDraft.class_group_id = opt.id"
+            >
+              {{ opt.name }}
+            </van-tag>
+          </template>
+        </van-cell>
         <van-cell title="標籤" center>
           <template #value>
             <van-tag
@@ -268,7 +323,7 @@ async function removeAnn() {
 }
 .top h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 25px;
 }
 .role-tags {
   display: flex;
@@ -279,6 +334,14 @@ async function removeAnn() {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+.fb-hint {
+  margin: -6px 0 10px;
+}
+.fb-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 .section-row {
   display: flex;
@@ -294,7 +357,7 @@ async function removeAnn() {
 .ann-editor h3 {
   margin: 0 0 12px;
   text-align: center;
-  font-size: 16px;
+  font-size: 22px;
 }
 .tag-opt {
   margin-left: 8px;
@@ -312,10 +375,10 @@ async function removeAnn() {
 }
 .ann-title {
   flex: 1;
-  font-size: 15px;
+  font-size: 21px;
 }
 .ann-body {
-  font-size: 13px;
+  font-size: 18px;
   color: var(--kll-sub);
   margin: 8px 0;
   white-space: pre-wrap;

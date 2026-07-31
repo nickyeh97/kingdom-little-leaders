@@ -71,4 +71,35 @@ describe('auth store：標籤式多角色權限', () => {
     expect(auth.can('parent')).toBe(false)
     expect(auth.isAdmin).toBe(false)
   })
+
+  describe('老師標籤班別化 canClass()', () => {
+    it('僅對被指派的班別為 true', () => {
+      const auth = useAuthStore()
+      auth.profile = profileWith(['teacher'])
+      auth.teacherClassIds = ['cg-kid']
+      expect(auth.canClass('cg-kid')).toBe(true)
+      expect(auth.canClass('cg-baby')).toBe(false) // 幼幼班未指派 → 不能點名/寫日誌
+    })
+
+    it('邊際：有指派但無老師標籤 → false（例如標籤被移除後殘留指派）', () => {
+      const auth = useAuthStore()
+      auth.profile = profileWith(['parent'])
+      auth.teacherClassIds = ['cg-kid']
+      expect(auth.canClass('cg-kid')).toBe(false)
+    })
+
+    it('邊際：未審核者即使有指派也為 false', () => {
+      const auth = useAuthStore()
+      auth.profile = profileWith(['teacher'], false)
+      auth.teacherClassIds = ['cg-kid']
+      expect(auth.canClass('cg-kid')).toBe(false)
+    })
+
+    it('admin 無老師標籤時不可點名任何班別（逐標籤授權）', () => {
+      const auth = useAuthStore()
+      auth.profile = profileWith(['admin'])
+      auth.teacherClassIds = []
+      expect(auth.canClass('cg-kid')).toBe(false)
+    })
+  })
 })

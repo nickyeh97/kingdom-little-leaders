@@ -3,6 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import { listSessionLogsRange, upsertSessionLog } from '../api/records'
+import { listCurrentPlaylistSongs, upsertFamiliarity } from '../api/songs'
+import { FAMILIARITY_VALUES } from '../lib/familiarity'
+import { classHasIndex } from '../lib/performance'
 import {
   feedbackDeadline,
   isFeedbackOpen,
@@ -10,7 +13,7 @@ import {
   weekdayName,
 } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
-import type { ClassGroup, SessionLog } from '../types'
+import type { ClassGroup, SessionLog, Song } from '../types'
 
 const auth = useAuthStore()
 const groups = ref<ClassGroup[]>([])
@@ -59,6 +62,39 @@ const draft = ref({ content: '', song_progress: '', feedback: '' })
 const editDate = ref(today)
 const saving = ref(false)
 
+// ---- 詩歌熟悉度（v3 決議 5）：於日誌流程填寫；幼幼班老師不需填寫 ----
+const famSongs = ref<Song[]>([])
+/** songId → { song_level, motion_level } 草稿 */
+const famDraft = ref<Record<string, { song_level: number | null; motion_level: number | null }>>({})
+const showFam = computed(() =>
+  classHasIndex(groups.value.find((g) => g.id === activeGroup.value)?.name),
+)
+
+async function loadFamSongs() {
+  famSongs.value = []
+  famDraft.value = {}
+  if (!showFam.value) return
+  try {
+    const songs = await listCurrentPlaylistSongs(activeGroup.value, editDate.value)
+    famSongs.value = songs
+    for (const s of songs) {
+      const f = (s.song_familiarity ?? []).find((x) => x.class_group_id === activeGroup.value)
+      famDraft.value[s.id] = {
+        song_level: f?.song_level ?? null,
+        motion_level: f?.motion_level ?? null,
+      }
+    }
+  } catch (e) {
+    showFailToast((e as Error).message)
+  }
+}
+
+function setFam(songId: string, dim: 'song_level' | 'motion_level', value: number) {
+  const cur = famDraft.value[songId]
+  if (!cur) return
+  cur[dim] = cur[dim] === value ? null : value // 點同一級＝取消
+}
+
 function openEditor(log: SessionLog | null) {
   if (log) {
     editing.value = log
@@ -69,6 +105,7 @@ function openEditor(log: SessionLog | null) {
     editDate.value = today
     draft.value = { content: '', song_progress: '', feedback: '' }
   }
+  loadFamSongs()
 }
 
 async function save() {
@@ -80,6 +117,19 @@ async function save() {
       teacher_name: auth.profile?.display_name ?? '',
       ...draft.value,
     })
+    // 熟悉度隨日誌一併儲存（班別 × 歌曲）；上課日期＝本堂日期
+    for (const s of famSongs.value) {
+      const f = famDraft.value[s.id]
+      if (f)
+        await upsertFamiliarity(
+          s.id,
+          activeGroup.value,
+          f.song_level,
+          f.motion_level,
+          auth.profile?.display_name ?? '',
+          editDate.value,
+        )
+    }
     await load()
     showSuccessToast('已儲存')
     editing.value = null
@@ -101,13 +151,14 @@ async function save() {
     </van-tabs>
 
     <van-notice-bar
-      v-if="auth.can('teacher') && withinDue && !currentLog"
+      v-if="auth.canClass(activeGroup) && withinDue && !currentLog"
       left-icon="edit"
       :text="`本堂（${today}）尚未填寫，請於 ${dueDate.toLocaleDateString('zh-TW')}（${weekdayName(dueDate)}）23:59 前完成`"
     />
 
+    <!-- 老師標籤班別化：僅能填寫/編輯自己被指派的班別；其他班別可閱讀 -->
     <van-button
-      v-if="auth.can('teacher')"
+      v-if="auth.canClass(activeGroup)"
       round
       block
       type="primary"
@@ -124,7 +175,7 @@ async function save() {
         v-for="l in classLogs"
         :key="l.id"
         class="card"
-        @click="auth.can('teacher') && openEditor(l)"
+        @click="auth.canClass(activeGroup) && openEditor(l)"
       >
         <div class="log-head">
           <strong>{{ l.gathering_date }}</strong>
@@ -151,6 +202,28 @@ async function save() {
           maxlength="300" placeholder="練了哪些詩歌、進度到哪" />
         <van-field v-model="draft.feedback" label="課後反饋" type="textarea" rows="2" autosize
           maxlength="500" placeholder="給下一堂老師的提醒與交接" />
+
+        <template v-if="showFam && famSongs.length > 0">
+          <p class="hint fam-title">本堂歌單熟悉度（1＝不熟、5＝熟悉；班級整體練習進度，不評比孩子）</p>
+          <div v-for="s in famSongs" :key="s.id" class="fam-card">
+            <strong class="fam-song">{{ s.title }}</strong>
+            <div v-for="dim in (['song_level', 'motion_level'] as const)" :key="dim" class="fam-dim">
+              <span class="fam-label">{{ dim === 'song_level' ? '歌曲' : '動作' }}</span>
+              <van-tag
+                v-for="v in FAMILIARITY_VALUES"
+                :key="v"
+                round
+                size="large"
+                :type="famDraft[s.id]?.[dim] === v ? 'primary' : 'default'"
+                :plain="famDraft[s.id]?.[dim] !== v"
+                @click="setFam(s.id, dim, v)"
+              >
+                {{ v }}
+              </van-tag>
+            </div>
+          </div>
+        </template>
+
         <van-button round block type="primary" :loading="saving" class="save-btn" @click="save">
           儲存
         </van-button>
@@ -162,7 +235,7 @@ async function save() {
 <style scoped>
 h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: 25px;
 }
 .tabs {
   margin: 12px 0;
@@ -178,11 +251,11 @@ h2 {
 }
 .card p {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: 18px;
 }
 .label {
   color: var(--kll-sub);
-  font-size: 12px;
+  font-size: 17px;
   margin-right: 8px;
 }
 .fb {
@@ -196,7 +269,7 @@ h2 {
 .editor h3 {
   margin: 0 0 4px;
   text-align: center;
-  font-size: 16px;
+  font-size: 22px;
 }
 .editor .hint {
   text-align: center;
@@ -204,5 +277,29 @@ h2 {
 }
 .save-btn {
   margin-top: 14px;
+}
+.fam-title {
+  margin: 14px 16px 6px;
+}
+.fam-card {
+  margin: 0 16px 10px;
+  padding: 10px 12px;
+  background: var(--kll-bg);
+  border-radius: 10px;
+}
+.fam-song {
+  display: block;
+  margin-bottom: 6px;
+}
+.fam-dim {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.fam-label {
+  width: 40px;
+  color: var(--kll-sub);
+  font-size: 15px;
 }
 </style>

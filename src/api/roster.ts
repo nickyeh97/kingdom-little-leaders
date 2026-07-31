@@ -35,6 +35,33 @@ export async function deleteChild(id: string): Promise<void> {
   if (error) throw error
 }
 
+export interface TeacherClassAssignment {
+  teacher_id: string
+  class_group_id: string
+}
+
+/** 全部老師×班別指派（登入者可讀，供名單頁顯示班別老師標籤） */
+export async function listTeacherClassAssignments(): Promise<TeacherClassAssignment[]> {
+  const { data, error } = await db().from('teacher_class_assignments').select('*')
+  if (error) throw error
+  return data as TeacherClassAssignment[]
+}
+
+/** 管理端：整組覆寫老師的班別指派 */
+export async function setTeacherClasses(teacherId: string, classIds: string[]): Promise<void> {
+  const client = db()
+  const { error: delError } = await client
+    .from('teacher_class_assignments')
+    .delete()
+    .eq('teacher_id', teacherId)
+  if (delError) throw delError
+  if (classIds.length > 0) {
+    const rows = classIds.map((class_group_id) => ({ teacher_id: teacherId, class_group_id }))
+    const { error } = await client.from('teacher_class_assignments').insert(rows)
+    if (error) throw error
+  }
+}
+
 /** 整組覆寫孩子的家長綁定 */
 export async function setChildParents(childId: string, parentIds: string[]): Promise<void> {
   const client = db()

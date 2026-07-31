@@ -8,9 +8,12 @@ import {
   createChild,
   deleteChild,
   listFamilyLinks,
+  listTeacherClassAssignments,
   setChildParents,
+  setTeacherClasses,
   updateChild,
   type FamilyLink,
+  type TeacherClassAssignment,
 } from '../api/roster'
 import type { Child, ClassGroup, Profile, UserRole } from '../types'
 
@@ -18,6 +21,7 @@ const members = ref<Profile[]>([])
 const children = ref<Child[]>([])
 const links = ref<FamilyLink[]>([])
 const classGroups = ref<ClassGroup[]>([])
+const assignments = ref<TeacherClassAssignment[]>([])
 const keyword = ref('')
 const filter = ref<'all' | UserRole | 'children' | 'pending'>('all')
 const loading = ref(true)
@@ -28,11 +32,6 @@ const roleLabel: Record<UserRole, string> = {
   admin: '管理者',
   teacher: '老師',
   parent: '家長',
-}
-const roleTagType: Record<UserRole, 'warning' | 'primary' | 'success'> = {
-  admin: 'warning',
-  teacher: 'primary',
-  parent: 'success',
 }
 const allRoles: UserRole[] = ['admin', 'teacher', 'parent']
 
@@ -84,18 +83,40 @@ function memberDetail(m: Profile): string {
 
 onMounted(async () => {
   try {
-    ;[members.value, children.value, links.value, classGroups.value] = await Promise.all([
-      listProfiles(),
-      listAllChildren(),
-      listFamilyLinks(),
-      listClassGroups(),
-    ])
+    ;[members.value, children.value, links.value, classGroups.value, assignments.value] =
+      await Promise.all([
+        listProfiles(),
+        listAllChildren(),
+        listFamilyLinks(),
+        listClassGroups(),
+        listTeacherClassAssignments(),
+      ])
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
     loading.value = false
   }
 })
+
+/** 老師標籤班別化：老師的角色標籤顯示為「＊＊班老師」 */
+function classesOf(teacherId: string): ClassGroup[] {
+  const ids = new Set(
+    assignments.value.filter((a) => a.teacher_id === teacherId).map((a) => a.class_group_id),
+  )
+  return classGroups.value.filter((g) => ids.has(g.id))
+}
+
+function roleTags(m: Profile): { label: string; type: 'warning' | 'primary' | 'success' }[] {
+  const tags: { label: string; type: 'warning' | 'primary' | 'success' }[] = []
+  if (m.roles.includes('admin')) tags.push({ label: '管理者', type: 'warning' })
+  if (m.roles.includes('teacher')) {
+    const cls = classesOf(m.id)
+    if (cls.length === 0) tags.push({ label: '老師（未指派）', type: 'primary' })
+    else for (const g of cls) tags.push({ label: `${g.name}老師`, type: 'primary' })
+  }
+  if (m.roles.includes('parent')) tags.push({ label: '家長', type: 'success' })
+  return tags
+}
 
 // ---- 邀請成員（開放註冊後：分享網址 → 對方自行註冊 → 回此頁設定角色） ----
 const showInvite = ref(false)
@@ -110,14 +131,28 @@ async function copyInviteLink() {
   }
 }
 
-// ---- 成員角色編輯 ----
+// ---- 成員角色編輯（含老師班別指派） ----
 const editingMember = ref<Profile | null>(null)
 const draftRoles = ref<UserRole[]>([])
+const draftClasses = ref<string[]>([])
 const savingMember = ref(false)
 
 function openMemberEditor(m: Profile) {
   editingMember.value = m
   draftRoles.value = [...m.roles]
+  draftClasses.value = classesOf(m.id).map((g) => g.id)
+}
+
+function toggleRole(r: UserRole) {
+  draftRoles.value = draftRoles.value.includes(r)
+    ? draftRoles.value.filter((x) => x !== r)
+    : [...draftRoles.value, r]
+}
+
+function toggleClass(id: string) {
+  draftClasses.value = draftClasses.value.includes(id)
+    ? draftClasses.value.filter((x) => x !== id)
+    : [...draftClasses.value, id]
 }
 
 async function saveMember() {
@@ -127,10 +162,24 @@ async function saveMember() {
     showFailToast('至少需保留一個角色')
     return
   }
+  if (draftRoles.value.includes('teacher') && draftClasses.value.length === 0) {
+    showFailToast('老師需至少指派一個班別')
+    return
+  }
   savingMember.value = true
   try {
     await updateRoles(target.id, draftRoles.value)
+    await setTeacherClasses(
+      target.id,
+      draftRoles.value.includes('teacher') ? draftClasses.value : [],
+    )
     target.roles = [...draftRoles.value]
+    assignments.value = [
+      ...assignments.value.filter((a) => a.teacher_id !== target.id),
+      ...(draftRoles.value.includes('teacher')
+        ? draftClasses.value.map((class_group_id) => ({ teacher_id: target.id, class_group_id }))
+        : []),
+    ]
     showSuccessToast('已更新角色')
     editingMember.value = null
   } catch (e) {
@@ -285,8 +334,14 @@ async function removeChild() {
         </div>
         <div class="tags">
           <van-tag v-if="!m.approved" type="danger" plain round>待審核</van-tag>
-          <van-tag v-for="r in m.roles" :key="r" :type="roleTagType[r]" round :class="{ dim: !m.approved }">
-            {{ roleLabel[r] }}
+          <van-tag
+            v-for="t in roleTags(m)"
+            :key="t.label"
+            :type="t.type"
+            round
+            :class="{ dim: !m.approved }"
+          >
+            {{ t.label }}
           </van-tag>
         </div>
         <span class="more">⋯</span>
@@ -359,17 +414,32 @@ async function removeChild() {
             :key="r"
             clickable
             :title="roleLabel[r]"
-            @click="
-              draftRoles.includes(r)
-                ? (draftRoles = draftRoles.filter((x) => x !== r))
-                : draftRoles.push(r)
-            "
+            @click="toggleRole(r)"
           >
             <template #right-icon>
-              <van-checkbox :model-value="draftRoles.includes(r)" @click.stop />
+              <van-checkbox :model-value="draftRoles.includes(r)" @click.stop="toggleRole(r)" />
             </template>
           </van-cell>
         </van-cell-group>
+        <template v-if="draftRoles.includes('teacher')">
+          <p class="hint bind-title">老師班別指派（點名/日誌僅限被指派的班別）</p>
+          <van-cell-group inset>
+            <van-cell
+              v-for="g in classGroups"
+              :key="g.id"
+              clickable
+              :title="`${g.name}老師`"
+              @click="toggleClass(g.id)"
+            >
+              <template #right-icon>
+                <van-checkbox
+                  :model-value="draftClasses.includes(g.id)"
+                  @click.stop="toggleClass(g.id)"
+                />
+              </template>
+            </van-cell>
+          </van-cell-group>
+        </template>
         <p class="hint center">擁有標籤即開通對應功能（嚴格逐標籤授權）；未審核者僅能看公告</p>
         <van-button round block type="primary" :loading="savingMember" @click="saveMember">
           儲存
@@ -426,7 +496,10 @@ async function removeChild() {
             @click="toggleParent(p.id)"
           >
             <template #right-icon>
-              <van-checkbox :model-value="childDraft.parentIds.includes(p.id)" @click.stop />
+              <van-checkbox
+                :model-value="childDraft.parentIds.includes(p.id)"
+                @click.stop="toggleParent(p.id)"
+              />
             </template>
           </van-cell>
           <van-cell v-if="parentMembers.length === 0" title="尚無具家長標籤的成員" />
@@ -459,7 +532,7 @@ async function removeChild() {
 }
 .head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 25px;
 }
 .filters {
   display: flex;
@@ -473,8 +546,8 @@ async function removeChild() {
   gap: 12px;
 }
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: #e8eaed;
   flex-shrink: 0;
@@ -513,14 +586,15 @@ async function removeChild() {
 }
 .editor {
   padding: 20px 16px 28px;
+  user-select: none; /* 快速點擊勾選時避免反白選字 */
 }
 .editor h3 {
   margin: 0 0 12px;
-  font-size: 16px;
+  font-size: 22px;
   text-align: center;
 }
 .invite-desc {
-  font-size: 13px;
+  font-size: 18px;
   color: var(--kll-sub);
   line-height: 1.7;
   margin: 0 0 14px;
@@ -529,7 +603,7 @@ async function removeChild() {
   background: var(--kll-bg);
   border-radius: 10px;
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: 17px;
   word-break: break-all;
   margin-bottom: 14px;
   text-align: center;

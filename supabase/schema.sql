@@ -30,6 +30,13 @@ create table profiles (
   created_at timestamptz not null default now()
 );
 
+-- 老師×班別 指派（老師標籤班別化：點名/日誌等依班別授權）
+create table teacher_class_assignments (
+  teacher_id uuid not null references profiles (id) on delete cascade,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  primary key (teacher_id, class_group_id)
+);
+
 -- 孩子（不建帳號；由家長/老師代操作）
 create table children (
   id uuid primary key default gen_random_uuid(),
@@ -65,6 +72,8 @@ create table attendance_plans (
 create table check_ins (
   id uuid primary key default gen_random_uuid(),
   child_id uuid not null references children (id) on delete cascade,
+  -- 點名所屬班別：跨班現場加入時＝加入的班（非孩子所屬班）
+  class_group_id uuid not null references class_groups (id),
   gathering_date date not null,
   status checkin_status not null default 'present',
   note text,
@@ -85,6 +94,29 @@ create table session_feedback (
   updated_at timestamptz not null default now(),
   unique (child_id, gathering_date)
 );
+
+-- 專心度/配合度（v4 決議 2）：兩維 1–5（預設 5）；僅老師/同工可讀（家長不可見）；
+-- 幼幼班不評；老師端可調閱近三個月走勢
+create table performance_scores (
+  child_id uuid not null references children (id) on delete cascade,
+  gathering_date date not null,
+  focus smallint check (focus between 1 and 5),
+  cooperation smallint check (cooperation between 1 and 5),
+  updated_by uuid not null default auth.uid() references profiles (id),
+  updated_at timestamptz not null default now(),
+  primary key (child_id, gathering_date)
+);
+create index idx_perf_scores_date on performance_scores (gathering_date);
+
+create or replace function public.touch_performance_scores()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  new.updated_by := auth.uid();
+  return new;
+end $$;
+create trigger trg_touch_performance_scores before update on performance_scores
+  for each row execute function public.touch_performance_scores();
 
 -- 課堂紀錄（每班每聚會日一筆）：日期、老師、教學內容、詩歌進度、課後反饋
 -- teacher_name 為填寫當下快照（供匯出顯示，避免老師互查 profiles 的權限問題）
@@ -118,12 +150,14 @@ create trigger on_session_log_update
   before update on session_logs
   for each row execute function public.touch_session_log();
 
--- 敬拜歌單：每聚會日一組（約 4 首）；影音一律外連 YouTube
+-- 敬拜詩歌「曲庫」（v3 決議 5）：可一次上傳整學期、越新越上面；
+-- 影音一律外連 YouTube（youtube_url＝詩歌、dance_url＝詩歌舞蹈）
 create table songs (
   id uuid primary key default gen_random_uuid(),
-  gathering_date date not null,
+  gathering_date date, -- 舊「每週歌單」時期欄位；曲庫化後由 song_schedule 排程
   title text not null,
   youtube_url text,
+  dance_url text,
   lyrics text,
   sort_order int not null default 0,
   created_by uuid not null default auth.uid() references profiles (id),
@@ -132,12 +166,57 @@ create table songs (
 
 create index idx_songs_date on songs (gathering_date);
 
--- 公告（所有登入者可讀）
+-- 歌單期間（班別 × 期間，如「2026年7-8月」雙月歌單；v4 決議 4：以班別區分。
+-- 幼幼班無詩歌模組（只有點名＋課後紀錄）。欄位依現行共編 Excel「（兒童班）敬拜歌單」）
+create table song_playlists (
+  id uuid primary key default gen_random_uuid(),
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  title text not null,             -- 例：2026年7-8月
+  start_date date not null,
+  end_date date not null,
+  created_at timestamptz not null default now(),
+  unique (class_group_id, title)
+);
+
+create table playlist_songs (
+  playlist_id uuid not null references song_playlists (id) on delete cascade,
+  song_id uuid not null references songs (id) on delete cascade,
+  sort_order int not null default 0,
+  primary key (playlist_id, song_id)
+);
+
+-- 兩維熟悉度（班別 × 歌曲；歌唱/動作各 1–5：1＝不熟、5＝熟悉——v4 決議 3）
+-- 記錄於詩歌曲目上；老師可於詩歌頁直接編輯或於日誌流程覆寫；幼幼班不需填寫。
+-- 欄位依 Excel「敬拜過的歌單」：熟悉指數、填寫人（快照）、填寫日期、上課日期
+create table song_familiarity (
+  song_id uuid not null references songs (id) on delete cascade,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  song_level smallint check (song_level between 1 and 5),
+  motion_level smallint check (motion_level between 1 and 5),
+  last_practiced_on date,
+  updated_by uuid not null default auth.uid() references profiles (id),
+  updated_by_name text not null default '',
+  updated_at timestamptz not null default now(),
+  primary key (song_id, class_group_id)
+);
+
+create or replace function public.touch_song_familiarity()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  new.updated_by := auth.uid();
+  return new;
+end $$;
+create trigger trg_touch_song_familiarity before update on song_familiarity
+  for each row execute function public.touch_song_familiarity();
+
+-- 公告（所有登入者可讀）；class_group_id：null＝全體公告，其餘為班別公告（v3 決議 4）
 create table announcements (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   body text not null,
   tag text not null default '公告',
+  class_group_id uuid references class_groups (id),
   pinned boolean not null default false,
   created_by uuid not null default auth.uid() references profiles (id),
   created_at timestamptz not null default now()

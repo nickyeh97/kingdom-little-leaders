@@ -9,6 +9,9 @@ import {
   recordsRangeStart,
   upcomingGathering,
   weekdayName,
+  nextGathering,
+  recentGatherings,
+  shortDate,
 } from '../gathering'
 import { GATHERING_WEEKDAY, PLAN_DEADLINE_DAYS_BEFORE } from '../config'
 
@@ -168,5 +171,45 @@ describe('顯示文字', () => {
     expect(weekdayName(D(2026, 7, 22))).toBe('週三')
     expect(weekdayName(D(2026, 7, 25))).toBe('週六')
     expect(weekdayName(D(2026, 7, 26))).toBe('週日')
+  })
+})
+
+describe('recentGatherings（近三週走勢用）', () => {
+  const D = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12)
+
+  it('回傳近 N 次聚會日，舊 → 新、間隔 7 天、最後一筆＝最近一次聚會', () => {
+    // 以週六聚會為例：2026-08-05（週三）往回推
+    const dates = recentGatherings(3, D(2026, 8, 5), 6)
+    expect(dates).toEqual(['2026-07-18', '2026-07-25', '2026-08-01'])
+  })
+
+  it('邊際：當天就是聚會日時，包含當天', () => {
+    const dates = recentGatherings(2, D(2026, 8, 1), 6)
+    expect(dates).toEqual(['2026-07-25', '2026-08-01'])
+  })
+
+  it('邊際：可跨月', () => {
+    const dates = recentGatherings(4, D(2026, 8, 5), 6)
+    expect(dates[0]).toBe('2026-07-11')
+  })
+})
+
+describe('shortDate', () => {
+  it('轉為 M/D（去前導零）', () => {
+    expect(shortDate('2026-07-18')).toBe('7/18')
+    expect(shortDate('2026-08-01')).toBe('8/1')
+    expect(shortDate('2026-12-25')).toBe('12/25')
+  })
+})
+
+describe('nextGathering（歌單「下週」標籤用）', () => {
+  const D = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12)
+
+  it('回傳本週聚會日 + 7 天', () => {
+    expect(nextGathering(D(2026, 8, 5), 6)).toBe('2026-08-15') // 本週 8/8 → 下週 8/15
+  })
+
+  it('邊際：當天就是聚會日時，下週＝當天 + 7', () => {
+    expect(nextGathering(D(2026, 8, 1), 6)).toBe('2026-08-08')
   })
 })

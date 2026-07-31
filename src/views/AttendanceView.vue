@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { showFailToast, showSuccessToast } from 'vant'
-import { listMyChildren, listPlans, upsertPlans } from '../api/attendance'
+import { listMyChildren, listPlansRange, upsertPlans } from '../api/attendance'
+import { addMonths, monthGrid, monthOf, monthRange, monthTitle } from '../lib/calendar'
+import { WEEKDAY_NAMES } from '../lib/config'
 import {
   formatGathering,
   isPlanOpen,
@@ -9,13 +11,18 @@ import {
   upcomingGathering,
   weekdayName,
 } from '../lib/gathering'
-import type { AttendanceStatus, Child } from '../types'
+import type { AttendancePlan, AttendanceStatus, Child } from '../types'
 
+/** 本週可填寫的聚會日（其餘日期唯讀；未來日期預留、尚未開放） */
 const gathering = upcomingGathering()
 const open = isPlanOpen(gathering)
 const deadline = planDeadline(gathering)
 
+const anchor = ref(monthOf(gathering))
+const selected = ref(gathering)
+
 const children = ref<Child[]>([])
+const monthPlans = ref<AttendancePlan[]>([])
 const statusMap = ref<Record<string, AttendanceStatus>>({})
 const noteMap = ref<Record<string, string>>({})
 const loading = ref(true)
@@ -26,26 +33,68 @@ const options: { value: AttendanceStatus; label: string }[] = [
   { value: 'leave', label: '請假' },
   { value: 'undecided', label: '未定' },
 ]
+const planLabel: Record<AttendanceStatus, string> = {
+  attending: '出席',
+  leave: '請假',
+  undecided: '未定',
+}
+
+const cells = computed(() => monthGrid(anchor.value))
+
+/** 「日期|孩子」→ 該筆預先出席（供月曆點點與歷史唯讀呈現） */
+const planAt = computed(() => {
+  const map = new Map<string, AttendancePlan>()
+  for (const p of monthPlans.value) map.set(`${p.gathering_date}|${p.child_id}`, p)
+  return map
+})
+
+/** 選到的日期屬於哪種呈現：本週可填寫／過去唯讀／未來未開放 */
+const mode = computed<'edit' | 'past' | 'future'>(() =>
+  selected.value === gathering ? 'edit' : selected.value < gathering ? 'past' : 'future',
+)
 
 const attendingCount = computed(
   () => Object.values(statusMap.value).filter((s) => s === 'attending').length,
 )
 
+function dotClass(date: string, childId: string): string {
+  const status = planAt.value.get(`${date}|${childId}`)?.status
+  return status === 'attending' ? 'dot-attend' : status === 'leave' ? 'dot-leave' : 'dot-none'
+}
+
+async function loadMonth() {
+  const { from, to } = monthRange(anchor.value)
+  monthPlans.value = await listPlansRange(from, to)
+}
+
+/** 以既有資料帶入本週的可編輯狀態（預設維持「未定」——v3 決議） */
+function seedEditable() {
+  for (const kid of children.value) {
+    const p = planAt.value.get(`${gathering}|${kid.id}`)
+    statusMap.value[kid.id] = p?.status ?? 'undecided'
+    noteMap.value[kid.id] = p?.note ?? ''
+  }
+}
+
 onMounted(async () => {
   try {
-    const [kids, plans] = await Promise.all([listMyChildren(), listPlans(gathering)])
-    children.value = kids
-    const byChild = new Map(plans.map((p) => [p.child_id, p]))
-    for (const kid of kids) {
-      statusMap.value[kid.id] = byChild.get(kid.id)?.status ?? 'undecided'
-      noteMap.value[kid.id] = byChild.get(kid.id)?.note ?? ''
-    }
+    children.value = await listMyChildren()
+    await loadMonth()
+    seedEditable()
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
     loading.value = false
   }
 })
+
+watch(anchor, () => {
+  loadMonth().catch((e) => showFailToast((e as Error).message))
+})
+
+function selectDate(cell: { date: string; isGathering: boolean }) {
+  if (cell.isGathering) selected.value = cell.date
+}
 
 async function submit() {
   saving.value = true
@@ -58,6 +107,7 @@ async function submit() {
         note: noteMap.value[c.id]?.trim() || null,
       })),
     )
+    await loadMonth() // 月曆點點同步更新
     showSuccessToast('已送出，感謝配合！')
   } catch (e) {
     showFailToast((e as Error).message)
@@ -69,14 +119,52 @@ async function submit() {
 
 <template>
   <div class="page">
-    <h2>本週出席勾選</h2>
+    <h2>出席行事曆</h2>
     <p class="hint">
-      {{ formatGathering(gathering) }} ·
-      {{ open ? `${deadline.toLocaleDateString('zh-TW')}（${weekdayName(deadline)}）23:59 前可修改` : '本週已截止，如有變動請聯繫窗口' }}
+      {{ open
+        ? `本週 ${formatGathering(gathering)}，${deadline.toLocaleDateString('zh-TW')}（${weekdayName(deadline)}）23:59 前可修改`
+        : '本週已截止，如有變動請聯繫窗口' }}
     </p>
 
+    <div class="card cal">
+      <div class="cal-head">
+        <button class="cal-nav" aria-label="上個月" @click="anchor = addMonths(anchor, -1)">‹</button>
+        <strong>{{ monthTitle(anchor) }}</strong>
+        <button class="cal-nav" aria-label="下個月" @click="anchor = addMonths(anchor, 1)">›</button>
+      </div>
+      <div class="cal-grid cal-week">
+        <span v-for="w in WEEKDAY_NAMES" :key="w">{{ w }}</span>
+      </div>
+      <div class="cal-grid">
+        <div
+          v-for="cell in cells"
+          :key="cell.date"
+          class="cal-cell"
+          :class="{
+            out: !cell.inMonth,
+            gday: cell.isGathering,
+            sel: cell.date === selected,
+            thisweek: cell.date === gathering,
+          }"
+          @click="selectDate(cell)"
+        >
+          <span class="num">{{ cell.day }}</span>
+          <span v-if="cell.isGathering && cell.date <= gathering" class="dots">
+            <i v-for="c in children" :key="c.id" :class="dotClass(cell.date, c.id)" />
+          </span>
+        </div>
+      </div>
+      <p class="cal-legend hint">
+        ●<span class="lg-attend">出席</span> ●<span class="lg-leave">請假</span>
+        ●<span class="lg-none">未定/未填</span> · 點聚會日查看
+      </p>
+    </div>
+
     <van-skeleton v-if="loading" title :row="4" />
-    <template v-else>
+
+    <!-- 本週：可填寫 -->
+    <template v-else-if="mode === 'edit'">
+      <h3 class="section-title">{{ formatGathering(gathering) }} · 本週勾選</h3>
       <div v-for="c in children" :key="c.id" class="card">
         <div class="kid">
           <strong>{{ c.name }}</strong>
@@ -117,6 +205,7 @@ async function submit() {
         round
         block
         type="primary"
+        class="submit-btn"
         :loading="saving"
         :disabled="!open"
         @click="submit"
@@ -124,29 +213,211 @@ async function submit() {
         送出本週出席（{{ attendingCount }} 位出席）
       </van-button>
     </template>
+
+    <!-- 過去的聚會日：唯讀 -->
+    <template v-else-if="mode === 'past'">
+      <h3 class="section-title">{{ formatGathering(selected) }} · 當週勾選紀錄</h3>
+      <div v-if="children.length === 0" class="card hint">
+        尚未綁定孩子，請聯繫兒主窗口協助綁定。
+      </div>
+      <div v-for="c in children" :key="c.id" class="card">
+        <div class="kid">
+          <strong>{{ c.name }}</strong>
+          <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+          <van-tag
+            class="status-tag"
+            :type="planAt.get(`${selected}|${c.id}`)?.status === 'attending'
+              ? 'success'
+              : planAt.get(`${selected}|${c.id}`)?.status === 'leave' ? 'warning' : 'default'"
+          >
+            {{ planAt.get(`${selected}|${c.id}`)
+              ? planLabel[planAt.get(`${selected}|${c.id}`)!.status]
+              : '未填' }}
+          </van-tag>
+        </div>
+        <p v-if="planAt.get(`${selected}|${c.id}`)?.note" class="hint past-note">
+          💬 {{ planAt.get(`${selected}|${c.id}`)?.note }}
+        </p>
+      </div>
+      <div class="card hint">此為當週預先勾選的紀錄；實際到課以老師現場點名為準。</div>
+    </template>
+
+    <!-- 未來的聚會日：預留、尚未開放 -->
+    <div v-else class="card hint">
+      {{ formatGathering(selected) }} 尚未開放填寫——每週開放勾選下一次聚會，
+      屆時會在首頁提醒您。
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* 出席頁字級整體放大 1.4 倍（使用者回饋） */
 h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: 25px;
 }
+.hint {
+  font-size: 17px;
+}
+
+/* ---- 月曆 ---- */
+.cal {
+  padding: 14px 12px 10px;
+  margin-top: 12px;
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-head strong {
+  font-size: 20px;
+}
+.cal-nav {
+  border: none;
+  background: var(--kll-bg);
+  color: var(--kll-primary-dark);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 24px;
+  line-height: 1;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.cal-week span {
+  text-align: center;
+  font-size: 15px;
+  color: var(--kll-sub);
+  padding-bottom: 6px;
+}
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  height: 52px;
+  padding-top: 6px;
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+.cal-cell .num {
+  font-size: 18px;
+  line-height: 1.2;
+}
+.cal-cell.out .num {
+  color: #c3c9c6;
+}
+.cal-cell.gday {
+  background: var(--kll-primary-soft);
+  cursor: pointer;
+}
+.cal-cell.gday.out {
+  background: var(--kll-bg);
+}
+.cal-cell.thisweek {
+  outline: 2px solid var(--kll-primary);
+  outline-offset: -2px;
+}
+.cal-cell.sel {
+  background: var(--kll-primary);
+}
+.cal-cell.sel .num {
+  color: #fff;
+  font-weight: 700;
+}
+.dots {
+  display: flex;
+  gap: 3px;
+}
+.dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-attend {
+  background: #2aa876;
+}
+.sel .dot-attend {
+  background: #bdeedd;
+}
+.dot-leave {
+  background: var(--kll-amber);
+}
+.dot-none {
+  background: #c3c9c6;
+}
+.sel .dot-none {
+  background: #ffffff88;
+}
+.cal-legend {
+  margin: 10px 2px 2px;
+  font-size: 14px;
+}
+.lg-attend {
+  color: #2aa876;
+  margin: 0 8px 0 2px;
+}
+.lg-leave {
+  color: var(--kll-amber);
+  margin: 0 8px 0 2px;
+}
+.lg-none {
+  color: var(--kll-sub);
+  margin: 0 0 0 2px;
+}
+.cal-legend {
+  letter-spacing: 0.2px;
+}
+
+/* ---- 孩子卡 ---- */
 .kid {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.kid strong {
+  font-size: 22px;
+}
+.kid :deep(.van-tag) {
+  font-size: 15px;
+  padding: 3px 10px;
+}
+.status-tag {
+  margin-left: auto;
 }
 .seg {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
+.seg :deep(.van-button--small) {
+  height: 46px;
+  font-size: 20px;
+}
 .note {
-  margin-top: 10px;
-  padding: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
   background: var(--kll-bg);
   border-radius: 10px;
+}
+.note :deep(.van-field__control) {
+  font-size: 18px;
+}
+.past-note {
+  margin: 0;
+}
+.card.hint {
+  font-size: 17px;
+}
+.submit-btn {
+  height: 54px;
+  font-size: 22px;
 }
 </style>

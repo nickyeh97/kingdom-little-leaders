@@ -7,6 +7,8 @@ import type { Profile, UserRole } from '../types'
 export const useAuthStore = defineStore('auth', () => {
   const session = ref<Session | null>(null)
   const profile = ref<Profile | null>(null)
+  /** 老師標籤班別化：我被指派的班別 id（見 teacher_class_assignments） */
+  const teacherClassIds = ref<string[]>([])
   const ready = ref(false)
 
   const roles = computed<UserRole[]>(() => profile.value?.roles ?? [])
@@ -22,14 +24,25 @@ export const useAuthStore = defineStore('auth', () => {
     return isApproved.value && roles.value.includes(role)
   }
 
+  /** 是否為某班別的老師（點名/日誌等依班別授權） */
+  function canClass(classGroupId: string): boolean {
+    return can('teacher') && teacherClassIds.value.includes(classGroupId)
+  }
+
   async function loadProfile() {
     if (!supabase || !session.value) return
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.value.user.id)
-      .single()
+    const uid = session.value.user.id
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single()
     if (!error) profile.value = data as Profile
+    if (profile.value?.roles.includes('teacher')) {
+      const { data: tca } = await supabase
+        .from('teacher_class_assignments')
+        .select('class_group_id')
+        .eq('teacher_id', uid)
+      teacherClassIds.value = (tca ?? []).map((r) => String(r.class_group_id))
+    } else {
+      teacherClassIds.value = []
+    }
   }
 
   /** App 啟動時呼叫一次：還原 session 並監聽變化 */
@@ -100,9 +113,11 @@ export const useAuthStore = defineStore('auth', () => {
     profile,
     ready,
     roles,
+    teacherClassIds,
     isApproved,
     isAdmin,
     can,
+    canClass,
     isLoggedIn,
     init,
     signIn,
