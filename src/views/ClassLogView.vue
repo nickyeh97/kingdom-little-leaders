@@ -3,9 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import { listSessionLogsRange, upsertSessionLog } from '../api/records'
-import { listScheduledSongs, upsertFamiliarity } from '../api/songs'
-import { classHasIndex } from '../lib/engagement'
-import { FAMILIARITY_LEVELS } from '../lib/familiarity'
+import { listCurrentPlaylistSongs, upsertFamiliarity } from '../api/songs'
+import { FAMILIARITY_VALUES } from '../lib/familiarity'
+import { classHasIndex } from '../lib/performance'
 import {
   feedbackDeadline,
   isFeedbackOpen,
@@ -75,7 +75,7 @@ async function loadFamSongs() {
   famDraft.value = {}
   if (!showFam.value) return
   try {
-    const songs = await listScheduledSongs(activeGroup.value, editDate.value)
+    const songs = await listCurrentPlaylistSongs(activeGroup.value, editDate.value)
     famSongs.value = songs
     for (const s of songs) {
       const f = (s.song_familiarity ?? []).find((x) => x.class_group_id === activeGroup.value)
@@ -117,10 +117,18 @@ async function save() {
       teacher_name: auth.profile?.display_name ?? '',
       ...draft.value,
     })
-    // 熟悉度隨日誌一併儲存（班別 × 歌曲）
+    // 熟悉度隨日誌一併儲存（班別 × 歌曲）；上課日期＝本堂日期
     for (const s of famSongs.value) {
       const f = famDraft.value[s.id]
-      if (f) await upsertFamiliarity(s.id, activeGroup.value, f.song_level, f.motion_level)
+      if (f)
+        await upsertFamiliarity(
+          s.id,
+          activeGroup.value,
+          f.song_level,
+          f.motion_level,
+          auth.profile?.display_name ?? '',
+          editDate.value,
+        )
     }
     await load()
     showSuccessToast('已儲存')
@@ -196,21 +204,21 @@ async function save() {
           maxlength="500" placeholder="給下一堂老師的提醒與交接" />
 
         <template v-if="showFam && famSongs.length > 0">
-          <p class="hint fam-title">本堂歌單熟悉度（班級整體練習進度，不評比孩子）</p>
+          <p class="hint fam-title">本堂歌單熟悉度（1＝不熟、5＝熟悉；班級整體練習進度，不評比孩子）</p>
           <div v-for="s in famSongs" :key="s.id" class="fam-card">
             <strong class="fam-song">{{ s.title }}</strong>
             <div v-for="dim in (['song_level', 'motion_level'] as const)" :key="dim" class="fam-dim">
               <span class="fam-label">{{ dim === 'song_level' ? '歌曲' : '動作' }}</span>
               <van-tag
-                v-for="lv in FAMILIARITY_LEVELS"
-                :key="lv.value"
+                v-for="v in FAMILIARITY_VALUES"
+                :key="v"
                 round
                 size="large"
-                :type="famDraft[s.id]?.[dim] === lv.value ? 'primary' : 'default'"
-                :plain="famDraft[s.id]?.[dim] !== lv.value"
-                @click="setFam(s.id, dim, lv.value)"
+                :type="famDraft[s.id]?.[dim] === v ? 'primary' : 'default'"
+                :plain="famDraft[s.id]?.[dim] !== v"
+                @click="setFam(s.id, dim, v)"
               >
-                {{ lv.label }}
+                {{ v }}
               </van-tag>
             </div>
           </div>

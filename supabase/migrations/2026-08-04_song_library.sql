@@ -1,30 +1,45 @@
--- Sprint 03 #5：詩歌曲庫重構（規格書 v3 決議 5）
+-- Sprint 03 #5：詩歌曲庫重構（v4 決議 3/4＋現行共編 Excel 欄位基準）
 -- 於 Supabase SQL Editor 執行。
+--
+-- 模型依（兒童班）敬拜歌單 Excel：
+--   雙月固定歌單（月份、歌名、連結1有動作、連結2純歌詞）＝ song_playlists＋playlist_songs
+--   敬拜過的歌單（歌名、歌唱/動作熟悉指數 1~5、填寫人、填寫日期、上課日期）＝ song_familiarity
 
--- 1) songs 曲庫化：不再綁定單一聚會日（可一次上傳整學期，越新越上面）；
---    新增「詩歌舞蹈」影片連結（youtube_url＝詩歌、dance_url＝詩歌舞蹈）
+-- 1) songs 曲庫化：不再綁定單一聚會日；
+--    youtube_url＝連結（純歌詞）、dance_url＝連結（有動作）
 alter table songs add column if not exists dance_url text;
 alter table songs alter column gathering_date drop not null;
 
--- 2) 歌單排程（班別 × 聚會日）：「本週＊＊班的詩歌」「下週＊＊班的詩歌」由日期推導
-create table if not exists song_schedule (
+-- 2) 歌單期間（班別 × 期間，如「2026年7-8月」雙月歌單；v4 決議 4：以班別區分）
+create table if not exists song_playlists (
   id uuid primary key default gen_random_uuid(),
-  song_id uuid not null references songs (id) on delete cascade,
   class_group_id uuid not null references class_groups (id) on delete cascade,
-  gathering_date date not null,
-  unique (song_id, class_group_id, gathering_date)
+  title text not null,             -- 例：2026年7-8月
+  start_date date not null,
+  end_date date not null,
+  created_at timestamptz not null default now(),
+  unique (class_group_id, title)
 );
-create index if not exists idx_song_schedule_date on song_schedule (gathering_date);
 
--- 3) 兩維熟悉度（班別 × 歌曲；「歌曲」與「動作」各 1–3：陌生/練習中/熟悉）
---    是班級整體的練習進度，不評比個別孩子；幼幼班老師不需填寫（前端不顯示）
+create table if not exists playlist_songs (
+  playlist_id uuid not null references song_playlists (id) on delete cascade,
+  song_id uuid not null references songs (id) on delete cascade,
+  sort_order int not null default 0,
+  primary key (playlist_id, song_id)
+);
+
+-- 3) 兩維熟悉度（班別 × 歌曲；歌唱/動作各 1–5：1＝不熟、5＝熟悉——v4 決議 3）
+--    記錄於詩歌曲目上；老師可於詩歌頁直接編輯、也可於課堂紀錄（日誌）流程覆寫；
+--    幼幼班不需填寫。填寫人以快照存名（避免互查 profiles 的權限問題）
 create table if not exists song_familiarity (
   song_id uuid not null references songs (id) on delete cascade,
   class_group_id uuid not null references class_groups (id) on delete cascade,
-  song_level smallint check (song_level between 1 and 3),
-  motion_level smallint check (motion_level between 1 and 3),
+  song_level smallint check (song_level between 1 and 5),     -- 歌唱熟悉指數
+  motion_level smallint check (motion_level between 1 and 5), -- 動作熟悉指數
+  last_practiced_on date,                                     -- 上課日期（最近練習）
   updated_by uuid not null default auth.uid() references profiles (id),
-  updated_at timestamptz not null default now(),
+  updated_by_name text not null default '',                   -- 填寫人（快照）
+  updated_at timestamptz not null default now(),              -- 填寫日期
   primary key (song_id, class_group_id)
 );
 
@@ -40,25 +55,38 @@ drop trigger if exists trg_touch_song_familiarity on song_familiarity;
 create trigger trg_touch_song_familiarity before update on song_familiarity
   for each row execute function public.touch_song_familiarity();
 
--- 4) 既有歌曲搬遷：原「每週歌單」為全班共用 → 轉為三班排程（保留歷史）
-insert into song_schedule (song_id, class_group_id, gathering_date)
-select s.id, cg.id, s.gathering_date
-from songs s cross join class_groups cg
-where s.gathering_date is not null
+-- 4) 既有歌曲搬遷：各班建立一份「2026年8月」歌單，收納現有全部歌曲（管理者可再調整）
+insert into song_playlists (class_group_id, title, start_date, end_date)
+select cg.id, '2026年8月', date '2026-08-01', date '2026-08-31'
+from class_groups cg
+on conflict do nothing;
+
+insert into playlist_songs (playlist_id, song_id, sort_order)
+select pl.id, s.id, coalesce(s.sort_order, 0)
+from song_playlists pl
+cross join songs s
+where pl.title = '2026年8月'
 on conflict do nothing;
 
 -- 5) RLS
-alter table song_schedule enable row level security;
-create policy "song_schedule_read" on song_schedule
+alter table song_playlists enable row level security;
+create policy "song_playlists_read" on song_playlists
   for select to authenticated using (public.is_approved());
-create policy "song_schedule_write" on song_schedule
+create policy "song_playlists_write" on song_playlists
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table playlist_songs enable row level security;
+create policy "playlist_songs_read" on playlist_songs
+  for select to authenticated using (public.is_approved());
+create policy "playlist_songs_write" on playlist_songs
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
 alter table song_familiarity enable row level security;
 create policy "song_familiarity_read" on song_familiarity
   for select to authenticated using (public.is_approved());
--- 於日誌流程由「該班老師」填寫；同工可代為修正
+-- 由「該班老師」填寫（詩歌頁或日誌流程）；同工可代為修正
 create policy "song_familiarity_write" on song_familiarity
   for all to authenticated
   using (public.is_admin() or public.has_class_role(class_group_id))

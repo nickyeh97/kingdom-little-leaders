@@ -5,6 +5,7 @@ import type {
   CheckInStatus,
   Child,
   ClassGroup,
+  PerformanceScore,
   SessionFeedback,
 } from '../types'
 
@@ -83,19 +84,65 @@ export async function upsertFeedback(
   if (error) throw error
 }
 
-/** 老師點名列：標記/取消專心配合指數（null＝取消；moods 維持不動） */
-export async function setEngagement(
+// ---- 專心度/配合度（v4 決議 2：僅老師/同工可讀，家長不可見）----
+
+export async function listScores(gatheringDate: string): Promise<PerformanceScore[]> {
+  const { data, error } = await db()
+    .from('performance_scores')
+    .select('*')
+    .eq('gathering_date', gatheringDate)
+  if (error) throw error
+  return data as PerformanceScore[]
+}
+
+/** 老師點名列：兩維 1–5 即點即存（PRD 預設 5：未設定的另一維以 5 帶入） */
+export async function upsertScore(
   childId: string,
   gatheringDate: string,
-  engagement: number | null,
+  focus: number | null,
+  cooperation: number | null,
 ): Promise<void> {
   const { error } = await db()
-    .from('session_feedback')
+    .from('performance_scores')
     .upsert(
-      { child_id: childId, gathering_date: gatheringDate, engagement },
+      { child_id: childId, gathering_date: gatheringDate, focus, cooperation },
       { onConflict: 'child_id,gathering_date' },
     )
   if (error) throw error
+}
+
+/** 老師端：單一孩子的近三個月指數走勢 */
+export async function listChildScores(
+  childId: string,
+  from: string,
+  to: string,
+): Promise<PerformanceScore[]> {
+  const { data, error } = await db()
+    .from('performance_scores')
+    .select('*')
+    .eq('child_id', childId)
+    .gte('gathering_date', from)
+    .lte('gathering_date', to)
+    .order('gathering_date', { ascending: false })
+  if (error) throw error
+  return data as PerformanceScore[]
+}
+
+/** 老師端：單一孩子的近三個月出席/請假紀錄（含老師備註） */
+export async function listChildCheckIns(
+  childId: string,
+  from: string,
+  to: string,
+): Promise<CheckIn[]> {
+  const { data, error } = await db()
+    .from('check_ins')
+    .select('*')
+    .eq('child_id', childId)
+    .gte('gathering_date', from)
+    .lte('gathering_date', to)
+    .order('gathering_date', { ascending: false })
+  if (error) throw error
+  return data as CheckIn[]
 }
 
 /** 家長端出席勾勾（S3 幼幼班走勢）：僅回傳自己孩子的簽到狀態，不含老師備註 */

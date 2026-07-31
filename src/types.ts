@@ -57,9 +57,15 @@ export interface SessionFeedback {
   child_id: string
   gathering_date: string
   moods: string[]
-  /** 專心/配合指數 1–4（4 最投入）；null＝未評（幼幼班一律不評） */
-  engagement: number | null
   created_by: string
+}
+
+/** 專心度/配合度（v4 決議 2）：1–5、僅老師/同工可讀；幼幼班不評 */
+export interface PerformanceScore {
+  child_id: string
+  gathering_date: string
+  focus: number | null
+  cooperation: number | null
 }
 
 /** 家長端出席勾勾（parent_checkin_marks RPC 回傳；不含老師備註） */
@@ -82,7 +88,7 @@ export interface SessionLog {
   updated_at: string
 }
 
-/** 敬拜詩歌曲庫（v3 決議 5）：影音外連 YouTube（youtube_url＝詩歌、dance_url＝詩歌舞蹈） */
+/** 敬拜詩歌曲庫：影音外連 YouTube（youtube_url＝連結·純歌詞、dance_url＝連結·有動作） */
 export interface Song {
   id: string
   title: string
@@ -90,25 +96,29 @@ export interface Song {
   dance_url: string | null
   lyrics: string | null
   created_at: string
-  /** 巢狀查詢帶回的排程與熟悉度 */
-  song_schedule?: SongSchedule[]
+  /** 巢狀查詢帶回的各班熟悉度 */
   song_familiarity?: SongFamiliarity[]
 }
 
-/** 歌單排程：班別 × 聚會日（「本週＊＊班」「下週＊＊班」由日期推導） */
-export interface SongSchedule {
+/** 歌單期間（班別 × 期間，如「2026年7-8月」雙月歌單；欄位依現行共編 Excel） */
+export interface SongPlaylist {
   id: string
-  song_id: string
   class_group_id: string
-  gathering_date: string
+  title: string
+  start_date: string
+  end_date: string
+  playlist_songs?: { song_id: string; sort_order: number; songs?: Song }[]
 }
 
-/** 兩維熟悉度（班別 × 歌曲；1–3：陌生/練習中/熟悉；不評比個別孩子） */
+/** 兩維熟悉度（班別 × 歌曲；1–5：1＝不熟、5＝熟悉；含填寫人/填寫日期/上課日期） */
 export interface SongFamiliarity {
   song_id: string
   class_group_id: string
   song_level: number | null
   motion_level: number | null
+  last_practiced_on: string | null
+  updated_by_name: string
+  updated_at: string
 }
 
 export interface Announcement {

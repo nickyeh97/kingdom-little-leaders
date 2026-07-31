@@ -1,21 +1,16 @@
 /**
- * 詩歌兩維熟悉度（規格書 v3 決議 5）。
- * 「歌曲熟悉度」與「動作熟悉度」是**班級整體**的練習進度（班別 × 歌曲），
- * 不評比個別孩子（守則紅燈 #1）；幼幼班老師不需填寫。
- * 於課堂紀錄（日誌）流程填寫，詩歌頁同步顯示。
+ * 詩歌兩維熟悉度（PRD v2.0／v4 決議 3）。
+ * 「歌曲熟悉度」與「動作熟練度」記錄於詩歌曲目上（班別 × 歌曲），
+ * 數值 1–5：1＝不熟、5＝熟悉。是班級整體的練習進度，不評比個別孩子（守則紅燈 #1）。
+ * 老師可於詩歌頁直接編輯，也可於課堂紀錄（日誌）流程覆寫；幼幼班老師不需填寫。
  */
-export interface FamiliarityLevel {
-  value: number
-  label: string
-}
+export const FAMILIARITY_VALUES = [1, 2, 3, 4, 5]
 
-export const FAMILIARITY_LEVELS: FamiliarityLevel[] = [
-  { value: 1, label: '陌生' },
-  { value: 2, label: '練習中' },
-  { value: 3, label: '熟悉' },
-]
+export const FAMILIARITY_MIN_LABEL = '不熟'
+export const FAMILIARITY_MAX_LABEL = '熟悉'
 
-export function familiarityLabel(value: number | null | undefined): string | null {
-  if (value == null) return null
-  return FAMILIARITY_LEVELS.find((l) => l.value === value)?.label ?? null
+/** 顯示文字：如「4/5」；未填回傳 null */
+export function familiarityText(value: number | null | undefined): string | null {
+  if (value == null || value < 1 || value > 5) return null
+  return `${value}/5`
 }

@@ -6,12 +6,19 @@ import {
   listCheckInsRange,
   listFeedbackRange,
   listPlansRange,
+  listScoresRange,
   listSessionLogsRange,
 } from '../api/records'
 import { downloadCsv } from '../lib/csv'
-import { engagementOf } from '../lib/engagement'
 import { recordsRangeStart, upcomingGathering } from '../lib/gathering'
-import type { AttendancePlan, CheckIn, Child, SessionFeedback, SessionLog } from '../types'
+import type {
+  AttendancePlan,
+  CheckIn,
+  Child,
+  PerformanceScore,
+  SessionFeedback,
+  SessionLog,
+} from '../types'
 
 const from = recordsRangeStart() // 近半年
 const to = upcomingGathering()
@@ -20,6 +27,7 @@ const children = ref<Child[]>([])
 const plans = ref<AttendancePlan[]>([])
 const checks = ref<CheckIn[]>([])
 const feedback = ref<SessionFeedback[]>([])
+const scores = ref<PerformanceScore[]>([])
 const logs = ref<SessionLog[]>([])
 const loading = ref(true)
 const openDates = ref<string[]>([])
@@ -37,7 +45,7 @@ interface DateGroup {
     plan?: AttendancePlan
     check?: CheckIn
     moods: string[]
-    engagement: number | null
+    score?: PerformanceScore
   }[]
 }
 
@@ -54,7 +62,7 @@ const groups = computed<DateGroup[]>(() => {
     if (!row) {
       const child = childMap.value.get(childId)
       if (!child) return null
-      row = { child, moods: [], engagement: null }
+      row = { child, moods: [] }
       g.rows.push(row)
     }
     return row
@@ -69,10 +77,11 @@ const groups = computed<DateGroup[]>(() => {
   }
   for (const f of feedback.value) {
     const row = rowFor(f.gathering_date, f.child_id)
-    if (row) {
-      row.moods = f.moods
-      row.engagement = f.engagement
-    }
+    if (row) row.moods = f.moods
+  }
+  for (const sc of scores.value) {
+    const row = rowFor(sc.gathering_date, sc.child_id)
+    if (row) row.score = sc
   }
   for (const g of byDate.values()) {
     g.planned = g.rows.filter((r) => r.plan?.status === 'attending').length
@@ -86,13 +95,15 @@ const groups = computed<DateGroup[]>(() => {
 
 onMounted(async () => {
   try {
-    ;[children.value, plans.value, checks.value, feedback.value, logs.value] = await Promise.all([
-      listAllChildren(),
-      listPlansRange(from, to),
-      listCheckInsRange(from, to),
-      listFeedbackRange(from, to),
-      listSessionLogsRange(from, to),
-    ])
+    ;[children.value, plans.value, checks.value, feedback.value, scores.value, logs.value] =
+      await Promise.all([
+        listAllChildren(),
+        listPlansRange(from, to),
+        listCheckInsRange(from, to),
+        listFeedbackRange(from, to),
+        listScoresRange(from, to),
+        listSessionLogsRange(from, to),
+      ])
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -106,7 +117,7 @@ const checkLabel = { present: '簽到', leave: '臨時請假' } as const
 /** 匯出「出席與學生狀況」：出席統計＋簽到＋表情＋備註整合於同一份表 */
 function exportAttendance() {
   const rows: string[][] = [
-    ['日期', '班別', '孩子', '預先出席', '家長備註', '當日狀態', '現場加入', '專心/配合', '課堂表情', '老師備註'],
+    ['日期', '班別', '孩子', '預先出席', '家長備註', '當日狀態', '現場加入', '專心度', '配合度', '課堂表情', '老師備註'],
   ]
   for (const g of [...groups.value].reverse()) {
     for (const r of g.rows) {
@@ -118,7 +129,8 @@ function exportAttendance() {
         r.plan?.note ?? '',
         r.check ? checkLabel[r.check.status] : '未紀錄',
         r.check?.is_walk_in ? '是' : '',
-        engagementOf(r.engagement)?.label ?? '',
+        r.score?.focus != null ? String(r.score.focus) : '',
+        r.score?.cooperation != null ? String(r.score.cooperation) : '',
         r.moods.join('、'),
         r.check?.note ?? '',
       ])
@@ -183,8 +195,8 @@ function exportLogs() {
               </van-tag>
             </div>
             <p v-if="r.plan?.note" class="hint">💬 家長：{{ r.plan.note }}</p>
-            <p v-if="r.engagement" class="hint">
-              {{ engagementOf(r.engagement)?.emoji }} 專心/配合：{{ engagementOf(r.engagement)?.label }}
+            <p v-if="r.score" class="hint">
+              專心 {{ r.score.focus ?? '–' }}・配合 {{ r.score.cooperation ?? '–' }}
             </p>
             <p v-if="r.moods.length" class="hint">{{ r.moods.join('、') }}</p>
             <p v-if="r.check?.note" class="hint">📝 {{ r.check.note }}</p>

@@ -199,11 +199,27 @@ create policy "announcements_teacher_write" on announcements
   using (class_group_id is not null and public.has_class_role(class_group_id))
   with check (class_group_id is not null and public.has_class_role(class_group_id));
 
--- ---- song_schedule / song_familiarity（v3 決議 5）----
-alter table song_schedule enable row level security;
-create policy "song_schedule_read" on song_schedule
+-- ---- performance_scores（v4 決議 2）：僅老師/同工可讀；該班老師可寫 ----
+alter table performance_scores enable row level security;
+create policy "perf_scores_read" on performance_scores
+  for select to authenticated using (public.is_staff());
+create policy "perf_scores_write" on performance_scores
+  for all to authenticated
+  using (public.child_in_my_class(child_id))
+  with check (public.child_in_my_class(child_id));
+
+-- ---- song_playlists / playlist_songs / song_familiarity（v4 決議 3/4）----
+alter table song_playlists enable row level security;
+create policy "song_playlists_read" on song_playlists
   for select to authenticated using (public.is_approved());
-create policy "song_schedule_write" on song_schedule
+create policy "song_playlists_write" on song_playlists
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table playlist_songs enable row level security;
+create policy "playlist_songs_read" on playlist_songs
+  for select to authenticated using (public.is_approved());
+create policy "playlist_songs_write" on playlist_songs
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 

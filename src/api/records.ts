@@ -1,5 +1,12 @@
 import { db } from '../lib/supabase'
-import type { AttendancePlan, CheckIn, Child, SessionFeedback, SessionLog } from '../types'
+import type {
+  AttendancePlan,
+  CheckIn,
+  Child,
+  PerformanceScore,
+  SessionFeedback,
+  SessionLog,
+} from '../types'
 
 /** 老師/同工：全部孩子（供紀錄查詢對照班別與姓名） */
 export async function listAllChildren(): Promise<Child[]> {
@@ -39,6 +46,17 @@ export async function listFeedbackRange(from: string, to: string): Promise<Sessi
     .lte('gathering_date', to)
   if (error) throw error
   return data as SessionFeedback[]
+}
+
+/** 專心度/配合度（僅老師/同工可讀，RLS 強制）—— 紀錄頁與 CSV 匯出用 */
+export async function listScoresRange(from: string, to: string): Promise<PerformanceScore[]> {
+  const { data, error } = await db()
+    .from('performance_scores')
+    .select('*')
+    .gte('gathering_date', from)
+    .lte('gathering_date', to)
+  if (error) throw error
+  return data as PerformanceScore[]
 }
 
 export async function listSessionLogsRange(from: string, to: string): Promise<SessionLog[]> {
