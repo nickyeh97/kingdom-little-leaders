@@ -165,7 +165,7 @@ create table songs (
 create index idx_songs_date on songs (gathering_date);
 
 -- 歌單期間（班別 × 期間，如「2026年7-8月」雙月歌單；v4 決議 4：以班別區分。
--- 欄位依現行共編 Excel「（兒童班）敬拜歌單」）
+-- 幼幼班無詩歌模組（只有點名＋課後紀錄）。欄位依現行共編 Excel「（兒童班）敬拜歌單」）
 create table song_playlists (
   id uuid primary key default gen_random_uuid(),
   class_group_id uuid not null references class_groups (id) on delete cascade,

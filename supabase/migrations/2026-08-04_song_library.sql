@@ -56,9 +56,11 @@ create trigger trg_touch_song_familiarity before update on song_familiarity
   for each row execute function public.touch_song_familiarity();
 
 -- 4) 既有歌曲搬遷：各班建立一份「2026年8月」歌單，收納現有全部歌曲（管理者可再調整）
+--    幼幼班無詩歌模組（只有點名＋課後紀錄）——不建歌單
 insert into song_playlists (class_group_id, title, start_date, end_date)
 select cg.id, '2026年8月', date '2026-08-01', date '2026-08-31'
 from class_groups cg
+where cg.name not like '%幼幼%'
 on conflict do nothing;
 
 insert into playlist_songs (playlist_id, song_id, sort_order)

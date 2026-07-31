@@ -35,11 +35,15 @@ const songById = computed(() => new Map(songs.value.map((s) => [s.id, s])))
 async function load() {
   loading.value = true
   try {
-    ;[songs.value, playlists.value, groups.value] = await Promise.all([
+    const [allSongs, allPlaylists, allGroups] = await Promise.all([
       listSongs(),
       listPlaylists(),
       listClassGroups(),
     ])
+    songs.value = allSongs
+    playlists.value = allPlaylists
+    // 幼幼班無詩歌模組（只有點名＋老師課後紀錄）——不顯示頁籤
+    groups.value = allGroups.filter((g) => classHasIndex(g.name))
     if (!activeGroup.value) activeGroup.value = groups.value[0]?.id ?? ''
   } catch (e) {
     showFailToast((e as Error).message)
