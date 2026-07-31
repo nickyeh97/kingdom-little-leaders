@@ -73,6 +73,22 @@ export function nextGathering(from = new Date(), weekday = GATHERING_WEEKDAY): s
   return toDateString(d)
 }
 
+/** 未來 N 次聚會日（含本週，新 → 更未來）— 供服事報名/排班的日期清單 */
+export function upcomingGatherings(
+  count: number,
+  from = new Date(),
+  weekday = GATHERING_WEEKDAY,
+): string[] {
+  const first = upcomingGathering(from, weekday)
+  const d = new Date(`${first}T00:00:00`)
+  const dates: string[] = []
+  for (let i = 0; i < count; i++) {
+    dates.push(toDateString(d))
+    d.setDate(d.getDate() + 7)
+  }
+  return dates
+}
+
 /** 近 N 次聚會日（舊 → 新，最後一筆＝最近一次聚會）— 供家長端近三週走勢 */
 export function recentGatherings(
   count: number,

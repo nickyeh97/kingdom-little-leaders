@@ -135,3 +135,36 @@ export interface Announcement {
   created_by: string
   created_at: string
 }
+
+/** 每週各班服事內容（C-01：日期/詩歌/主題/彈性時間；發布後老師可見） */
+export interface ServiceWeek {
+  id: string
+  gathering_date: string
+  class_group_id: string
+  songs_text: string
+  topic: string
+  flex_text: string
+  published: boolean
+  service_assignments?: ServiceAssignment[]
+}
+
+/** 老師服事報名（T-COM-01；teacher_name 為快照） */
+export interface TeacherServiceSignup {
+  id: string
+  teacher_id: string
+  teacher_name: string
+  gathering_date: string
+  class_group_id: string
+  item: string
+  note: string | null
+}
+
+/** 排班結果（C-01b） */
+export interface ServiceAssignment {
+  id: string
+  service_week_id: string
+  teacher_id: string | null
+  teacher_name: string
+  item: string
+  sort_order: number
+}

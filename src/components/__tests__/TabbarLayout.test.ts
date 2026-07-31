@@ -17,6 +17,7 @@ function makeRouter() {
       { path: '/attendance', name: 'attendance', component: Empty },
       { path: '/checkin', name: 'checkin', component: Empty },
       { path: '/songs', name: 'songs', component: Empty },
+      { path: '/service', name: 'service', component: Empty },
       { path: '/members', name: 'members', component: Empty },
       { path: '/me', name: 'me', component: Empty },
     ],
@@ -63,19 +64,19 @@ describe('TabbarLayout：分頁依角色標籤顯示（詩歌全員可見；名�
     expect(tabLabels(w)).toEqual(['首頁', '出席', '詩歌', '我的'])
   })
 
-  it('老師標籤：首頁／點名／詩歌／我的', async () => {
+  it('老師標籤：首頁／點名／詩歌／服事／我的', async () => {
     const w = await mountWithRoles(['teacher'])
-    expect(tabLabels(w)).toEqual(['首頁', '點名', '詩歌', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '點名', '詩歌', '服事', '我的'])
   })
 
   it('邊際：純 admin 不含點名/出席（逐標籤授權），名單入口在「我的」', async () => {
     const w = await mountWithRoles(['admin'])
-    expect(tabLabels(w)).toEqual(['首頁', '詩歌', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '詩歌', '服事', '我的'])
   })
 
-  it('組長（三標籤）：五個分頁', async () => {
+  it('組長（三標籤）：六個分頁', async () => {
     const w = await mountWithRoles(['admin', 'teacher', 'parent'])
-    expect(tabLabels(w)).toEqual(['首頁', '出席', '點名', '詩歌', '我的'])
+    expect(tabLabels(w)).toEqual(['首頁', '出席', '點名', '詩歌', '服事', '我的'])
   })
 
   it('審核制：未審核者僅有首頁與我的', async () => {

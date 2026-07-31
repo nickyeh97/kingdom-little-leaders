@@ -268,3 +268,44 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- ===== Sprint 04 Wave 1a：老師服事排班 =====
+
+-- 每週各班服事內容（C-01a：日期、詩歌、主題課程、彈性時間文字欄；發布後老師可見）
+create table service_weeks (
+  id uuid primary key default gen_random_uuid(),
+  gathering_date date not null,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  songs_text text not null default '',
+  topic text not null default '',
+  flex_text text not null default '',
+  published boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (gathering_date, class_group_id)
+);
+create index idx_service_weeks_date on service_weeks (gathering_date);
+
+-- 老師服事報名（T-COM-01：依班別區分填寫權限；teacher_name 快照）
+create table teacher_service_signups (
+  id uuid primary key default gen_random_uuid(),
+  teacher_id uuid not null default auth.uid() references profiles (id) on delete cascade,
+  teacher_name text not null default '',
+  gathering_date date not null,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  item text not null,
+  note text,
+  created_at timestamptz not null default now(),
+  unique (teacher_id, gathering_date, class_group_id, item)
+);
+create index idx_signups_date on teacher_service_signups (gathering_date);
+
+-- 排班結果（C-01b；teacher_name 快照供顯示/匯出）
+create table service_assignments (
+  id uuid primary key default gen_random_uuid(),
+  service_week_id uuid not null references service_weeks (id) on delete cascade,
+  teacher_id uuid references profiles (id) on delete set null,
+  teacher_name text not null default '',
+  item text not null,
+  sort_order int not null default 0
+);
+create index idx_assignments_week on service_assignments (service_week_id);
