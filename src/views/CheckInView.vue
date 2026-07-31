@@ -16,6 +16,7 @@ import {
   upsertScore,
 } from '../api/checkin'
 import { listAllChildren } from '../api/records'
+import { updateChild } from '../api/roster'
 import { MOOD_OPTIONS, moodKey } from '../lib/moods'
 import { SCORE_DEFAULT, classHasIndex } from '../lib/performance'
 import { formatGathering, recordsRangeStart, upcomingGathering } from '../lib/gathering'
@@ -278,6 +279,19 @@ const pickCandidates = computed(() => {
     .filter((c) => !kw || c.name.includes(kw))
 })
 
+/** 升班（如幼幼班→幼童班）：正式把孩子轉入本班名冊（同工權限；RLS 強制） */
+async function promoteChild(child: Child) {
+  try {
+    await updateChild(child.id, { name: child.name, class_group_id: activeGroup.value })
+    allChildren.value = await listAllChildren()
+    await loadClass()
+    picking.value = false
+    showSuccessToast(`${child.name} 已轉入本班名冊`)
+  } catch (e) {
+    showFailToast((e as Error).message)
+  }
+}
+
 async function pickChild(child: Child) {
   try {
     await upsertCheckIn({
@@ -483,17 +497,24 @@ async function pickChild(child: Child) {
     >
       <div class="editor">
         <h3>現場加入</h3>
-        <p class="hint">僅能從全校名冊挑選；名冊沒有的孩子請聯繫同工於名單頁建檔</p>
+        <p class="hint">
+          僅能從全校名冊挑選；名冊沒有的孩子請聯繫同工於名單頁建檔。
+          「今日加入」＝只算這一天；孩子若已<b>升班</b>（如幼幼班→幼童班），
+          請用「轉入本班」正式調整班別{{ auth.can('admin') ? '' : '（需同工權限，請聯繫同工）' }}。
+        </p>
         <van-field v-model="pickKeyword" placeholder="搜尋姓名⋯" clearable class="pick-search" />
         <p v-if="pickCandidates.length === 0" class="hint center">找不到符合的孩子</p>
-        <div
-          v-for="c in pickCandidates.slice(0, 30)"
-          :key="c.id"
-          class="pick-row"
-          @click="pickChild(c)"
-        >
-          <strong>{{ c.name }}</strong>
-          <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+        <div v-for="c in pickCandidates.slice(0, 30)" :key="c.id" class="pick-row">
+          <div class="pick-info">
+            <strong>{{ c.name }}</strong>
+            <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+          </div>
+          <div class="pick-actions">
+            <van-button size="small" plain type="primary" @click="pickChild(c)">今日加入</van-button>
+            <van-button v-if="auth.can('admin')" size="small" type="primary" @click="promoteChild(c)">
+              轉入本班
+            </van-button>
+          </div>
         </div>
       </div>
     </van-popup>
@@ -655,9 +676,20 @@ async function pickChild(child: Child) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 12px 4px;
   border-bottom: 1px solid var(--kll-bg);
-  cursor: pointer;
+}
+.pick-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pick-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .pick-row:last-child {
   border-bottom: none;
