@@ -81,7 +81,8 @@ onMounted(load)
 const signupOpen = ref(false)
 const signupDate = ref('')
 const signupClassId = ref('')
-const signupItem = ref('')
+/** 服事項目可複選，一次報多項 */
+const signupItems = ref<string[]>([])
 const signupCustom = ref('')
 const signupNote = ref('')
 const signupSaving = ref(false)
@@ -89,33 +90,53 @@ const signupSaving = ref(false)
 function openSignup(date: string) {
   signupDate.value = date
   signupClassId.value = myClasses.value[0]?.id ?? ''
-  signupItem.value = ''
+  signupItems.value = []
   signupCustom.value = ''
   signupNote.value = ''
   signupOpen.value = true
 }
 
+function toggleSignupItem(item: string) {
+  signupItems.value = signupItems.value.includes(item)
+    ? signupItems.value.filter((x) => x !== item)
+    : [...signupItems.value, item]
+}
+
 async function saveSignup() {
-  const item = (signupItem.value || signupCustom.value).trim()
-  if (!signupClassId.value || !item) {
-    showFailToast('請選擇班別與服事項目')
+  const items = [...signupItems.value]
+  const custom = signupCustom.value.trim()
+  if (custom && !items.includes(custom)) items.push(custom)
+  if (!signupClassId.value || items.length === 0) {
+    showFailToast('請選擇班別與至少一個服事項目')
     return
   }
   signupSaving.value = true
+  let ok = 0
+  let dup = 0
   try {
-    await addSignup({
-      teacher_name: auth.profile?.display_name ?? '',
-      gathering_date: signupDate.value,
-      class_group_id: signupClassId.value,
-      item,
-      note: signupNote.value.trim() || null,
-    })
+    for (const item of items) {
+      try {
+        await addSignup({
+          teacher_name: auth.profile?.display_name ?? '',
+          gathering_date: signupDate.value,
+          class_group_id: signupClassId.value,
+          item,
+          note: signupNote.value.trim() || null,
+        })
+        ok++
+      } catch (e) {
+        // 同日期同項目重複報名 → 跳過並統計，其他錯誤直接拋出
+        if (/duplicate/i.test((e as Error).message)) dup++
+        else throw e
+      }
+    }
     await load()
-    showSuccessToast('已報名')
+    showSuccessToast(
+      dup > 0 ? `已報名 ${ok} 項（${dup} 項先前已報過，略過）` : `已報名 ${ok} 項`,
+    )
     signupOpen.value = false
   } catch (e) {
-    const msg = (e as Error).message
-    showFailToast(/duplicate/i.test(msg) ? '這個日期已報過相同項目' : msg)
+    showFailToast((e as Error).message)
   } finally {
     signupSaving.value = false
   }
@@ -356,29 +377,33 @@ function assignmentLines(w: ServiceWeek): string[] {
             {{ g.name }}
           </van-tag>
         </div>
-        <p class="hint pop-label">服事項目（可自行輸入其他）</p>
+        <p class="hint pop-label">
+          服事項目（可複選<template v-if="signupItems.length"
+            >，已選 {{ signupItems.length }} 項</template
+          >）
+        </p>
         <div class="tag-row">
           <van-tag
             v-for="it in SERVICE_ITEM_PRESETS"
             :key="it"
             round
             size="large"
-            :type="signupItem === it ? 'primary' : 'default'"
-            :plain="signupItem !== it"
-            @click="signupItem = signupItem === it ? '' : it; signupCustom = ''"
+            :type="signupItems.includes(it) ? 'primary' : 'default'"
+            :plain="!signupItems.includes(it)"
+            @click="toggleSignupItem(it)"
           >
-            {{ it }}
+            {{ signupItems.includes(it) ? '✓ ' : '' }}{{ it }}
           </van-tag>
         </div>
         <van-field
           v-model="signupCustom"
           label="其他項目"
-          placeholder="未列出的服事項目"
-          @update:model-value="signupItem = ''"
+          placeholder="未列出的服事項目（會與勾選的一併送出）"
         />
         <van-field v-model="signupNote" label="備註" maxlength="100" placeholder="選填" />
         <van-button round block type="primary" :loading="signupSaving" class="save-btn" @click="saveSignup">
-          送出報名
+          送出報名{{ signupItems.length + (signupCustom.trim() ? 1 : 0) > 0
+            ? `（${signupItems.length + (signupCustom.trim() ? 1 : 0)} 項）` : '' }}
         </van-button>
       </div>
     </van-popup>
