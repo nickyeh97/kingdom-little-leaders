@@ -11,6 +11,7 @@ import {
   weekdayName,
   nextGathering,
   recentGatherings,
+  upcomingGatherings,
   shortDate,
 } from '../gathering'
 import { GATHERING_WEEKDAY, PLAN_DEADLINE_DAYS_BEFORE } from '../config'
@@ -211,5 +212,23 @@ describe('nextGathering（歌單「下週」標籤用）', () => {
 
   it('邊際：當天就是聚會日時，下週＝當天 + 7', () => {
     expect(nextGathering(D(2026, 8, 1), 6)).toBe('2026-08-08')
+  })
+})
+
+describe('upcomingGatherings（服事報名日期清單）', () => {
+  const D = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12)
+
+  it('回傳未來 N 次聚會日，含本週、間隔 7 天', () => {
+    expect(upcomingGatherings(3, D(2026, 8, 5), 6)).toEqual([
+      '2026-08-08',
+      '2026-08-15',
+      '2026-08-22',
+    ])
+  })
+
+  it('邊際：當天是聚會日時，第一筆＝當天；可跨月', () => {
+    const dates = upcomingGatherings(5, D(2026, 8, 29), 6)
+    expect(dates[0]).toBe('2026-08-29')
+    expect(dates[4]).toBe('2026-09-26')
   })
 })

@@ -246,3 +246,39 @@ as $$
 $$;
 
 grant execute on function public.parent_checkin_marks(date, date) to authenticated;
+
+-- ---- 服事排班（Sprint 04 Wave 1a）----
+alter table service_weeks enable row level security;
+create policy "service_weeks_read" on service_weeks
+  for select to authenticated
+  using (public.is_admin() or (public.is_staff() and published));
+create policy "service_weeks_write" on service_weeks
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table teacher_service_signups enable row level security;
+create policy "signups_read" on teacher_service_signups
+  for select to authenticated using (public.is_staff());
+create policy "signups_insert" on teacher_service_signups
+  for insert to authenticated
+  with check (
+    public.is_admin()
+    or (teacher_id = auth.uid() and public.has_class_role(class_group_id))
+  );
+create policy "signups_delete" on teacher_service_signups
+  for delete to authenticated
+  using (public.is_admin() or teacher_id = auth.uid());
+
+alter table service_assignments enable row level security;
+create policy "assignments_read" on service_assignments
+  for select to authenticated
+  using (
+    public.is_admin()
+    or (public.is_staff() and exists (
+      select 1 from service_weeks w
+      where w.id = service_week_id and w.published
+    ))
+  );
+create policy "assignments_write" on service_assignments
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());

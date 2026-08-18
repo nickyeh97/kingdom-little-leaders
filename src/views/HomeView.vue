@@ -10,12 +10,14 @@ import {
 import { listMyChildren, listPlans } from '../api/attendance'
 import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
 import { listSessionLogsRange } from '../api/records'
+import { listServiceWeeks } from '../api/service'
 import {
   feedbackDeadline,
   isFeedbackOpen,
   lastGathering,
   planDeadline,
   upcomingGathering,
+  upcomingGatherings,
   isPlanOpen,
   weekdayName,
 } from '../lib/gathering'
@@ -55,6 +57,8 @@ const deadline = planDeadline(gathering)
 const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 /** 老師：上堂課的課堂紀錄尚未填寫（兩天內提醒） */
 const needClassLog = ref(false)
+/** 老師：已發布的服事安排（站內通知——v4 裁決 D） */
+const myServiceDates = ref<string[]>([])
 const lastG = lastGathering()
 const feedbackDue = feedbackDeadline(lastG)
 
@@ -76,6 +80,23 @@ onMounted(async () => {
       lastFeedback.value = children
         .filter((c) => (byChild.get(c.id) ?? []).length > 0)
         .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
+    }
+    // 老師：已發布服事表中有自己的排班 → 站內通知
+    if (auth.can('teacher') || auth.can('admin')) {
+      const svcDates = upcomingGatherings(4)
+      const svcWeeks = await listServiceWeeks(svcDates[0], svcDates[svcDates.length - 1])
+      const meId = auth.session?.user.id
+      myServiceDates.value = [
+        ...new Set(
+          svcWeeks
+            .filter(
+              (w) =>
+                w.published &&
+                (w.service_assignments ?? []).some((a) => a.teacher_id === meId),
+            )
+            .map((w) => w.gathering_date),
+        ),
+      ].sort()
     }
     // 老師：上堂課（兩天內）若有自己點名過的班別還沒填課堂紀錄 → 提醒
     if (auth.can('teacher') && isFeedbackOpen(lastG)) {
@@ -202,6 +223,16 @@ async function removeAnn() {
       mode="link"
       :text="`本週出席還沒填喔——${weekdayName(deadline)} 23:59 前完成勾選`"
       @click="$router.push({ name: 'attendance' })"
+    />
+
+    <van-notice-bar
+      v-if="myServiceDates.length > 0"
+      left-icon="calendar-o"
+      mode="link"
+      color="#1f6f54"
+      background="#e2f0e8"
+      :text="`您有已發布的服事安排（${myServiceDates.map((d) => d.slice(5).replace('-', '/')).join('、')}）——點我查看服事表`"
+      @click="$router.push({ name: 'service' })"
     />
 
     <template v-if="lastFeedback.length > 0">

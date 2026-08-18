@@ -37,6 +37,12 @@ const router = createRouter({
           meta: { requiresApproval: true },
         },
         {
+          path: 'service',
+          name: 'service',
+          component: () => import('../views/ServiceView.vue'),
+          meta: { roles: ['teacher', 'admin'] },
+        },
+        {
           path: 'records',
           name: 'records',
           component: () => import('../views/RecordsView.vue'),
