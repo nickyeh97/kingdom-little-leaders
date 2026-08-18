@@ -3,6 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import {
+  listChildRosters,
+  listChildSignups,
+  setChildAssignments,
+  upsertChildRoster,
+} from '../api/childService'
+import { listAllChildren } from '../api/records'
+import {
   addSignup,
   listServiceWeeks,
   listSignups,
@@ -13,15 +20,25 @@ import {
 import { formatGathering, upcomingGatherings } from '../lib/gathering'
 import { SERVICE_ITEM_PRESETS, SIGNUP_WEEKS_AHEAD } from '../lib/service'
 import { useAuthStore } from '../stores/auth'
-import type { ClassGroup, ServiceWeek, TeacherServiceSignup } from '../types'
+import type {
+  Child,
+  ChildServiceRoster,
+  ChildServiceSignup,
+  ClassGroup,
+  ServiceWeek,
+  TeacherServiceSignup,
+} from '../types'
 
 const auth = useAuthStore()
 const dates = upcomingGatherings(SIGNUP_WEEKS_AHEAD)
 
-const activeTab = ref<'roster' | 'signup' | 'all'>('roster')
+const activeTab = ref<'roster' | 'signup' | 'all' | 'kids'>('roster')
 const groups = ref<ClassGroup[]>([])
 const weeks = ref<ServiceWeek[]>([])
 const signups = ref<TeacherServiceSignup[]>([])
+const allChildren = ref<Child[]>([])
+const childSignups = ref<ChildServiceSignup[]>([])
+const childRosters = ref<ChildServiceRoster[]>([])
 const loading = ref(true)
 
 const me = computed(() => auth.session?.user.id ?? '')
@@ -63,11 +80,15 @@ async function load() {
   try {
     const from = dates[0]
     const to = dates[dates.length - 1]
-    ;[groups.value, weeks.value, signups.value] = await Promise.all([
-      listClassGroups(),
-      listServiceWeeks(from, to),
-      listSignups(from, to),
-    ])
+    ;[groups.value, weeks.value, signups.value, allChildren.value, childSignups.value, childRosters.value] =
+      await Promise.all([
+        listClassGroups(),
+        listServiceWeeks(from, to),
+        listSignups(from, to),
+        listAllChildren(),
+        listChildSignups(from, to),
+        listChildRosters(from, to),
+      ])
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -239,6 +260,122 @@ async function saveWeek() {
   }
 }
 
+// ---- 兒童服事（Wave 1b：C-02 排班發布；T-KID-01 查看）----
+/** 兒童服事僅適用兒童班（權限矩陣：幼童/幼幼班老師「無」） */
+const kidsClasses = computed(() => groups.value.filter((g) => g.name.includes('兒童')))
+const showKidsTab = computed(
+  () => auth.can('admin') || kidsClasses.value.some((g) => auth.canClass(g.id)),
+)
+const childById = computed(() => new Map(allChildren.value.map((c) => [c.id, c])))
+
+function kidSignupsFor(date: string, classId: string): ChildServiceSignup[] {
+  return childSignups.value.filter((cs) => {
+    if (cs.gathering_date !== date) return false
+    const child = childById.value.get(cs.child_id)
+    return child != null && String(child.class_group_id) === classId
+  })
+}
+function kidRosterAt(date: string, classId: string): ChildServiceRoster | undefined {
+  return childRosters.value.find(
+    (r) => r.gathering_date === date && String(r.class_group_id) === classId,
+  )
+}
+function kidRosterLines(r: ChildServiceRoster): string[] {
+  return (r.child_service_assignments ?? [])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((a) => `${a.item}：${a.child_name}`)
+}
+/** 兒童服事表分頁：老師只看有已發布內容的日期；同工全看 */
+function kidDates(): string[] {
+  if (auth.can('admin')) return dates
+  return dates.filter((d) =>
+    kidsClasses.value.some((g) => kidRosterAt(d, g.id)?.published),
+  )
+}
+
+interface KidDraftAssignment {
+  child_id: string | null
+  child_name: string
+  item: string
+}
+const kidEditOpen = ref(false)
+const kidEditDate = ref('')
+const kidEditClassId = ref('')
+const kidEditPublished = ref(false)
+const kidAssignments = ref<KidDraftAssignment[]>([])
+const kidManualItem = ref('')
+const kidManualChildId = ref('')
+const kidSaving = ref(false)
+
+function openKidEditor(date: string, classId: string) {
+  if (!auth.can('admin')) return
+  const r = kidRosterAt(date, classId)
+  kidEditDate.value = date
+  kidEditClassId.value = classId
+  kidEditPublished.value = r?.published ?? false
+  kidAssignments.value = (r?.child_service_assignments ?? [])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((a) => ({ child_id: a.child_id, child_name: a.child_name, item: a.item }))
+  kidManualItem.value = ''
+  kidManualChildId.value = ''
+  kidEditOpen.value = true
+}
+
+/** 具服事資格、屬於此班的孩子（手動加入用） */
+const kidEligible = computed(() =>
+  allChildren.value.filter(
+    (c) => c.service_eligible && String(c.class_group_id) === kidEditClassId.value,
+  ),
+)
+
+function addKidFromSignup(cs: ChildServiceSignup) {
+  const child = childById.value.get(cs.child_id)
+  kidAssignments.value = [
+    ...kidAssignments.value,
+    { child_id: cs.child_id, child_name: child?.name ?? '', item: cs.item },
+  ]
+}
+
+function addKidManual() {
+  const child = childById.value.get(kidManualChildId.value)
+  const item = kidManualItem.value.trim()
+  if (!child || !item) {
+    showFailToast('請選擇孩子並填寫項目')
+    return
+  }
+  kidAssignments.value = [
+    ...kidAssignments.value,
+    { child_id: child.id, child_name: child.name, item },
+  ]
+  kidManualItem.value = ''
+  kidManualChildId.value = ''
+}
+
+function removeKidAssignment(i: number) {
+  kidAssignments.value = kidAssignments.value.filter((_, idx) => idx !== i)
+}
+
+async function saveKidRoster() {
+  kidSaving.value = true
+  try {
+    const rosterId = await upsertChildRoster({
+      gathering_date: kidEditDate.value,
+      class_group_id: kidEditClassId.value,
+      published: kidEditPublished.value,
+    })
+    await setChildAssignments(rosterId, kidAssignments.value)
+    await load()
+    showSuccessToast(kidEditPublished.value ? '已儲存並發布' : '已儲存（未發布）')
+    kidEditOpen.value = false
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    kidSaving.value = false
+  }
+}
+
 /** 排班顯示：項目：老師（依 sort_order） */
 function assignmentLines(w: ServiceWeek): string[] {
   return (w.service_assignments ?? [])
@@ -257,6 +394,7 @@ function assignmentLines(w: ServiceWeek): string[] {
       <van-tab name="roster" title="服事表" />
       <van-tab v-if="myClasses.length > 0" name="signup" title="我要報名" />
       <van-tab name="all" title="全部報名" />
+      <van-tab v-if="showKidsTab" name="kids" title="兒童服事" />
     </van-tabs>
 
     <van-skeleton v-if="loading" title :row="6" />
@@ -350,6 +488,46 @@ function assignmentLines(w: ServiceWeek): string[] {
             {{ s.teacher_name }}｜{{ groupName.get(s.class_group_id) }}｜{{ s.item }}
             <span v-if="s.note" class="hint">（{{ s.note }}）</span>
           </p>
+        </div>
+      </template>
+    </template>
+
+    <!-- 兒童服事（C-02 排班發布；T-KID-01 查看） -->
+    <template v-if="!loading && activeTab === 'kids'">
+      <div v-if="kidDates().length === 0" class="card hint">尚無已發布的兒童服事表</div>
+      <template v-for="d in kidDates()" :key="d">
+        <h3 class="section-title">{{ formatGathering(d) }}</h3>
+        <div v-for="g in kidsClasses" :key="g.id" class="card">
+          <div class="week-head">
+            <strong>{{ g.name }}</strong>
+            <van-tag
+              v-if="kidRosterAt(d, g.id)"
+              :type="kidRosterAt(d, g.id)!.published ? 'success' : 'default'"
+              plain
+            >
+              {{ kidRosterAt(d, g.id)!.published ? '已發布' : '草稿' }}
+            </van-tag>
+            <van-button
+              v-if="auth.can('admin')"
+              size="mini"
+              plain
+              class="week-edit"
+              @click="openKidEditor(d, g.id)"
+            >
+              {{ kidRosterAt(d, g.id) ? '編輯' : '安排' }}
+            </van-button>
+          </div>
+          <template v-if="kidRosterAt(d, g.id)">
+            <p v-for="line in kidRosterLines(kidRosterAt(d, g.id)!)" :key="line" class="svc-line">
+              🙌 {{ line }}
+            </p>
+          </template>
+          <p v-if="kidSignupsFor(d, g.id).length" class="hint svc-line">
+            報名：{{ kidSignupsFor(d, g.id)
+              .map((cs) => `${childById.get(cs.child_id)?.name ?? ''}·${cs.item}`)
+              .join('、') }}
+          </p>
+          <p v-else-if="!kidRosterAt(d, g.id)" class="hint">尚無報名</p>
         </div>
       </template>
     </template>
@@ -469,6 +647,81 @@ function assignmentLines(w: ServiceWeek): string[] {
         </van-cell>
 
         <van-button round block type="primary" :loading="editSaving" class="save-btn" @click="saveWeek">
+          儲存
+        </van-button>
+      </div>
+    </van-popup>
+
+    <!-- 兒童排班彈窗（同工） -->
+    <van-popup
+      :show="kidEditOpen"
+      round
+      position="bottom"
+      @update:show="(v: boolean) => (kidEditOpen = v)"
+    >
+      <div class="editor">
+        <h3>{{ formatGathering(kidEditDate) }}・{{ groupName.get(kidEditClassId) }}兒童服事</h3>
+
+        <p class="hint pop-label">已排班（點 × 移除）</p>
+        <div class="tag-row">
+          <van-tag
+            v-for="(a, i) in kidAssignments"
+            :key="`${a.child_name}-${a.item}-${i}`"
+            round
+            size="large"
+            type="primary"
+            plain
+            closeable
+            @close="removeKidAssignment(i)"
+          >
+            {{ a.item }}：{{ a.child_name }}
+          </van-tag>
+          <span v-if="kidAssignments.length === 0" class="hint">尚未排班</span>
+        </div>
+
+        <p class="hint pop-label">從報名帶入</p>
+        <div class="tag-row">
+          <van-tag
+            v-for="cs in kidSignupsFor(kidEditDate, kidEditClassId)"
+            :key="cs.id"
+            round
+            size="large"
+            plain
+            @click="addKidFromSignup(cs)"
+          >
+            ＋{{ childById.get(cs.child_id)?.name ?? '' }}·{{ cs.item }}
+          </van-tag>
+          <span v-if="kidSignupsFor(kidEditDate, kidEditClassId).length === 0" class="hint">
+            尚無報名
+          </span>
+        </div>
+
+        <p class="hint pop-label">手動加入（僅具服事資格的孩子）</p>
+        <div class="tag-row">
+          <van-tag
+            v-for="c in kidEligible"
+            :key="c.id"
+            round
+            size="large"
+            :type="kidManualChildId === c.id ? 'primary' : 'default'"
+            :plain="kidManualChildId !== c.id"
+            @click="kidManualChildId = kidManualChildId === c.id ? '' : c.id"
+          >
+            {{ c.name }}
+          </van-tag>
+          <span v-if="kidEligible.length === 0" class="hint">此班尚無具資格的孩子</span>
+        </div>
+        <van-field v-model="kidManualItem" label="項目" placeholder="例：收奉獻">
+          <template #button>
+            <van-button size="small" plain @click="addKidManual">加入</van-button>
+          </template>
+        </van-field>
+
+        <van-cell title="發布（家長與老師可見）" center>
+          <template #value><van-switch v-model="kidEditPublished" size="24" /></template>
+        </van-cell>
+
+        <van-button round block type="primary" :loading="kidSaving" class="save-btn" @click="saveKidRoster">
           儲存
         </van-button>
       </div>

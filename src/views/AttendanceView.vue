@@ -2,6 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { showFailToast, showSuccessToast } from 'vant'
 import { listMyChildren, listPlansRange, upsertPlans } from '../api/attendance'
+import {
+  addChildSignup,
+  listChildRosters,
+  listChildSignups,
+  removeChildSignup,
+} from '../api/childService'
+import { CHILD_SERVICE_ITEM_PRESETS } from '../lib/service'
 import { addMonths, monthGrid, monthOf, monthRange, monthTitle } from '../lib/calendar'
 import { WEEKDAY_NAMES } from '../lib/config'
 import {
@@ -11,7 +18,13 @@ import {
   upcomingGathering,
   weekdayName,
 } from '../lib/gathering'
-import type { AttendancePlan, AttendanceStatus, Child } from '../types'
+import type {
+  AttendancePlan,
+  AttendanceStatus,
+  Child,
+  ChildServiceRoster,
+  ChildServiceSignup,
+} from '../types'
 
 /** 本週可填寫的聚會日（其餘日期唯讀；未來日期預留、尚未開放） */
 const gathering = upcomingGathering()
@@ -23,6 +36,8 @@ const selected = ref(gathering)
 
 const children = ref<Child[]>([])
 const monthPlans = ref<AttendancePlan[]>([])
+const childSignups = ref<ChildServiceSignup[]>([])
+const childRosters = ref<ChildServiceRoster[]>([])
 const statusMap = ref<Record<string, AttendanceStatus>>({})
 const noteMap = ref<Record<string, string>>({})
 const loading = ref(true)
@@ -64,7 +79,11 @@ function dotClass(date: string, childId: string): string {
 
 async function loadMonth() {
   const { from, to } = monthRange(anchor.value)
-  monthPlans.value = await listPlansRange(from, to)
+  ;[monthPlans.value, childSignups.value, childRosters.value] = await Promise.all([
+    listPlansRange(from, to),
+    listChildSignups(from, to),
+    listChildRosters(from, to),
+  ])
 }
 
 /** 以既有資料帶入本週的可編輯狀態（預設維持「未定」——v3 決議） */
@@ -94,6 +113,67 @@ watch(anchor, () => {
 
 function selectDate(cell: { date: string; isGathering: boolean }) {
   if (cell.isGathering) selected.value = cell.date
+}
+
+// ---- 兒童服事（P-04 報名／P-05 查看）----
+/** 具服事資格的孩子（P-03 由老師/同工開關） */
+const eligibleChildren = computed(() => children.value.filter((c) => c.service_eligible))
+
+/** 「日期|孩子|項目」→ 報名紀錄（即點即存的切換依據） */
+const childSignupAt = computed(() => {
+  const map = new Map<string, ChildServiceSignup>()
+  for (const cs of childSignups.value)
+    map.set(`${cs.gathering_date}|${cs.child_id}|${cs.item}`, cs)
+  return map
+})
+
+const savingService = ref(false)
+async function toggleChildService(child: Child, item: string) {
+  if (savingService.value) return
+  savingService.value = true
+  const existing = childSignupAt.value.get(`${selected.value}|${child.id}|${item}`)
+  try {
+    if (existing) {
+      await removeChildSignup(existing.id)
+      childSignups.value = childSignups.value.filter((x) => x.id !== existing.id)
+    } else {
+      await addChildSignup({
+        child_id: child.id,
+        gathering_date: selected.value,
+        item,
+        note: null,
+      })
+      const { from, to } = monthRange(anchor.value)
+      childSignups.value = await listChildSignups(from, to)
+    }
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    savingService.value = false
+  }
+}
+
+/** 選定日期的已發布兒童服事表（僅顯示自己孩子所屬班別） */
+const selectedRosters = computed(() => {
+  const myClassIds = new Set(children.value.map((c) => String(c.class_group_id)))
+  return childRosters.value.filter(
+    (r) =>
+      r.gathering_date === selected.value &&
+      r.published &&
+      myClassIds.has(String(r.class_group_id)),
+  )
+})
+function rosterClassName(r: ChildServiceRoster): string {
+  return (
+    children.value.find((c) => String(c.class_group_id) === String(r.class_group_id))
+      ?.class_groups?.name ?? ''
+  )
+}
+function rosterLines(r: ChildServiceRoster): string[] {
+  return (r.child_service_assignments ?? [])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((a) => `${a.item}：${a.child_name}`)
 }
 
 async function submit() {
@@ -242,11 +322,50 @@ async function submit() {
       <div class="card hint">此為當週預先勾選的紀錄；實際到課以老師現場點名為準。</div>
     </template>
 
-    <!-- 未來的聚會日：預留、尚未開放 -->
+    <!-- 未來的聚會日：出席預留未開放（服事報名照常開放） -->
     <div v-else class="card hint">
-      {{ formatGathering(selected) }} 尚未開放填寫——每週開放勾選下一次聚會，
+      {{ formatGathering(selected) }} 出席尚未開放填寫——每週開放勾選下一次聚會，
       屆時會在首頁提醒您。
     </div>
+
+    <!-- 兒童服事報名（P-04）：本週與未來聚會日皆可報名；僅具資格的孩子 -->
+    <template v-if="!loading && mode !== 'past' && eligibleChildren.length > 0">
+      <h3 class="section-title">兒童服事報名 · {{ formatGathering(selected) }}</h3>
+      <div v-for="c in eligibleChildren" :key="c.id" class="card">
+        <div class="kid">
+          <strong>{{ c.name }}</strong>
+          <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+        </div>
+        <div class="svc-tags">
+          <van-tag
+            v-for="it in CHILD_SERVICE_ITEM_PRESETS"
+            :key="it"
+            round
+            size="large"
+            :type="childSignupAt.has(`${selected}|${c.id}|${it}`) ? 'primary' : 'default'"
+            :plain="!childSignupAt.has(`${selected}|${c.id}|${it}`)"
+            @click="toggleChildService(c, it)"
+          >
+            {{ childSignupAt.has(`${selected}|${c.id}|${it}`) ? '✓ ' : '' }}{{ it }}
+          </van-tag>
+        </div>
+      </div>
+      <p class="hint svc-note">
+        點選即報名、再點取消；最終安排以同工發布的服事表為準。
+      </p>
+    </template>
+
+    <!-- 兒童服事表（P-05）：發布後顯示自己孩子班別的安排 -->
+    <template v-if="!loading && selectedRosters.length > 0">
+      <h3 class="section-title">兒童服事表 · {{ formatGathering(selected) }}</h3>
+      <div v-for="r in selectedRosters" :key="r.id" class="card">
+        <div class="kid">
+          <strong>{{ rosterClassName(r) }}</strong>
+          <van-tag type="success" plain>已發布</van-tag>
+        </div>
+        <p v-for="line in rosterLines(r)" :key="line" class="svc-line">🙌 {{ line }}</p>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -419,5 +538,17 @@ h2 {
 .submit-btn {
   height: 54px;
   font-size: 22px;
+}
+.svc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.svc-note {
+  margin-top: 4px;
+}
+.svc-line {
+  margin: 8px 0 0;
+  font-size: 18px;
 }
 </style>

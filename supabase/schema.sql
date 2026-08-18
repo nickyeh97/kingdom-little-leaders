@@ -42,6 +42,7 @@ create table children (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   class_group_id uuid not null references class_groups (id),
+  service_eligible boolean not null default false, -- 服事資格（P-03；老師/同工可開關）
   level text,     -- 預留：大孩子階級（培訓中/正式領袖）
   birthday date,  -- 預留
   created_at timestamptz not null default now()
@@ -309,3 +310,39 @@ create table service_assignments (
   sort_order int not null default 0
 );
 create index idx_assignments_week on service_assignments (service_week_id);
+
+-- ===== Sprint 04 Wave 1b：兒童服事 =====
+
+-- 兒童服事報名（P-04：家長為符合資格的孩子勾選日期×項目）
+create table child_service_signups (
+  id uuid primary key default gen_random_uuid(),
+  child_id uuid not null references children (id) on delete cascade,
+  gathering_date date not null,
+  item text not null,
+  note text,
+  created_by uuid not null default auth.uid() references profiles (id),
+  created_at timestamptz not null default now(),
+  unique (child_id, gathering_date, item)
+);
+create index idx_child_signups_date on child_service_signups (gathering_date);
+
+-- 兒童服事表（C-02：同工依報名排班；發布後家長/老師可見）
+create table child_service_rosters (
+  id uuid primary key default gen_random_uuid(),
+  gathering_date date not null,
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  published boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (gathering_date, class_group_id)
+);
+create index idx_child_rosters_date on child_service_rosters (gathering_date);
+
+create table child_service_assignments (
+  id uuid primary key default gen_random_uuid(),
+  roster_id uuid not null references child_service_rosters (id) on delete cascade,
+  child_id uuid references children (id) on delete set null,
+  child_name text not null default '',
+  item text not null,
+  sort_order int not null default 0
+);
+create index idx_child_assignments_roster on child_service_assignments (roster_id);
