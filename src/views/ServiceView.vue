@@ -6,6 +6,7 @@ import {
   listChildRosters,
   listChildSignups,
   setChildAssignments,
+  setChildServiceEligible,
   upsertChildRoster,
 } from '../api/childService'
 import { listAllChildren } from '../api/records'
@@ -32,7 +33,10 @@ import type {
 const auth = useAuthStore()
 const dates = upcomingGatherings(SIGNUP_WEEKS_AHEAD)
 
-const activeTab = ref<'roster' | 'signup' | 'all' | 'kids'>('roster')
+const activeTab = ref<'teacher' | 'kids'>('teacher')
+/** 摺疊卡展開狀態：預設展開本週 */
+const openDates = ref<string[]>([dates[0]])
+const kidOpenDates = ref<string[]>([dates[0]])
 const groups = ref<ClassGroup[]>([])
 const weeks = ref<ServiceWeek[]>([])
 const signups = ref<TeacherServiceSignup[]>([])
@@ -65,14 +69,14 @@ const signupsAt = computed(() => {
 function mySignups(date: string): TeacherServiceSignup[] {
   return (signupsAt.value.get(date) ?? []).filter((s) => s.teacher_id === me.value)
 }
-/** 服事表分頁：該日期有內容的班別（同工看全部班別以便建立） */
+/** 服事表：該日期顯示的班別（同工看全部班別以便建立；老師只看已發布） */
 function rosterClasses(date: string): ClassGroup[] {
   if (auth.can('admin')) return groups.value
   return groups.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published)
 }
-function rosterDates(): string[] {
-  if (auth.can('admin')) return dates
-  return dates.filter((d) => rosterClasses(d).length > 0)
+/** 摺疊卡標題徽章：該日已發布的班數 */
+function publishedClassCount(date: string): number {
+  return groups.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published).length
 }
 
 async function load() {
@@ -286,12 +290,38 @@ function kidRosterLines(r: ChildServiceRoster): string[] {
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((a) => `${a.item}：${a.child_name}`)
 }
-/** 兒童服事表分頁：老師只看有已發布內容的日期；同工全看 */
-function kidDates(): string[] {
-  if (auth.can('admin')) return dates
-  return dates.filter((d) =>
-    kidsClasses.value.some((g) => kidRosterAt(d, g.id)?.published),
-  )
+function kidPublishedCount(date: string): number {
+  return kidsClasses.value.filter((g) => kidRosterAt(date, g.id)?.published).length
+}
+function kidSignupCount(date: string): number {
+  return kidsClasses.value.reduce((n, g) => n + kidSignupsFor(date, g.id).length, 0)
+}
+
+// ---- 服事資格管理（P-03 進階：該班老師或同工可開關）----
+const showEligibility = ref(false)
+const eligibilitySaving = ref('')
+/** 兒童班孩子（資格管理清單） */
+const kidsChildren = computed(() =>
+  allChildren.value
+    .filter((c) => kidsClasses.value.some((g) => g.id === String(c.class_group_id)))
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-TW')),
+)
+function canToggleEligible(c: Child): boolean {
+  return auth.can('admin') || auth.canClass(String(c.class_group_id))
+}
+async function toggleEligible(c: Child) {
+  if (!canToggleEligible(c) || eligibilitySaving.value) return
+  eligibilitySaving.value = c.id
+  try {
+    await setChildServiceEligible(c.id, !c.service_eligible)
+    allChildren.value = allChildren.value.map((x) =>
+      x.id === c.id ? { ...x, service_eligible: !c.service_eligible } : x,
+    )
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    eligibilitySaving.value = ''
+  }
 }
 
 interface KidDraftAssignment {
@@ -388,23 +418,38 @@ function assignmentLines(w: ServiceWeek): string[] {
 <template>
   <div class="page">
     <h2>服事排班</h2>
-    <p class="hint">未來 {{ dates.length }} 次聚會；報名後由核心同工排班、發布</p>
+    <p class="hint">未來 {{ dates.length }} 次聚會；點日期展開查看與操作</p>
 
     <van-tabs v-model:active="activeTab" type="card" class="tabs">
-      <van-tab name="roster" title="服事表" />
-      <van-tab v-if="myClasses.length > 0" name="signup" title="我要報名" />
-      <van-tab name="all" title="全部報名" />
+      <van-tab name="teacher" title="老師服事" />
       <van-tab v-if="showKidsTab" name="kids" title="兒童服事" />
     </van-tabs>
 
     <van-skeleton v-if="loading" title :row="6" />
 
-    <!-- 服事表（T-COM-03；同工可編輯/發布 C-01） -->
-    <template v-else-if="activeTab === 'roster'">
-      <div v-if="rosterDates().length === 0" class="card hint">尚無已發布的服事表</div>
-      <template v-for="d in rosterDates()" :key="d">
-        <h3 class="section-title">{{ formatGathering(d) }}</h3>
-        <div v-for="g in rosterClasses(d)" :key="g.id" class="card">
+    <!-- ============ 老師服事：每個聚會日一張摺疊卡 ============ -->
+    <van-collapse v-else-if="activeTab === 'teacher'" v-model="openDates">
+      <van-collapse-item v-for="d in dates" :key="d" :name="d">
+        <template #title>
+          <div class="date-title">
+            <strong>{{ formatGathering(d) }}</strong>
+            <span class="date-badges">
+              <van-tag v-if="publishedClassCount(d) > 0" type="success">
+                已發布 {{ publishedClassCount(d) }} 班
+              </van-tag>
+              <van-tag v-if="mySignups(d).length" type="primary" plain>
+                我報 {{ mySignups(d).length }}
+              </van-tag>
+              <van-tag v-if="(signupsAt.get(d) ?? []).length" plain>
+                共 {{ (signupsAt.get(d) ?? []).length }} 筆報名
+              </van-tag>
+            </span>
+          </div>
+        </template>
+
+        <!-- A. 服事表（T-COM-03／C-01） -->
+        <p class="blk-title">服事表</p>
+        <div v-for="g in rosterClasses(d)" :key="g.id" class="svc-block">
           <div class="week-head">
             <strong>{{ g.name }}</strong>
             <van-tag
@@ -442,94 +487,120 @@ function assignmentLines(w: ServiceWeek): string[] {
               🎨 彈性時間：{{ weekAt.get(`${d}|${g.id}`)!.flex_text }}
             </p>
           </template>
-          <p v-else class="hint">尚未安排</p>
+          <p v-else class="hint svc-empty">尚未安排</p>
         </div>
-      </template>
-    </template>
+        <p v-if="rosterClasses(d).length === 0" class="hint svc-empty">尚未發布</p>
 
-    <!-- 我要報名（T-COM-01） -->
-    <template v-else-if="activeTab === 'signup'">
-      <div v-for="d in dates" :key="d" class="card">
-        <div class="week-head">
-          <strong>{{ formatGathering(d) }}</strong>
-          <span v-if="mySignups(d).length" class="hint">已報 {{ mySignups(d).length }} 項</span>
-          <van-button size="mini" plain type="primary" class="week-edit" @click="openSignup(d)">
-            ＋報名
+        <!-- B. 我的報名（T-COM-01） -->
+        <template v-if="myClasses.length > 0">
+          <div class="blk-row">
+            <p class="blk-title">我的報名</p>
+            <van-button size="mini" plain type="primary" @click="openSignup(d)">＋報名</van-button>
+          </div>
+          <div v-if="mySignups(d).length" class="signup-tags">
+            <van-tag
+              v-for="sg in mySignups(d)"
+              :key="sg.id"
+              round
+              size="large"
+              type="primary"
+              plain
+              closeable
+              @close="cancelSignup(sg)"
+            >
+              {{ groupName.get(sg.class_group_id) }}·{{ sg.item }}
+            </van-tag>
+          </div>
+          <p v-else class="hint svc-empty">尚未報名（點「＋報名」可複選多個項目）</p>
+        </template>
+
+        <!-- C. 全部報名（T-COM-02） -->
+        <p class="blk-title">全部報名</p>
+        <template v-if="(signupsAt.get(d) ?? []).length">
+          <p v-for="sg in signupsAt.get(d)" :key="sg.id" class="svc-line small">
+            {{ sg.teacher_name }}｜{{ groupName.get(sg.class_group_id) }}｜{{ sg.item }}
+            <span v-if="sg.note" class="hint">（{{ sg.note }}）</span>
+          </p>
+        </template>
+        <p v-else class="hint svc-empty">尚無人報名</p>
+      </van-collapse-item>
+    </van-collapse>
+
+    <!-- ============ 兒童服事（只有兒童相關內容） ============ -->
+    <template v-else>
+      <!-- 服事資格管理（P-03：該班老師或同工可開關） -->
+      <div class="card">
+        <div class="blk-row">
+          <strong class="elig-title">服事資格</strong>
+          <van-button size="mini" plain @click="showEligibility = !showEligibility">
+            {{ showEligibility ? '收合' : `管理（已開通 ${kidsChildren.filter((c) => c.service_eligible).length} 位）` }}
           </van-button>
         </div>
-        <div v-if="mySignups(d).length" class="signup-tags">
-          <van-tag
-            v-for="s in mySignups(d)"
-            :key="s.id"
-            round
-            size="large"
-            type="primary"
-            plain
-            closeable
-            @close="cancelSignup(s)"
-          >
-            {{ groupName.get(s.class_group_id) }}·{{ s.item }}
-          </van-tag>
-        </div>
-      </div>
-      <p class="hint foot-note">點報名標籤右上角 × 可取消；排班以同工發布的服事表為準。</p>
-    </template>
-
-    <!-- 全部報名（T-COM-02） -->
-    <template v-else>
-      <template v-for="d in dates" :key="d">
-        <h3 class="section-title">
-          {{ formatGathering(d) }}
-          <span class="hint">（{{ (signupsAt.get(d) ?? []).length }} 筆報名）</span>
-        </h3>
-        <div v-if="(signupsAt.get(d) ?? []).length === 0" class="card hint">尚無人報名</div>
-        <div v-else class="card">
-          <p v-for="s in signupsAt.get(d)" :key="s.id" class="svc-line">
-            {{ s.teacher_name }}｜{{ groupName.get(s.class_group_id) }}｜{{ s.item }}
-            <span v-if="s.note" class="hint">（{{ s.note }}）</span>
-          </p>
-        </div>
-      </template>
-    </template>
-
-    <!-- 兒童服事（C-02 排班發布；T-KID-01 查看） -->
-    <template v-if="!loading && activeTab === 'kids'">
-      <div v-if="kidDates().length === 0" class="card hint">尚無已發布的兒童服事表</div>
-      <template v-for="d in kidDates()" :key="d">
-        <h3 class="section-title">{{ formatGathering(d) }}</h3>
-        <div v-for="g in kidsClasses" :key="g.id" class="card">
-          <div class="week-head">
-            <strong>{{ g.name }}</strong>
+        <template v-if="showEligibility">
+          <p class="hint">開通後，家長就能在出席頁為孩子報名服事（點名字切換）</p>
+          <div class="tag-row">
             <van-tag
-              v-if="kidRosterAt(d, g.id)"
-              :type="kidRosterAt(d, g.id)!.published ? 'success' : 'default'"
-              plain
+              v-for="c in kidsChildren"
+              :key="c.id"
+              round
+              size="large"
+              :type="c.service_eligible ? 'primary' : 'default'"
+              :plain="!c.service_eligible"
+              @click="toggleEligible(c)"
             >
-              {{ kidRosterAt(d, g.id)!.published ? '已發布' : '草稿' }}
+              {{ c.service_eligible ? '✓ ' : '' }}{{ c.name }}
             </van-tag>
-            <van-button
-              v-if="auth.can('admin')"
-              size="mini"
-              plain
-              class="week-edit"
-              @click="openKidEditor(d, g.id)"
-            >
-              {{ kidRosterAt(d, g.id) ? '編輯' : '安排' }}
-            </van-button>
+            <span v-if="kidsChildren.length === 0" class="hint">兒童班尚無孩子名單</span>
           </div>
-          <template v-if="kidRosterAt(d, g.id)">
-            <p v-for="line in kidRosterLines(kidRosterAt(d, g.id)!)" :key="line" class="svc-line">
-              🙌 {{ line }}
-            </p>
+        </template>
+      </div>
+
+      <van-collapse v-model="kidOpenDates">
+        <van-collapse-item v-for="d in dates" :key="d" :name="d">
+          <template #title>
+            <div class="date-title">
+              <strong>{{ formatGathering(d) }}</strong>
+              <span class="date-badges">
+                <van-tag v-if="kidPublishedCount(d) > 0" type="success">已發布</van-tag>
+                <van-tag v-if="kidSignupCount(d)" plain>{{ kidSignupCount(d) }} 筆報名</van-tag>
+              </span>
+            </div>
           </template>
-          <p v-if="kidSignupsFor(d, g.id).length" class="hint svc-line">
-            報名：{{ kidSignupsFor(d, g.id)
-              .map((cs) => `${childById.get(cs.child_id)?.name ?? ''}·${cs.item}`)
-              .join('、') }}
-          </p>
-          <p v-else-if="!kidRosterAt(d, g.id)" class="hint">尚無報名</p>
-        </div>
-      </template>
+
+          <div v-for="g in kidsClasses" :key="g.id" class="svc-block">
+            <div class="week-head">
+              <strong>{{ g.name }}</strong>
+              <van-tag
+                v-if="kidRosterAt(d, g.id)"
+                :type="kidRosterAt(d, g.id)!.published ? 'success' : 'default'"
+                plain
+              >
+                {{ kidRosterAt(d, g.id)!.published ? '已發布' : '草稿' }}
+              </van-tag>
+              <van-button
+                v-if="auth.can('admin')"
+                size="mini"
+                plain
+                class="week-edit"
+                @click="openKidEditor(d, g.id)"
+              >
+                {{ kidRosterAt(d, g.id) ? '編輯' : '安排' }}
+              </van-button>
+            </div>
+            <template v-if="kidRosterAt(d, g.id)">
+              <p v-for="line in kidRosterLines(kidRosterAt(d, g.id)!)" :key="line" class="svc-line">
+                🙌 {{ line }}
+              </p>
+            </template>
+            <p v-if="kidSignupsFor(d, g.id).length" class="svc-line small">
+              報名：{{ kidSignupsFor(d, g.id)
+                .map((cs) => `${childById.get(cs.child_id)?.name ?? ''}·${cs.item}`)
+                .join('、') }}
+            </p>
+            <p v-else-if="!kidRosterAt(d, g.id)" class="hint svc-empty">尚無報名與安排</p>
+          </div>
+        </van-collapse-item>
+      </van-collapse>
     </template>
 
     <!-- 報名彈窗 -->
@@ -736,6 +807,51 @@ h2 {
 }
 .tabs {
   margin: 12px 0;
+}
+.date-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.date-title strong {
+  font-size: 19px;
+}
+.date-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.blk-title {
+  margin: 14px 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--kll-primary-dark);
+  letter-spacing: 0.05em;
+}
+.blk-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.blk-row .blk-title {
+  margin: 14px 0 6px;
+}
+.elig-title {
+  font-size: 20px;
+}
+.svc-block {
+  padding: 10px 12px;
+  background: var(--kll-bg);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.svc-empty {
+  margin: 4px 0 8px;
+}
+.svc-line.small {
+  font-size: 16px;
 }
 .week-head {
   display: flex;
