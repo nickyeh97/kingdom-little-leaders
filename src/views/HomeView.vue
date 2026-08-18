@@ -9,6 +9,7 @@ import {
 } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
 import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
+import { listChildRosters } from '../api/childService'
 import { listSessionLogsRange } from '../api/records'
 import { listServiceWeeks } from '../api/service'
 import {
@@ -59,6 +60,8 @@ const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 const needClassLog = ref(false)
 /** 老師：已發布的服事安排（站內通知——v4 裁決 D） */
 const myServiceDates = ref<string[]>([])
+/** 家長：孩子被排上已發布的兒童服事表 */
+const kidServiceDates = ref<string[]>([])
 const lastG = lastGathering()
 const feedbackDue = feedbackDeadline(lastG)
 
@@ -67,11 +70,27 @@ onMounted(async () => {
     announcements.value = await listAnnouncements()
     if (canPostAnn.value) classGroups.value = await listClassGroups()
     if (auth.can('parent')) {
-      const [children, plans, feedback] = await Promise.all([
+      const svcDates = upcomingGatherings(4)
+      const [children, plans, feedback, kidRosters] = await Promise.all([
         listMyChildren(),
         listPlans(gathering),
         listFeedback(lastGathering()),
+        listChildRosters(svcDates[0], svcDates[svcDates.length - 1]),
       ])
+      const myKidIds = new Set(children.map((c) => c.id))
+      kidServiceDates.value = [
+        ...new Set(
+          kidRosters
+            .filter(
+              (r) =>
+                r.published &&
+                (r.child_service_assignments ?? []).some(
+                  (a) => a.child_id && myKidIds.has(a.child_id),
+                ),
+            )
+            .map((r) => r.gathering_date),
+        ),
+      ].sort()
       if (isPlanOpen(gathering)) {
         const planned = new Set(plans.map((p) => p.child_id))
         needPlan.value = children.some((c) => !planned.has(c.id))
@@ -222,6 +241,16 @@ async function removeAnn() {
       left-icon="todo-list-o"
       mode="link"
       :text="`本週出席還沒填喔——${weekdayName(deadline)} 23:59 前完成勾選`"
+      @click="$router.push({ name: 'attendance' })"
+    />
+
+    <van-notice-bar
+      v-if="kidServiceDates.length > 0"
+      left-icon="smile-o"
+      mode="link"
+      color="#1f6f54"
+      background="#e2f0e8"
+      :text="`您的孩子有服事安排（${kidServiceDates.map((d) => d.slice(5).replace('-', '/')).join('、')}）——點日期到出席頁查看服事表`"
       @click="$router.push({ name: 'attendance' })"
     />
 

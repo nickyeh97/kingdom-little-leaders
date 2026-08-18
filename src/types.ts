@@ -23,6 +23,8 @@ export interface Child {
   id: string
   name: string
   class_group_id: number | string
+  /** 服事資格（P-03；該班老師或同工可開關） */
+  service_eligible: boolean
   level: string | null
   class_groups?: ClassGroup
 }
@@ -165,6 +167,34 @@ export interface ServiceAssignment {
   service_week_id: string
   teacher_id: string | null
   teacher_name: string
+  item: string
+  sort_order: number
+}
+
+/** 兒童服事報名（P-04；家長為符合資格的孩子填） */
+export interface ChildServiceSignup {
+  id: string
+  child_id: string
+  gathering_date: string
+  item: string
+  note: string | null
+  created_by: string
+}
+
+/** 兒童服事表（C-02；發布後家長/老師可見） */
+export interface ChildServiceRoster {
+  id: string
+  gathering_date: string
+  class_group_id: string
+  published: boolean
+  child_service_assignments?: ChildServiceAssignment[]
+}
+
+export interface ChildServiceAssignment {
+  id: string
+  roster_id: string
+  child_id: string | null
+  child_name: string
   item: string
   sort_order: number
 }

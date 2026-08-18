@@ -282,3 +282,51 @@ create policy "assignments_read" on service_assignments
 create policy "assignments_write" on service_assignments
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+-- ---- 兒童服事（Sprint 04 Wave 1b）----
+-- 服事資格開關：該班老師或同工（security definer；不放寬 children 寫入權）
+create or replace function public.set_child_service_eligible(cid uuid, flag boolean)
+returns void
+language sql security definer set search_path = public
+as $$
+  update children set service_eligible = flag
+  where id = cid
+    and (public.is_admin() or public.child_in_my_class(cid));
+$$;
+grant execute on function public.set_child_service_eligible(uuid, boolean) to authenticated;
+
+alter table child_service_signups enable row level security;
+create policy "child_signups_read" on child_service_signups
+  for select to authenticated
+  using (public.is_staff() or child_id in (select public.my_child_ids()));
+create policy "child_signups_insert" on child_service_signups
+  for insert to authenticated
+  with check (
+    exists (select 1 from children c where c.id = child_id and c.service_eligible)
+    and (public.is_admin() or child_id in (select public.my_child_ids()))
+  );
+create policy "child_signups_delete" on child_service_signups
+  for delete to authenticated
+  using (public.is_admin() or child_id in (select public.my_child_ids()));
+
+alter table child_service_rosters enable row level security;
+create policy "child_rosters_read" on child_service_rosters
+  for select to authenticated
+  using (public.is_admin() or (public.is_approved() and published));
+create policy "child_rosters_write" on child_service_rosters
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table child_service_assignments enable row level security;
+create policy "child_assignments_read" on child_service_assignments
+  for select to authenticated
+  using (
+    public.is_admin()
+    or (public.is_approved() and exists (
+      select 1 from child_service_rosters r
+      where r.id = roster_id and r.published
+    ))
+  );
+create policy "child_assignments_write" on child_service_assignments
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());

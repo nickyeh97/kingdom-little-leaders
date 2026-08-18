@@ -4,6 +4,7 @@ import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import { deleteProfile, listProfiles, updateApproved, updateRoles } from '../api/members'
 import { listAllChildren } from '../api/records'
+import { setChildServiceEligible } from '../api/childService'
 import {
   createChild,
   deleteChild,
@@ -226,7 +227,12 @@ async function removeMember() {
 
 // ---- 孩子編輯（含家庭綁定） ----
 const editingChild = ref<Child | 'new' | null>(null)
-const childDraft = ref({ name: '', class_group_id: '', parentIds: [] as string[] })
+const childDraft = ref({
+  name: '',
+  class_group_id: '',
+  service_eligible: false,
+  parentIds: [] as string[],
+})
 const savingChild = ref(false)
 
 function openChildEditor(c: Child | null) {
@@ -235,9 +241,15 @@ function openChildEditor(c: Child | null) {
     ? {
         name: c.name,
         class_group_id: String(c.class_group_id),
+        service_eligible: c.service_eligible ?? false,
         parentIds: parentsOf(c.id).map((p) => p.id),
       }
-    : { name: '', class_group_id: classGroups.value[0]?.id ?? '', parentIds: [] }
+    : {
+        name: '',
+        class_group_id: classGroups.value[0]?.id ?? '',
+        service_eligible: false,
+        parentIds: [],
+      }
 }
 
 function toggleParent(id: string) {
@@ -266,6 +278,10 @@ async function saveChild() {
       await updateChild(childId, base)
     }
     await setChildParents(childId, childDraft.value.parentIds)
+    // 服事資格（P-03）：走 RPC（該班老師或同工可開關）
+    const before = editingChild.value === 'new' ? false : (editingChild.value as Child).service_eligible
+    if (childDraft.value.service_eligible !== before)
+      await setChildServiceEligible(childId, childDraft.value.service_eligible)
     ;[children.value, links.value] = await Promise.all([listAllChildren(), listFamilyLinks()])
     showSuccessToast('已儲存')
     editingChild.value = null
@@ -484,6 +500,11 @@ async function removeChild() {
             >
               {{ g.name }}
             </van-tag>
+          </template>
+        </van-cell>
+        <van-cell title="服事資格（可報名兒童服事）" center>
+          <template #value>
+            <van-switch v-model="childDraft.service_eligible" size="24" />
           </template>
         </van-cell>
         <p class="hint bind-title">綁定家長（可多選）</p>
