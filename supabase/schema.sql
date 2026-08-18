@@ -346,3 +346,59 @@ create table child_service_assignments (
   sort_order int not null default 0
 );
 create index idx_child_assignments_roster on child_service_assignments (roster_id);
+
+-- ===== Sprint 04 Wave 2：教學模組 =====
+
+-- 教案（每班每聚會日；列＝流程段落，欄位依現行共編 Excel；分區塊共編）
+create table lesson_segments (
+  id uuid primary key default gen_random_uuid(),
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  gathering_date date not null,
+  time_text text not null default '',
+  item text not null default '',
+  content text not null default '',
+  teacher_text text not null default '',
+  materials_text text not null default '',
+  review_text text not null default '',
+  sort_order int not null default 0,
+  updated_by uuid not null default auth.uid() references profiles (id),
+  updated_by_name text not null default '',
+  updated_at timestamptz not null default now()
+);
+create index idx_lesson_segments_date on lesson_segments (gathering_date, class_group_id);
+
+create or replace function public.touch_lesson_segment()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  new.updated_by := auth.uid();
+  return new;
+end $$;
+create trigger trg_touch_lesson_segment before update on lesson_segments
+  for each row execute function public.touch_lesson_segment();
+
+-- 聚會流程（flow：主題/內容/方式）與運作要點（guide）；每班一份、資訊頁
+create table class_docs (
+  id uuid primary key default gen_random_uuid(),
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  kind text not null check (kind in ('flow', 'guide')),
+  title text not null,
+  content text not null default '',
+  extra text not null default '',
+  sort_order int not null default 0
+);
+create index idx_class_docs on class_docs (class_group_id, kind);
+
+-- 教材資料庫（外連型；class_group_id null＝共用）
+create table materials (
+  id uuid primary key default gen_random_uuid(),
+  class_group_id uuid references class_groups (id) on delete cascade,
+  category text not null default '未分類',
+  title text not null,
+  url text not null,
+  note text not null default '',
+  created_by uuid not null default auth.uid() references profiles (id),
+  created_by_name text not null default '',
+  created_at timestamptz not null default now()
+);
+create index idx_materials_class on materials (class_group_id, category);

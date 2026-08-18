@@ -198,3 +198,43 @@ export interface ChildServiceAssignment {
   item: string
   sort_order: number
 }
+
+/** 教案段落（每班每聚會日；欄位依現行共編 Excel；分區塊共編） */
+export interface LessonSegment {
+  id: string
+  class_group_id: string
+  gathering_date: string
+  time_text: string
+  item: string
+  content: string
+  teacher_text: string
+  materials_text: string
+  review_text: string
+  sort_order: number
+  updated_by_name: string
+  updated_at: string
+}
+
+/** 聚會流程（flow：主題/內容/方式）與運作要點（guide） */
+export interface ClassDoc {
+  id: string
+  class_group_id: string
+  kind: 'flow' | 'guide'
+  title: string
+  content: string
+  extra: string
+  sort_order: number
+}
+
+/** 教材（外連型；class_group_id null＝共用） */
+export interface Material {
+  id: string
+  class_group_id: string | null
+  category: string
+  title: string
+  url: string
+  note: string
+  created_by: string
+  created_by_name: string
+  created_at: string
+}

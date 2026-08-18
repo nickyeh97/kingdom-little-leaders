@@ -330,3 +330,32 @@ create policy "child_assignments_read" on child_service_assignments
 create policy "child_assignments_write" on child_service_assignments
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+-- ---- 教學模組（Sprint 04 Wave 2）----
+alter table lesson_segments enable row level security;
+create policy "lesson_segments_read" on lesson_segments
+  for select to authenticated using (public.is_staff());
+create policy "lesson_segments_write" on lesson_segments
+  for all to authenticated
+  using (public.is_admin() or public.has_class_role(class_group_id))
+  with check (public.is_admin() or public.has_class_role(class_group_id));
+
+alter table class_docs enable row level security;
+create policy "class_docs_read" on class_docs
+  for select to authenticated using (public.is_staff());
+create policy "class_docs_write" on class_docs
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table materials enable row level security;
+create policy "materials_read" on materials
+  for select to authenticated using (public.is_staff());
+create policy "materials_insert" on materials
+  for insert to authenticated with check (public.is_staff());
+create policy "materials_update" on materials
+  for update to authenticated
+  using (public.is_admin() or created_by = auth.uid())
+  with check (public.is_admin() or created_by = auth.uid());
+create policy "materials_delete" on materials
+  for delete to authenticated
+  using (public.is_admin() or created_by = auth.uid());

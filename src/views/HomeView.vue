@@ -12,6 +12,8 @@ import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
 import { listChildRosters } from '../api/childService'
 import { listSessionLogsRange } from '../api/records'
 import { listServiceWeeks } from '../api/service'
+import { listLessonSegmentsByDate } from '../api/teaching'
+import { classHasIndex } from '../lib/performance'
 import {
   feedbackDeadline,
   isFeedbackOpen,
@@ -62,6 +64,8 @@ const needClassLog = ref(false)
 const myServiceDates = ref<string[]>([])
 /** 家長：孩子被排上已發布的兒童服事表 */
 const kidServiceDates = ref<string[]>([])
+/** 同工：本週教案填寫狀況（已填班數／應填班數） */
+const lessonStatus = ref<{ filled: number; total: number } | null>(null)
 const lastG = lastGathering()
 const feedbackDue = feedbackDeadline(lastG)
 
@@ -99,6 +103,19 @@ onMounted(async () => {
       lastFeedback.value = children
         .filter((c) => (byChild.get(c.id) ?? []).length > 0)
         .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
+    }
+    // 同工：本週教案填寫狀況（教案更新的站內通知）
+    if (auth.can('admin')) {
+      const [segs, allGroups] = await Promise.all([
+        listLessonSegmentsByDate(gathering),
+        listClassGroups(),
+      ])
+      const lessonClasses = allGroups.filter((g) => classHasIndex(g.name))
+      const filled = new Set(segs.map((sg) => String(sg.class_group_id)))
+      lessonStatus.value = {
+        filled: lessonClasses.filter((g) => filled.has(String(g.id))).length,
+        total: lessonClasses.length,
+      }
     }
     // 老師：已發布服事表中有自己的排班 → 站內通知
     if (auth.can('teacher') || auth.can('admin')) {
@@ -242,6 +259,14 @@ async function removeAnn() {
       mode="link"
       :text="`本週出席還沒填喔——${weekdayName(deadline)} 23:59 前完成勾選`"
       @click="$router.push({ name: 'attendance' })"
+    />
+
+    <van-notice-bar
+      v-if="lessonStatus && lessonStatus.filled > 0"
+      left-icon="notes-o"
+      mode="link"
+      :text="`本週教案：${lessonStatus.filled}/${lessonStatus.total} 班已填寫——點我查看`"
+      @click="$router.push({ name: 'lesson-plans' })"
     />
 
     <van-notice-bar
