@@ -14,6 +14,14 @@ import {
   upcomingGathering,
   upcomingGatherings,
 } from '../lib/gathering'
+import {
+  LESSON_DEFAULT_START,
+  LESSON_TEMPLATE,
+  addToClock,
+  composeTimeText,
+  parseTimeText,
+  totalMinutes,
+} from '../lib/lesson'
 import { classHasIndex } from '../lib/performance'
 import { LESSON_ITEM_PRESETS } from '../lib/teaching'
 import { useAuthStore } from '../stores/auth'
@@ -29,10 +37,19 @@ const activeGroup = ref('')
 const segments = ref<LessonSegment[]>([])
 const loading = ref(true)
 
-/** 可否編輯目前班別（該班老師或同工；分區塊共編以列為單位） */
-const canEdit = computed(
-  () => auth.can('admin') || auth.canClass(activeGroup.value),
-)
+/** 可否編輯目前班別（該班老師或同工；分區塊共編以段落為單位） */
+const canEdit = computed(() => auth.can('admin') || auth.canClass(activeGroup.value))
+
+const total = computed(() => totalMinutes(segments.value.map((s) => s.time_text)))
+
+/** 呈現用：拆回大字分鐘數與起訖區間 */
+function timeOf(seg: LessonSegment): { min: string; range: string } {
+  const t = parseTimeText(seg.time_text)
+  return {
+    min: t.minutes != null ? `${t.minutes}分` : '—',
+    range: t.start ? `${t.start}${t.end ? `–${t.end}` : ''}` : '',
+  }
+}
 
 async function load() {
   if (!activeGroup.value) return
@@ -60,10 +77,43 @@ onMounted(async () => {
 
 watch([activeGroup, selectedDate], load)
 
-// ---- 段落編輯（分區塊：一列一存）----
+/** 一鍵以標準流程建立本日教案（源自現行共編常見段落，之後逐段改內容） */
+const creatingTemplate = ref(false)
+async function createFromTemplate() {
+  if (creatingTemplate.value) return
+  creatingTemplate.value = true
+  try {
+    let start = LESSON_DEFAULT_START
+    let order = 0
+    for (const t of LESSON_TEMPLATE) {
+      await createLessonSegment({
+        class_group_id: activeGroup.value,
+        gathering_date: selectedDate.value,
+        time_text: composeTimeText(t.minutes, start),
+        item: t.item,
+        content: '',
+        teacher_text: '',
+        materials_text: '',
+        review_text: '',
+        sort_order: order++,
+        updated_by_name: auth.profile?.display_name ?? '',
+      })
+      start = addToClock(start, t.minutes)
+    }
+    await load()
+    showSuccessToast('已建立標準流程，點各段落填寫內容')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    creatingTemplate.value = false
+  }
+}
+
+// ---- 段落編輯（分區塊：一段一存）----
 const editing = ref<LessonSegment | 'new' | null>(null)
 const draft = ref({
-  time_text: '',
+  minutes: '' as string,
+  start: '',
   item: '',
   content: '',
   teacher_text: '',
@@ -72,26 +122,39 @@ const draft = ref({
 })
 const saving = ref(false)
 
+/** 編輯中時間預覽：如「10分鐘 14:00-14:10」 */
+const timePreview = computed(() =>
+  composeTimeText(draft.value.minutes ? Number(draft.value.minutes) : null, draft.value.start),
+)
+
 function openEditor(seg: LessonSegment | null) {
   if (!canEdit.value) return
   editing.value = seg ?? 'new'
-  draft.value = seg
-    ? {
-        time_text: seg.time_text,
-        item: seg.item,
-        content: seg.content,
-        teacher_text: seg.teacher_text,
-        materials_text: seg.materials_text,
-        review_text: seg.review_text,
-      }
-    : {
-        time_text: '',
-        item: '',
-        content: '',
-        teacher_text: auth.profile?.display_name ?? '',
-        materials_text: '',
-        review_text: '',
-      }
+  if (seg) {
+    const t = parseTimeText(seg.time_text)
+    draft.value = {
+      minutes: t.minutes != null ? String(t.minutes) : '',
+      start: t.start,
+      item: seg.item,
+      content: seg.content,
+      teacher_text: seg.teacher_text,
+      materials_text: seg.materials_text,
+      review_text: seg.review_text,
+    }
+  } else {
+    // 新段落：自動接在最後一段的結束時間之後
+    const last = segments.value[segments.value.length - 1]
+    const lastEnd = last ? parseTimeText(last.time_text).end : ''
+    draft.value = {
+      minutes: '10',
+      start: lastEnd || (segments.value.length === 0 ? LESSON_DEFAULT_START : ''),
+      item: '',
+      content: '',
+      teacher_text: auth.profile?.display_name ?? '',
+      materials_text: '',
+      review_text: '',
+    }
+  }
 }
 
 async function save() {
@@ -102,7 +165,12 @@ async function save() {
   saving.value = true
   try {
     const base = {
-      ...draft.value,
+      time_text: timePreview.value,
+      item: draft.value.item.trim(),
+      content: draft.value.content,
+      teacher_text: draft.value.teacher_text,
+      materials_text: draft.value.materials_text,
+      review_text: draft.value.review_text,
       updated_by_name: auth.profile?.display_name ?? '',
     }
     if (editing.value === 'new') {
@@ -163,7 +231,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
 <template>
   <div class="page">
     <h2>教案</h2>
-    <p class="hint">每班每聚會日一份；各段落獨立編輯（主題課程/彈性時間可由不同老師分別填寫）</p>
+    <p class="hint">每班每聚會日一份；各段落獨立填寫（不同老師編各自負責的段落）</p>
 
     <van-tabs v-model:active="activeGroup" type="card" class="tabs">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
@@ -182,43 +250,103 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         {{ d.slice(5).replace('-', '/') }}
       </van-tag>
     </div>
-    <p class="hint sel-date">{{ formatGathering(selectedDate) }}</p>
-
-    <van-button
-      v-if="canEdit"
-      round
-      block
-      plain
-      type="primary"
-      class="add-btn"
-      @click="openEditor(null)"
-    >
-      ＋新增段落
-    </van-button>
 
     <van-skeleton v-if="loading" title :row="5" />
     <template v-else>
-      <div v-if="segments.length === 0" class="card hint">本日尚無教案內容</div>
-      <div v-for="(seg, i) in segments" :key="seg.id" class="card">
-        <div class="seg-head">
-          <van-tag type="primary" plain>{{ seg.item || '未命名' }}</van-tag>
-          <span class="hint">{{ seg.time_text }}</span>
-          <span v-if="seg.teacher_text" class="hint">👤 {{ seg.teacher_text }}</span>
-          <span class="spacer" />
-          <template v-if="canEdit">
-            <button class="mv" :disabled="i === 0" @click="move(seg, -1)">↑</button>
-            <button class="mv" :disabled="i === segments.length - 1" @click="move(seg, 1)">↓</button>
-            <van-button size="mini" plain @click="openEditor(seg)">編輯</van-button>
-          </template>
+      <div class="plan-head card">
+        <div>
+          <strong>{{ formatGathering(selectedDate) }}</strong>
+          <p class="hint plan-sub">
+            {{ segments.length ? `${segments.length} 個段落 · 總時長約 ${total} 分鐘` : '尚未建立教案' }}
+          </p>
         </div>
-        <p v-if="seg.content" class="seg-line">{{ seg.content }}</p>
-        <p v-if="seg.materials_text" class="seg-line dim">🧰 教材預備：{{ seg.materials_text }}</p>
-        <p v-if="seg.review_text" class="seg-line review">📝 課後執行記錄:{{ seg.review_text }}</p>
-        <p v-if="seg.updated_by_name" class="hint upd">
-          {{ seg.updated_by_name }} 更新於 {{ seg.updated_at.slice(0, 10) }}
-        </p>
+        <van-button
+          v-if="canEdit && segments.length > 0"
+          size="small"
+          plain
+          type="primary"
+          @click="openEditor(null)"
+        >
+          ＋段落
+        </van-button>
       </div>
-      <p v-if="!canEdit && segments.length > 0" class="hint">
+
+      <!-- 空白日：引導建立 -->
+      <div v-if="segments.length === 0 && canEdit" class="card empty">
+        <p class="empty-title">這一天還沒有教案</p>
+        <p class="hint">可以套用標準流程再逐段修改，或從空白開始</p>
+        <van-button
+          round
+          block
+          type="primary"
+          :loading="creatingTemplate"
+          class="tpl-btn"
+          @click="createFromTemplate"
+        >
+          ⚡ 以標準流程建立（{{ LESSON_TEMPLATE.length }} 段）
+        </van-button>
+        <van-button round block plain type="primary" @click="openEditor(null)">
+          從空白新增第一段
+        </van-button>
+      </div>
+      <div v-else-if="segments.length === 0" class="card hint">本日尚無教案內容</div>
+
+      <!-- 時間軸 run sheet -->
+      <div class="timeline">
+        <div
+          v-for="(seg, i) in segments"
+          :key="seg.id"
+          class="tl-row"
+          :class="{ clickable: canEdit }"
+          @click="openEditor(seg)"
+        >
+          <div class="tl-time">
+            <strong>{{ timeOf(seg).min }}</strong>
+            <span v-if="timeOf(seg).range">{{ timeOf(seg).range }}</span>
+          </div>
+          <div class="tl-axis">
+            <i class="tl-dot" />
+            <i v-if="i < segments.length - 1" class="tl-line" />
+          </div>
+          <div class="tl-card card">
+            <div class="tl-head">
+              <strong class="tl-item">{{ seg.item || '未命名段落' }}</strong>
+              <van-tag v-if="seg.teacher_text" plain type="primary">{{ seg.teacher_text }}</van-tag>
+              <span class="spacer" />
+              <template v-if="canEdit">
+                <button class="mv" :disabled="i === 0" @click.stop="move(seg, -1)">↑</button>
+                <button
+                  class="mv"
+                  :disabled="i === segments.length - 1"
+                  @click.stop="move(seg, 1)"
+                >
+                  ↓
+                </button>
+              </template>
+            </div>
+            <p v-if="seg.content" class="tl-content">{{ seg.content }}</p>
+            <p v-else class="tl-content unfilled">（內容未填寫）</p>
+            <p class="tl-field">
+              <span class="f-label">🧰 教材預備</span>
+              <span v-if="seg.materials_text">{{ seg.materials_text }}</span>
+              <span v-else class="unfilled">未填寫</span>
+            </p>
+            <p class="tl-field">
+              <span class="f-label">📝 課後執行</span>
+              <span v-if="seg.review_text">{{ seg.review_text }}</span>
+              <span v-else class="unfilled">未填寫</span>
+            </p>
+            <p v-if="seg.updated_by_name" class="hint upd">
+              {{ seg.updated_by_name }} · {{ seg.updated_at.slice(0, 10) }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="canEdit && segments.length > 0" class="hint foot-tip">
+        點段落卡即可編輯該段（一段一存，不會蓋到其他老師的段落）
+      </p>
+      <p v-else-if="segments.length > 0" class="hint foot-tip">
         ※ 僅該班老師與同工可編輯；您目前為唯讀檢視。
       </p>
     </template>
@@ -230,10 +358,9 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
       @update:show="(v: boolean) => !v && (editing = null)"
     >
       <div class="editor">
-        <h3>{{ editing === 'new' ? '新增段落' : '編輯段落' }}</h3>
-        <van-field v-model="draft.time_text" label="時間" maxlength="40"
-          placeholder="例：5分鐘 1400-1405" />
-        <p class="hint pop-label">項目（可自行輸入）</p>
+        <h3>{{ editing === 'new' ? '新增段落' : `編輯「${(editing as LessonSegment)?.item || '段落'}」` }}</h3>
+
+        <p class="hint pop-label">項目</p>
         <div class="tag-row">
           <van-tag
             v-for="it in LESSON_ITEM_PRESETS"
@@ -247,15 +374,26 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
             {{ it }}
           </van-tag>
         </div>
-        <van-field v-model="draft.item" label="項目" maxlength="40" placeholder="或自行輸入" />
+        <van-field v-model="draft.item" label="自訂項目" maxlength="40"
+          placeholder="或自行輸入（如：防災演習）" />
+
+        <p class="hint pop-label">
+          時間{{ timePreview ? `：${timePreview}` : '（填分鐘數與開始時間自動計算）' }}
+        </p>
+        <div class="time-grid">
+          <van-field v-model="draft.minutes" type="digit" label="分鐘" placeholder="10" />
+          <van-field v-model="draft.start" label="開始" placeholder="14:00" />
+        </div>
+
         <van-field v-model="draft.content" label="內容" type="textarea" rows="3" autosize
           maxlength="2000" placeholder="教學內容、流程說明、YouTube 連結…" />
         <van-field v-model="draft.teacher_text" label="老師" maxlength="60"
           placeholder="此段落負責老師" />
         <van-field v-model="draft.materials_text" label="教材預備" type="textarea" rows="1" autosize
-          maxlength="500" placeholder="教材預備／備註" />
+          maxlength="500" placeholder="需要準備的教材／物品" />
         <van-field v-model="draft.review_text" label="課後執行" type="textarea" rows="1" autosize
           maxlength="500" placeholder="課後執行記錄（改善&建議，課後補填）" />
+
         <van-button round block type="primary" :loading="saving" class="save-btn" @click="save">
           儲存此段落
         </van-button>
@@ -280,52 +418,146 @@ h2 {
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
+  margin-bottom: 10px;
 }
-.sel-date {
-  margin: 6px 0 10px;
+.plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
-.add-btn {
-  margin-bottom: 12px;
+.plan-head strong {
+  font-size: 20px;
 }
-.seg-head {
+.plan-sub {
+  margin: 4px 0 0;
+}
+.empty {
+  text-align: center;
+  padding: 24px 16px;
+}
+.empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.tpl-btn {
+  margin: 14px 0 10px;
+}
+
+/* ---- 時間軸 run sheet ---- */
+.timeline {
+  margin-top: 4px;
+}
+.tl-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.tl-row.clickable {
+  cursor: pointer;
+}
+.tl-time {
+  width: 66px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-top: 14px;
+  gap: 2px;
+}
+.tl-time strong {
+  font-size: 22px;
+  color: var(--kll-primary-dark);
+  line-height: 1.1;
+}
+.tl-time span {
+  font-size: 13px;
+  color: var(--kll-sub);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.tl-axis {
+  width: 14px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+}
+.tl-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--kll-primary);
+  flex-shrink: 0;
+}
+.tl-line {
+  width: 3px;
+  flex: 1;
+  background: var(--kll-primary-soft);
+  border-radius: 2px;
+  margin-top: 2px;
+}
+.tl-card {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+.tl-head {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
+.tl-item {
+  font-size: 22px;
+}
 .spacer {
   flex: 1;
 }
 .mv {
-  width: 34px;
-  height: 32px;
+  width: 36px;
+  height: 34px;
   border: 1px solid var(--kll-border, #dde4df);
   border-radius: 8px;
   background: var(--kll-bg);
-  font-size: 16px;
+  font-size: 17px;
 }
 .mv:disabled {
   opacity: 0.35;
 }
-.seg-line {
+.tl-content {
   margin: 8px 0 0;
   font-size: 18px;
   white-space: pre-wrap;
 }
-.dim {
-  color: var(--kll-sub);
+.tl-field {
+  margin: 8px 0 0;
   font-size: 16px;
-}
-.review {
-  background: var(--kll-amber-soft);
+  background: var(--kll-bg);
   border-radius: 8px;
   padding: 6px 10px;
-  font-size: 16px;
+}
+.f-label {
+  color: var(--kll-sub);
+  margin-right: 8px;
+  font-size: 15px;
+}
+.unfilled {
+  color: var(--kll-sub);
+  font-style: italic;
+  opacity: 0.75;
 }
 .upd {
   margin: 8px 0 0;
   font-size: 13px;
 }
+.foot-tip {
+  margin-top: 4px;
+}
+
+/* ---- 編輯彈窗 ---- */
 .editor {
   padding: 20px 16px 28px;
 }
@@ -342,6 +574,10 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 16px 8px;
+}
+.time-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 .save-btn {
   margin-top: 14px;
