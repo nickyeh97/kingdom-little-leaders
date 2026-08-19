@@ -53,6 +53,18 @@ async function logout() {
         @click="$router.push({ name: 'materials' })"
       />
       <van-cell
+        title="開會決議"
+        label="大會/同工/班別會議紀錄與待辦追蹤"
+        is-link
+        @click="$router.push({ name: 'meetings' })"
+      />
+      <van-cell
+        title="組織架構與分工"
+        label="兒主團隊組別、職務與名單"
+        is-link
+        @click="$router.push({ name: 'org' })"
+      />
+      <van-cell
         title="出席紀錄（近半年）"
         label="可匯出 CSV 存 NAS / Google Sheet"
         is-link

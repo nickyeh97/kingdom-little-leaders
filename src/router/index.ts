@@ -61,6 +61,18 @@ const router = createRouter({
           meta: { roles: ['teacher', 'admin'] },
         },
         {
+          path: 'meetings',
+          name: 'meetings',
+          component: () => import('../views/MeetingsView.vue'),
+          meta: { roles: ['teacher', 'admin'] },
+        },
+        {
+          path: 'org',
+          name: 'org',
+          component: () => import('../views/OrgView.vue'),
+          meta: { roles: ['teacher', 'admin'] },
+        },
+        {
           path: 'records',
           name: 'records',
           component: () => import('../views/RecordsView.vue'),

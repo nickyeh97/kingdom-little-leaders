@@ -359,3 +359,41 @@ create policy "materials_update" on materials
 create policy "materials_delete" on materials
   for delete to authenticated
   using (public.is_admin() or created_by = auth.uid());
+
+-- ---- 會議與行政（Sprint 04 Wave 3）----
+alter table meetings enable row level security;
+create policy "meetings_read" on meetings
+  for select to authenticated
+  using (
+    public.is_admin()
+    or (public.is_staff() and scope = 'all')
+    or (scope = 'class' and public.has_class_role(class_group_id))
+  );
+create policy "meetings_write" on meetings
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table meeting_items enable row level security;
+create policy "meeting_items_read" on meeting_items
+  for select to authenticated
+  using (
+    exists (
+      select 1 from meetings m
+      where m.id = meeting_id
+        and (
+          public.is_admin()
+          or (public.is_staff() and m.scope = 'all')
+          or (m.scope = 'class' and public.has_class_role(m.class_group_id))
+        )
+    )
+  );
+create policy "meeting_items_write" on meeting_items
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+alter table org_units enable row level security;
+create policy "org_units_read" on org_units
+  for select to authenticated using (public.is_staff());
+create policy "org_units_write" on org_units
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());

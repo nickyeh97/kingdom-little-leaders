@@ -12,6 +12,7 @@ import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
 import { listChildRosters } from '../api/childService'
 import { listSessionLogsRange } from '../api/records'
 import { listServiceWeeks } from '../api/service'
+import { listMeetings } from '../api/meetings'
 import { listLessonSegmentsByDate } from '../api/teaching'
 import { classHasIndex } from '../lib/performance'
 import {
@@ -66,6 +67,8 @@ const myServiceDates = ref<string[]>([])
 const kidServiceDates = ref<string[]>([])
 /** 同工：本週教案填寫狀況（已填班數／應填班數） */
 const lessonStatus = ref<{ filled: number; total: number } | null>(null)
+/** 同工：會議待辦逾期數（C-05 狀態追蹤） */
+const overdueItems = ref(0)
 const lastG = lastGathering()
 const feedbackDue = feedbackDeadline(lastG)
 
@@ -104,12 +107,17 @@ onMounted(async () => {
         .filter((c) => (byChild.get(c.id) ?? []).length > 0)
         .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
     }
-    // 同工：本週教案填寫狀況（教案更新的站內通知）
+    // 同工：本週教案填寫狀況（教案更新的站內通知）＋會議待辦逾期
     if (auth.can('admin')) {
-      const [segs, allGroups] = await Promise.all([
+      const todayIso = new Date().toISOString().slice(0, 10)
+      const [segs, allGroups, mts] = await Promise.all([
         listLessonSegmentsByDate(gathering),
         listClassGroups(),
+        listMeetings(),
       ])
+      overdueItems.value = mts
+        .flatMap((m) => m.meeting_items ?? [])
+        .filter((i) => i.status !== 'done' && !!i.due_date && i.due_date < todayIso).length
       const lessonClasses = allGroups.filter((g) => classHasIndex(g.name))
       const filled = new Set(segs.map((sg) => String(sg.class_group_id)))
       lessonStatus.value = {
@@ -259,6 +267,16 @@ async function removeAnn() {
       mode="link"
       :text="`本週出席還沒填喔——${weekdayName(deadline)} 23:59 前完成勾選`"
       @click="$router.push({ name: 'attendance' })"
+    />
+
+    <van-notice-bar
+      v-if="overdueItems > 0"
+      left-icon="warning-o"
+      mode="link"
+      color="#8a2a24"
+      background="#f9e0dd"
+      :text="`會議待辦有 ${overdueItems} 項已逾期——點我查看`"
+      @click="$router.push({ name: 'meetings' })"
     />
 
     <van-notice-bar
