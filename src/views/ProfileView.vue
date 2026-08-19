@@ -35,6 +35,24 @@ async function logout() {
     </van-cell-group>
     <van-cell-group inset v-if="auth.can('teacher') || auth.can('admin')">
       <van-cell
+        title="教案"
+        label="每班每聚會日；段落分區塊共編"
+        is-link
+        @click="$router.push({ name: 'lesson-plans' })"
+      />
+      <van-cell
+        title="聚會流程與運作要點"
+        label="各班標準流程與班務規則"
+        is-link
+        @click="$router.push({ name: 'class-info' })"
+      />
+      <van-cell
+        title="教材資料庫"
+        label="外連教會 NAS / 雲端的教材目錄"
+        is-link
+        @click="$router.push({ name: 'materials' })"
+      />
+      <van-cell
         title="出席紀錄（近半年）"
         label="可匯出 CSV 存 NAS / Google Sheet"
         is-link
