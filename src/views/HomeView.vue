@@ -12,6 +12,7 @@ import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
 import { listChildRosters } from '../api/childService'
 import { listSessionLogsRange } from '../api/records'
 import { listServiceWeeks } from '../api/service'
+import { listMeetings } from '../api/meetings'
 import { listLessonSegmentsByDate } from '../api/teaching'
 import { classHasIndex } from '../lib/performance'
 import {
@@ -66,6 +67,8 @@ const myServiceDates = ref<string[]>([])
 const kidServiceDates = ref<string[]>([])
 /** 同工：本週教案填寫狀況（已填班數／應填班數） */
 const lessonStatus = ref<{ filled: number; total: number } | null>(null)
+/** 同工：會議待辦逾期數（C-05 狀態追蹤） */
+const overdueItems = ref(0)
 const lastG = lastGathering()
 const feedbackDue = feedbackDeadline(lastG)
 
@@ -104,12 +107,17 @@ onMounted(async () => {
         .filter((c) => (byChild.get(c.id) ?? []).length > 0)
         .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
     }
-    // 同工：本週教案填寫狀況（教案更新的站內通知）
+    // 同工：本週教案填寫狀況（教案更新的站內通知）＋會議待辦逾期
     if (auth.can('admin')) {
-      const [segs, allGroups] = await Promise.all([
+      const todayIso = new Date().toISOString().slice(0, 10)
+      const [segs, allGroups, mts] = await Promise.all([
         listLessonSegmentsByDate(gathering),
         listClassGroups(),
+        listMeetings(),
       ])
+      overdueItems.value = mts
+        .flatMap((m) => m.meeting_items ?? [])
+        .filter((i) => i.status !== 'done' && !!i.due_date && i.due_date < todayIso).length
       const lessonClasses = allGroups.filter((g) => classHasIndex(g.name))
       const filled = new Set(segs.map((sg) => String(sg.class_group_id)))
       lessonStatus.value = {
@@ -262,6 +270,16 @@ async function removeAnn() {
     />
 
     <van-notice-bar
+      v-if="overdueItems > 0"
+      left-icon="warning-o"
+      mode="link"
+      color="#8a2a24"
+      background="#f9e0dd"
+      :text="`會議待辦有 ${overdueItems} 項已逾期——點我查看`"
+      @click="$router.push({ name: 'meetings' })"
+    />
+
+    <van-notice-bar
       v-if="lessonStatus && lessonStatus.filled > 0"
       left-icon="notes-o"
       mode="link"
@@ -337,6 +355,7 @@ async function removeAnn() {
     <van-popup
       :show="editingAnn !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (editingAnn = null)"
     >
@@ -402,17 +421,23 @@ async function removeAnn() {
 <style scoped>
 .top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
 }
 .top h2 {
   margin: 0;
   font-size: 25px;
 }
+/* 窄螢幕（iPhone SE）：多角色標籤允許換行，不擠壓標題 */
 .role-tags {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  max-width: 40%;
 }
 .mood-tags {
   display: flex;
@@ -445,7 +470,14 @@ async function removeAnn() {
   font-size: 22px;
 }
 .tag-opt {
-  margin-left: 8px;
+  margin: 0;
+}
+/* 窄螢幕（iPhone SE）：cell 內的選項標籤允許換行，避免溢出 */
+.ann-editor :deep(.van-cell__value) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 .save-btn {
   margin-top: 14px;

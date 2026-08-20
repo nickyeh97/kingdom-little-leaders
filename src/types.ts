@@ -238,3 +238,35 @@ export interface Material {
   created_by_name: string
   created_at: string
 }
+
+/** 會議（scope：all＝全體大會、staff＝核心同工、class＝班別） */
+export interface Meeting {
+  id: string
+  scope: 'all' | 'staff' | 'class'
+  class_group_id: string | null
+  meeting_date: string
+  title: string
+  minutes: string
+  created_by_name: string
+  meeting_items?: MeetingItem[]
+}
+
+/** 會議事項（決議/待討論：內容、分工、預計完成日、狀態） */
+export interface MeetingItem {
+  id: string
+  meeting_id: string
+  content: string
+  assignee: string
+  due_date: string | null
+  status: 'todo' | 'doing' | 'done'
+  sort_order: number
+}
+
+/** 組織架構／分工（C-06） */
+export interface OrgUnit {
+  id: string
+  title: string
+  members_text: string
+  note: string
+  sort_order: number
+}

@@ -607,6 +607,7 @@ function assignmentLines(w: ServiceWeek): string[] {
     <van-popup
       :show="signupOpen"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => (signupOpen = v)"
     >
@@ -661,6 +662,7 @@ function assignmentLines(w: ServiceWeek): string[] {
     <van-popup
       :show="editOpen"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => (editOpen = v)"
     >
@@ -727,6 +729,7 @@ function assignmentLines(w: ServiceWeek): string[] {
     <van-popup
       :show="kidEditOpen"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => (kidEditOpen = v)"
     >

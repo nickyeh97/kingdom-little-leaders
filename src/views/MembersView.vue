@@ -347,18 +347,18 @@ async function removeChild() {
         <div class="info">
           <strong>{{ m.display_name }}</strong>
           <span class="hint detail">{{ memberDetail(m) }}</span>
-        </div>
-        <div class="tags">
-          <van-tag v-if="!m.approved" type="danger" plain round>待審核</van-tag>
-          <van-tag
-            v-for="t in roleTags(m)"
-            :key="t.label"
-            :type="t.type"
-            round
-            :class="{ dim: !m.approved }"
-          >
-            {{ t.label }}
-          </van-tag>
+          <div class="tags">
+            <van-tag v-if="!m.approved" type="danger" plain round>待審核</van-tag>
+            <van-tag
+              v-for="t in roleTags(m)"
+              :key="t.label"
+              :type="t.type"
+              round
+              :class="{ dim: !m.approved }"
+            >
+              {{ t.label }}
+            </van-tag>
+          </div>
         </div>
         <span class="more">⋯</span>
       </div>
@@ -391,7 +391,7 @@ async function removeChild() {
     </p>
 
     <!-- 邀請成員 -->
-    <van-popup :show="showInvite" round position="bottom" @update:show="(v: boolean) => (showInvite = v)">
+    <van-popup :show="showInvite" round closeable position="bottom" @update:show="(v: boolean) => (showInvite = v)">
       <div class="editor">
         <h3>邀請成員</h3>
         <p class="invite-desc">
@@ -407,6 +407,7 @@ async function removeChild() {
     <van-popup
       :show="editingMember !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (editingMember = null)"
     >
@@ -480,6 +481,7 @@ async function removeChild() {
     <van-popup
       :show="editingChild !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (editingChild = null)"
     >
@@ -592,7 +594,7 @@ async function removeChild() {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  margin-top: 4px;
 }
 .more {
   color: var(--kll-sub);
@@ -634,7 +636,14 @@ async function removeChild() {
   margin: 10px 0 14px;
 }
 .tag-opt {
-  margin-left: 8px;
+  margin: 0;
+}
+/* 窄螢幕（iPhone SE）：cell 內的選項標籤允許換行，避免溢出 */
+.editor :deep(.van-cell__value) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 .bind-title {
   margin: 12px 16px 6px;

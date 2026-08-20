@@ -402,3 +402,40 @@ create table materials (
   created_at timestamptz not null default now()
 );
 create index idx_materials_class on materials (class_group_id, category);
+
+-- ===== Sprint 04 Wave 3：會議與行政 =====
+
+-- 會議（scope：all＝全體大會、staff＝核心同工、class＝班別）
+create table meetings (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null check (scope in ('all', 'staff', 'class')),
+  class_group_id uuid references class_groups (id) on delete cascade,
+  meeting_date date not null,
+  title text not null,
+  minutes text not null default '',
+  created_by uuid not null default auth.uid() references profiles (id),
+  created_by_name text not null default '',
+  created_at timestamptz not null default now()
+);
+create index idx_meetings_date on meetings (meeting_date desc);
+
+-- 事項追蹤（決議事項／分工／預計完成日期／狀態 待辦-進行中-已完成）
+create table meeting_items (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid not null references meetings (id) on delete cascade,
+  content text not null,
+  assignee text not null default '',
+  due_date date,
+  status text not null default 'todo' check (status in ('todo', 'doing', 'done')),
+  sort_order int not null default 0
+);
+create index idx_meeting_items on meeting_items (meeting_id);
+
+-- 組織架構／分工（C-06）
+create table org_units (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  members_text text not null default '',
+  note text not null default '',
+  sort_order int not null default 0
+);
