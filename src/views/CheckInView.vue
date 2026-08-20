@@ -420,6 +420,7 @@ async function pickChild(child: Child) {
     <van-popup
       :show="editing !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (editing = null)"
     >
@@ -459,6 +460,7 @@ async function pickChild(child: Child) {
     <van-popup
       :show="historyChild !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (historyChild = null)"
     >
@@ -492,6 +494,7 @@ async function pickChild(child: Child) {
     <van-popup
       :show="picking"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (picking = false)"
     >

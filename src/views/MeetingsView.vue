@@ -316,6 +316,7 @@ async function cycleStatus(item: MeetingItem) {
     <van-popup
       :show="mtEditing !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (mtEditing = null)"
     >
@@ -370,6 +371,7 @@ async function cycleStatus(item: MeetingItem) {
     <van-popup
       :show="itEditing !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (itEditing = null)"
     >

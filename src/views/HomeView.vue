@@ -355,6 +355,7 @@ async function removeAnn() {
     <van-popup
       :show="editingAnn !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (editingAnn = null)"
     >
@@ -420,17 +421,23 @@ async function removeAnn() {
 <style scoped>
 .top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
 }
 .top h2 {
   margin: 0;
   font-size: 25px;
 }
+/* 窄螢幕（iPhone SE）：多角色標籤允許換行，不擠壓標題 */
 .role-tags {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  max-width: 40%;
 }
 .mood-tags {
   display: flex;
@@ -463,7 +470,14 @@ async function removeAnn() {
   font-size: 22px;
 }
 .tag-opt {
-  margin-left: 8px;
+  margin: 0;
+}
+/* 窄螢幕（iPhone SE）：cell 內的選項標籤允許換行，避免溢出 */
+.ann-editor :deep(.van-cell__value) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 .save-btn {
   margin-top: 14px;

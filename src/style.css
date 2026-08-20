@@ -77,3 +77,26 @@ body {
   font-size: 17px;
   color: var(--kll-sub);
 }
+
+/* ---- 行動版底部彈窗 ----
+   手機鍵盤彈出或內容過長時，彈窗會撐滿畫面導致遮罩點不到而無法取消；
+   統一限制高度、內容改為內部捲動，並保留右上關閉鈕的空間。 */
+.van-popup--bottom {
+  max-height: 85vh;
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+}
+.van-popup--bottom > div {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.van-popup__close-icon {
+  font-size: 28px;
+  color: var(--kll-sub);
+}
+/* 彈窗標題置中，兩側留出關閉鈕位置避免重疊 */
+.van-popup--bottom h3 {
+  padding: 0 36px;
+}

@@ -385,6 +385,7 @@ async function removePl() {
     <van-popup
       :show="editing !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (editing = null)"
     >
@@ -410,6 +411,7 @@ async function removePl() {
     <van-popup
       :show="plEditing !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (plEditing = null)"
     >
@@ -445,6 +447,7 @@ async function removePl() {
     <van-popup
       :show="famEditing !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (famEditing = null)"
     >
@@ -487,6 +490,10 @@ h2 {
 }
 .section-row .section-title {
   margin: 16px 0 10px;
+}
+/* 窄螢幕（iPhone SE）：按鈕不被左側標題/說明擠壓變形 */
+.section-row .van-button {
+  flex-shrink: 0;
 }
 .tabs {
   margin: 10px 0 4px;
@@ -554,6 +561,18 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   margin: 0 16px;
+}
+/* 窄螢幕（iPhone SE）：長歌名允許在標籤內換行，不溢出畫面 */
+.pl-songs :deep(.van-tag) {
+  max-width: 100%;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 .fam-dim {
   display: flex;

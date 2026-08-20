@@ -190,6 +190,7 @@ async function save() {
     <van-popup
       :show="editing !== null"
       round
+      closeable
       position="bottom"
       @update:show="(v: boolean) => !v && (editing = null)"
     >
