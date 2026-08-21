@@ -4,11 +4,11 @@ import { showFailToast, showSuccessToast } from 'vant'
 import { listMyChildren, listPlansRange, upsertPlans } from '../api/attendance'
 import {
   addChildSignup,
+  listChildPermissions,
   listChildRosters,
   listChildSignups,
   removeChildSignup,
 } from '../api/childService'
-import { CHILD_SERVICE_ITEM_PRESETS } from '../lib/service'
 import { addMonths, monthGrid, monthOf, monthRange, monthTitle } from '../lib/calendar'
 import { WEEKDAY_NAMES } from '../lib/config'
 import {
@@ -22,6 +22,7 @@ import type {
   AttendancePlan,
   AttendanceStatus,
   Child,
+  ChildServicePermission,
   ChildServiceRoster,
   ChildServiceSignup,
 } from '../types'
@@ -38,6 +39,7 @@ const children = ref<Child[]>([])
 const monthPlans = ref<AttendancePlan[]>([])
 const childSignups = ref<ChildServiceSignup[]>([])
 const childRosters = ref<ChildServiceRoster[]>([])
+const childPerms = ref<ChildServicePermission[]>([])
 const statusMap = ref<Record<string, AttendanceStatus>>({})
 const noteMap = ref<Record<string, string>>({})
 const loading = ref(true)
@@ -100,7 +102,11 @@ function seedEditable() {
 
 onMounted(async () => {
   try {
-    children.value = await listMyChildren()
+    // 授權清單（RLS：只拿得到自己孩子的）——家長端僅顯示已開通項目（v5 #3）
+    ;[children.value, childPerms.value] = await Promise.all([
+      listMyChildren(),
+      listChildPermissions(),
+    ])
     await loadMonth()
     seedEditable()
   } catch (e) {
@@ -122,8 +128,14 @@ function selectDate(cell: { date: string; isGathering: boolean }) {
 }
 
 // ---- 兒童服事（P-04 報名／P-05 查看）----
-/** 具服事資格的孩子（P-03 由老師/同工開關） */
-const eligibleChildren = computed(() => children.value.filter((c) => c.service_eligible))
+/** 孩子已獲授權的服事項目（v5 #3：家長端只顯示已開通項目） */
+function permittedItems(childId: string): string[] {
+  return childPerms.value.filter((p) => p.child_id === childId).map((p) => p.item)
+}
+/** 具服事資格（至少一項授權）的孩子 */
+const eligibleChildren = computed(() =>
+  children.value.filter((c) => permittedItems(c.id).length > 0),
+)
 
 /** 「日期|孩子|項目」→ 報名紀錄（即點即存的切換依據） */
 const childSignupAt = computed(() => {
@@ -345,7 +357,7 @@ async function submit() {
         </div>
         <div class="svc-tags">
           <van-tag
-            v-for="it in CHILD_SERVICE_ITEM_PRESETS"
+            v-for="it in permittedItems(c.id)"
             :key="it"
             round
             size="large"

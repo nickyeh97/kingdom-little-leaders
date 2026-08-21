@@ -8,6 +8,7 @@ import {
   listClassDocs,
   updateClassDoc,
 } from '../api/teaching'
+import { FLOW_TEMPLATE, GUIDE_TEMPLATE } from '../lib/classInfo'
 import { classHasIndex } from '../lib/performance'
 import { useAuthStore } from '../stores/auth'
 import type { ClassDoc, ClassGroup } from '../types'
@@ -46,6 +47,39 @@ onMounted(async () => {
 
 watch(activeGroup, load)
 
+/** 一鍵以標準流程建立（範本源自共編 Excel 兒童班流程；時長依教案範本回推） */
+const creatingTemplate = ref(false)
+async function createFromTemplate() {
+  if (creatingTemplate.value) return
+  creatingTemplate.value = true
+  try {
+    let order = 0
+    for (const t of FLOW_TEMPLATE) {
+      await createClassDoc({
+        class_group_id: activeGroup.value,
+        kind: 'flow',
+        ...t,
+        sort_order: order++,
+      })
+    }
+    order = 0
+    for (const t of GUIDE_TEMPLATE) {
+      await createClassDoc({
+        class_group_id: activeGroup.value,
+        kind: 'guide',
+        ...t,
+        sort_order: order++,
+      })
+    }
+    await load()
+    showSuccessToast('已建立標準流程，點各項目即可修改')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    creatingTemplate.value = false
+  }
+}
+
 // ---- 同工編輯 ----
 const editing = ref<ClassDoc | 'new' | null>(null)
 const draft = ref<{ kind: 'flow' | 'guide'; title: string; content: string; extra: string }>({
@@ -61,7 +95,7 @@ function openEditor(doc: ClassDoc | null, kind: 'flow' | 'guide' = 'flow') {
   editing.value = doc ?? 'new'
   draft.value = doc
     ? { kind: doc.kind, title: doc.title, content: doc.content, extra: doc.extra }
-    : { kind, title: '', content: '', extra: kind === 'flow' ? '固定' : '' }
+    : { kind, title: '', content: '', extra: kind === 'flow' ? '必做' : '' }
 }
 
 async function save() {
@@ -122,6 +156,22 @@ async function remove() {
 
     <van-skeleton v-if="loading" title :row="5" />
     <template v-else>
+      <!-- 空白班別：一鍵套用標準流程（老師寫教案的依據） -->
+      <div v-if="flows.length === 0 && guides.length === 0 && auth.can('admin')" class="card empty">
+        <p class="empty-title">這個班別還沒有聚會流程</p>
+        <p class="hint">範本取自現行共編（兒童班流程），含必做/選做與建議時長，建立後可逐項修改</p>
+        <van-button
+          round
+          block
+          type="primary"
+          :loading="creatingTemplate"
+          class="tpl-btn"
+          @click="createFromTemplate"
+        >
+          ⚡ 以標準流程建立（{{ FLOW_TEMPLATE.length }} 項流程＋{{ GUIDE_TEMPLATE.length }} 項要點）
+        </van-button>
+      </div>
+
       <div class="sec-row">
         <h3 class="section-title">聚會流程</h3>
         <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(null, 'flow')">
@@ -138,7 +188,7 @@ async function remove() {
       >
         <div class="doc-head">
           <strong>{{ d.title }}</strong>
-          <van-tag v-if="d.extra" :type="d.extra === '固定' ? 'primary' : 'warning'" plain>
+          <van-tag v-if="d.extra" :type="d.extra.includes('選做') || d.extra === '彈性' ? 'warning' : 'primary'" plain>
             {{ d.extra }}
           </van-tag>
         </div>
@@ -184,7 +234,7 @@ async function remove() {
           v-model="draft.extra"
           :label="draft.kind === 'flow' ? '方式' : '備註'"
           maxlength="30"
-          :placeholder="draft.kind === 'flow' ? '固定 / 彈性' : '選填'"
+          :placeholder="draft.kind === 'flow' ? '例：必做・約10分鐘 / 選做' : '選填'"
         />
         <van-button round block type="primary" :loading="saving" class="save-btn" @click="save">
           儲存
@@ -210,6 +260,18 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+.empty {
+  text-align: center;
+  padding: 24px 16px;
+}
+.empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.tpl-btn {
+  margin-top: 14px;
 }
 .clickable {
   cursor: pointer;

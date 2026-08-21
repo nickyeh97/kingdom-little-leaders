@@ -171,6 +171,14 @@ export interface ServiceAssignment {
   sort_order: number
 }
 
+/** 兒童服事項目授權（v5 #3：孩子 × 項目逐項開通；該班老師或同工維護） */
+export interface ChildServicePermission {
+  id: string
+  child_id: string
+  item: string
+  created_by_name: string
+}
+
 /** 兒童服事報名（P-04；家長為符合資格的孩子填） */
 export interface ChildServiceSignup {
   id: string

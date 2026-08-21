@@ -4,7 +4,13 @@ import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import { deleteProfile, listProfiles, updateApproved, updateRoles } from '../api/members'
 import { listAllChildren } from '../api/records'
-import { setChildServiceEligible } from '../api/childService'
+import {
+  addChildPermission,
+  listChildPermissions,
+  removeChildPermission,
+} from '../api/childService'
+import { CHILD_SERVICE_ITEM_PRESETS } from '../lib/service'
+import { useAuthStore } from '../stores/auth'
 import {
   createChild,
   deleteChild,
@@ -16,8 +22,9 @@ import {
   type FamilyLink,
   type TeacherClassAssignment,
 } from '../api/roster'
-import type { Child, ClassGroup, Profile, UserRole } from '../types'
+import type { Child, ChildServicePermission, ClassGroup, Profile, UserRole } from '../types'
 
+const auth = useAuthStore()
 const members = ref<Profile[]>([])
 const children = ref<Child[]>([])
 const links = ref<FamilyLink[]>([])
@@ -84,13 +91,14 @@ function memberDetail(m: Profile): string {
 
 onMounted(async () => {
   try {
-    ;[members.value, children.value, links.value, classGroups.value, assignments.value] =
+    ;[members.value, children.value, links.value, classGroups.value, assignments.value, childPerms.value] =
       await Promise.all([
         listProfiles(),
         listAllChildren(),
         listFamilyLinks(),
         listClassGroups(),
         listTeacherClassAssignments(),
+        listChildPermissions(),
       ])
   } catch (e) {
     showFailToast((e as Error).message)
@@ -230,26 +238,74 @@ const editingChild = ref<Child | 'new' | null>(null)
 const childDraft = ref({
   name: '',
   class_group_id: '',
-  service_eligible: false,
   parentIds: [] as string[],
 })
 const savingChild = ref(false)
 
 function openChildEditor(c: Child | null) {
   editingChild.value = c ?? 'new'
+  permCustom.value = ''
   childDraft.value = c
     ? {
         name: c.name,
         class_group_id: String(c.class_group_id),
-        service_eligible: c.service_eligible ?? false,
         parentIds: parentsOf(c.id).map((p) => p.id),
       }
     : {
         name: '',
         class_group_id: classGroups.value[0]?.id ?? '',
-        service_eligible: false,
         parentIds: [],
       }
+}
+
+// ---- 服事項目授權（v5 #3：孩子×項目；即點即存，該班老師或同工）----
+const childPerms = ref<ChildServicePermission[]>([])
+const permCustom = ref('')
+const permSaving = ref(false)
+
+function permsOf(childId: string): ChildServicePermission[] {
+  return childPerms.value.filter((p) => p.child_id === childId)
+}
+function permItemOptions(childId: string): string[] {
+  const granted = permsOf(childId).map((p) => p.item)
+  return [
+    ...CHILD_SERVICE_ITEM_PRESETS,
+    ...granted.filter((i) => !CHILD_SERVICE_ITEM_PRESETS.includes(i)),
+  ]
+}
+function hasPerm(childId: string, item: string): boolean {
+  return permsOf(childId).some((p) => p.item === item)
+}
+async function togglePerm(childId: string, item: string) {
+  if (permSaving.value) return
+  permSaving.value = true
+  const existing = permsOf(childId).find((p) => p.item === item)
+  try {
+    if (existing) {
+      await removeChildPermission(existing.id)
+      childPerms.value = childPerms.value.filter((p) => p.id !== existing.id)
+    } else {
+      await addChildPermission(childId, item, auth.profile?.display_name ?? '')
+      childPerms.value = await listChildPermissions()
+    }
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    permSaving.value = false
+  }
+}
+async function addCustomPerm(childId: string) {
+  const item = permCustom.value.trim()
+  if (!item) {
+    showFailToast('請輸入項目名稱')
+    return
+  }
+  if (hasPerm(childId, item)) {
+    showFailToast('此項目已開通')
+    return
+  }
+  await togglePerm(childId, item)
+  permCustom.value = ''
 }
 
 function toggleParent(id: string) {
@@ -278,10 +334,6 @@ async function saveChild() {
       await updateChild(childId, base)
     }
     await setChildParents(childId, childDraft.value.parentIds)
-    // 服事資格（P-03）：走 RPC（該班老師或同工可開關）
-    const before = editingChild.value === 'new' ? false : (editingChild.value as Child).service_eligible
-    if (childDraft.value.service_eligible !== before)
-      await setChildServiceEligible(childId, childDraft.value.service_eligible)
     ;[children.value, links.value] = await Promise.all([listAllChildren(), listFamilyLinks()])
     showSuccessToast('已儲存')
     editingChild.value = null
@@ -324,19 +376,15 @@ async function removeChild() {
 
     <van-search v-model="keyword" placeholder="搜尋姓名⋯" shape="round" />
 
-    <div class="filters">
-      <van-tag
-        v-for="p in pills"
-        :key="p.key"
-        round
-        size="large"
-        :type="filter === p.key ? 'primary' : 'default'"
-        :plain="filter !== p.key"
-        @click="filter = p.key"
-      >
-        {{ p.label }}
-      </van-tag>
-    </div>
+    <!-- 篩選改 card 頁籤（比照服事頁）：PC/手機都好點（使用者回饋 2026-08-21） -->
+    <van-tabs
+      :active="filter"
+      type="card"
+      class="filter-tabs"
+      @update:active="(v: string | number) => (filter = v as typeof filter)"
+    >
+      <van-tab v-for="p in pills" :key="p.key" :name="p.key" :title="p.label" />
+    </van-tabs>
 
     <van-skeleton v-if="loading" title :row="6" />
 
@@ -504,11 +552,34 @@ async function removeChild() {
             </van-tag>
           </template>
         </van-cell>
-        <van-cell title="服事資格（可報名兒童服事）" center>
-          <template #value>
-            <van-switch v-model="childDraft.service_eligible" size="24" />
-          </template>
-        </van-cell>
+        <template v-if="editingChild !== 'new'">
+          <p class="hint bind-title">
+            服事項目授權（點選開通/取消，即點即存；家長端只看到已開通項目）
+          </p>
+          <div class="perm-row">
+            <van-tag
+              v-for="it in permItemOptions((editingChild as Child).id)"
+              :key="it"
+              round
+              size="large"
+              :type="hasPerm((editingChild as Child).id, it) ? 'primary' : 'default'"
+              :plain="!hasPerm((editingChild as Child).id, it)"
+              @click="togglePerm((editingChild as Child).id, it)"
+            >
+              {{ hasPerm((editingChild as Child).id, it) ? '✓ ' : '' }}{{ it }}
+            </van-tag>
+          </div>
+          <van-field v-model="permCustom" label="自訂項目" maxlength="30"
+            placeholder="未列出的服事項目">
+            <template #button>
+              <van-button size="small" type="primary" plain :loading="permSaving"
+                @click="addCustomPerm((editingChild as Child).id)">
+                ＋開通
+              </van-button>
+            </template>
+          </van-field>
+        </template>
+        <p v-else class="hint bind-title">服事項目授權：儲存孩子資料後即可設定</p>
         <p class="hint bind-title">綁定家長（可多選）</p>
         <van-cell-group inset>
           <van-cell
@@ -557,11 +628,8 @@ async function removeChild() {
   margin: 0;
   font-size: 25px;
 }
-.filters {
-  display: flex;
-  gap: 8px;
+.filter-tabs {
   margin: 8px 0 14px;
-  flex-wrap: wrap;
 }
 .row {
   display: flex;
@@ -647,6 +715,12 @@ async function removeChild() {
 }
 .bind-title {
   margin: 12px 16px 6px;
+}
+.perm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 16px 8px;
 }
 .save-btn {
   margin-top: 14px;

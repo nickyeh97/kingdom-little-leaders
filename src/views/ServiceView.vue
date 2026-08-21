@@ -3,10 +3,12 @@ import { computed, onMounted, ref } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import {
+  addChildPermission,
+  listChildPermissions,
   listChildRosters,
   listChildSignups,
+  removeChildPermission,
   setChildAssignments,
-  setChildServiceEligible,
   upsertChildRoster,
 } from '../api/childService'
 import { listAllChildren } from '../api/records'
@@ -19,10 +21,15 @@ import {
   upsertServiceWeek,
 } from '../api/service'
 import { formatGathering, upcomingGatherings } from '../lib/gathering'
-import { SERVICE_ITEM_PRESETS, SIGNUP_WEEKS_AHEAD } from '../lib/service'
+import {
+  CHILD_SERVICE_ITEM_PRESETS,
+  SERVICE_ITEM_PRESETS,
+  SIGNUP_WEEKS_AHEAD,
+} from '../lib/service'
 import { useAuthStore } from '../stores/auth'
 import type {
   Child,
+  ChildServicePermission,
   ChildServiceRoster,
   ChildServiceSignup,
   ClassGroup,
@@ -43,6 +50,7 @@ const signups = ref<TeacherServiceSignup[]>([])
 const allChildren = ref<Child[]>([])
 const childSignups = ref<ChildServiceSignup[]>([])
 const childRosters = ref<ChildServiceRoster[]>([])
+const childPerms = ref<ChildServicePermission[]>([])
 const loading = ref(true)
 
 const me = computed(() => auth.session?.user.id ?? '')
@@ -92,7 +100,7 @@ async function load() {
   try {
     const from = dates[0]
     const to = dates[dates.length - 1]
-    ;[groups.value, weeks.value, signups.value, allChildren.value, childSignups.value, childRosters.value] =
+    ;[groups.value, weeks.value, signups.value, allChildren.value, childSignups.value, childRosters.value, childPerms.value] =
       await Promise.all([
         listClassGroups(),
         listServiceWeeks(from, to),
@@ -100,6 +108,7 @@ async function load() {
         listAllChildren(),
         listChildSignups(from, to),
         listChildRosters(from, to),
+        listChildPermissions(),
       ])
   } catch (e) {
     showFailToast((e as Error).message)
@@ -307,31 +316,83 @@ function kidSignupCount(date: string): number {
   return kidsClasses.value.reduce((n, g) => n + kidSignupsFor(date, g.id).length, 0)
 }
 
-// ---- 服事資格管理（P-03 進階：該班老師或同工可開關）----
+// ---- 服事資格管理（v5 #3：孩子 × 項目逐項授權；該班老師或同工可開關）----
 const showEligibility = ref(false)
-const eligibilitySaving = ref('')
 /** 兒童班孩子（資格管理清單） */
 const kidsChildren = computed(() =>
   allChildren.value
     .filter((c) => kidsClasses.value.some((g) => g.id === String(c.class_group_id)))
     .sort((a, b) => a.name.localeCompare(b.name, 'zh-TW')),
 )
-function canToggleEligible(c: Child): boolean {
+/** 孩子 → 已授權項目 */
+const permsByChild = computed(() => {
+  const map = new Map<string, ChildServicePermission[]>()
+  for (const p of childPerms.value) {
+    const list = map.get(p.child_id) ?? []
+    list.push(p)
+    map.set(p.child_id, list)
+  }
+  return map
+})
+function canEditPerm(c: Child): boolean {
   return auth.can('admin') || auth.canClass(String(c.class_group_id))
 }
-async function toggleEligible(c: Child) {
-  if (!canToggleEligible(c) || eligibilitySaving.value) return
-  eligibilitySaving.value = c.id
+
+const permChild = ref<Child | null>(null)
+const permCustom = ref('')
+const permSaving = ref(false)
+
+function openPermEditor(c: Child) {
+  if (!canEditPerm(c)) return
+  permChild.value = c
+  permCustom.value = ''
+}
+/** 此孩子在編輯器顯示的項目：建議五項 ∪ 已授權的自訂項目 */
+function permItemOptions(c: Child): string[] {
+  const granted = (permsByChild.value.get(c.id) ?? []).map((p) => p.item)
+  return [...CHILD_SERVICE_ITEM_PRESETS, ...granted.filter((i) => !CHILD_SERVICE_ITEM_PRESETS.includes(i))]
+}
+function hasPerm(c: Child, item: string): boolean {
+  return (permsByChild.value.get(c.id) ?? []).some((p) => p.item === item)
+}
+/** 開通/移除單一項目（即點即存；children.service_eligible 由 DB 觸發器同步） */
+async function togglePerm(c: Child, item: string) {
+  if (permSaving.value) return
+  permSaving.value = true
+  const existing = (permsByChild.value.get(c.id) ?? []).find((p) => p.item === item)
   try {
-    await setChildServiceEligible(c.id, !c.service_eligible)
+    if (existing) {
+      await removeChildPermission(existing.id)
+      childPerms.value = childPerms.value.filter((p) => p.id !== existing.id)
+    } else {
+      await addChildPermission(c.id, item, auth.profile?.display_name ?? '')
+      childPerms.value = await listChildPermissions()
+    }
+    // 本地同步派生欄位，讓「具資格孩子」清單即時反映
+    const eligible = (permsByChild.value.get(c.id) ?? []).length > 0
     allChildren.value = allChildren.value.map((x) =>
-      x.id === c.id ? { ...x, service_eligible: !c.service_eligible } : x,
+      x.id === c.id ? { ...x, service_eligible: eligible } : x,
     )
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
-    eligibilitySaving.value = ''
+    permSaving.value = false
   }
+}
+async function addCustomPerm() {
+  const item = permCustom.value.trim()
+  const c = permChild.value
+  if (!c) return
+  if (!item) {
+    showFailToast('請輸入項目名稱')
+    return
+  }
+  if (hasPerm(c, item)) {
+    showFailToast('此項目已開通')
+    return
+  }
+  await togglePerm(c, item)
+  permCustom.value = ''
 }
 
 interface KidDraftAssignment {
@@ -538,7 +599,7 @@ function assignmentLines(w: ServiceWeek): string[] {
 
     <!-- ============ 兒童服事（只有兒童相關內容） ============ -->
     <template v-else>
-      <!-- 服事資格管理（P-03：該班老師或同工可開關） -->
+      <!-- 服事資格管理（v5 #3：孩子×項目逐項授權；該班老師或同工可開關） -->
       <div class="card">
         <div class="blk-row">
           <strong class="elig-title">服事資格</strong>
@@ -547,18 +608,19 @@ function assignmentLines(w: ServiceWeek): string[] {
           </van-button>
         </div>
         <template v-if="showEligibility">
-          <p class="hint">開通後，家長就能在出席頁為孩子報名服事（點名字切換）</p>
+          <p class="hint">點孩子名字設定可服事的項目；家長在出席頁只會看到已開通的項目</p>
           <div class="tag-row">
             <van-tag
               v-for="c in kidsChildren"
               :key="c.id"
               round
               size="large"
-              :type="c.service_eligible ? 'primary' : 'default'"
-              :plain="!c.service_eligible"
-              @click="toggleEligible(c)"
+              :type="(permsByChild.get(c.id)?.length ?? 0) > 0 ? 'primary' : 'default'"
+              :plain="(permsByChild.get(c.id)?.length ?? 0) === 0"
+              @click="openPermEditor(c)"
             >
-              {{ c.service_eligible ? '✓ ' : '' }}{{ c.name }}
+              {{ c.name }}{{ (permsByChild.get(c.id)?.length ?? 0) > 0
+                ? `・${permsByChild.get(c.id)!.length} 項` : '' }}
             </van-tag>
             <span v-if="kidsChildren.length === 0" class="hint">兒童班尚無孩子名單</span>
           </div>
@@ -734,6 +796,46 @@ function assignmentLines(w: ServiceWeek): string[] {
         <van-button round block type="primary" :loading="editSaving" class="save-btn" @click="saveWeek">
           儲存
         </van-button>
+      </div>
+    </van-popup>
+
+    <!-- 服事資格項目編輯（v5 #3） -->
+    <van-popup
+      :show="permChild !== null"
+      round
+      closeable
+      position="bottom"
+      @update:show="(v: boolean) => !v && (permChild = null)"
+    >
+      <div class="editor" v-if="permChild">
+        <h3>{{ permChild.name }} 的服事項目</h3>
+        <p class="hint pop-label">點選開通/取消（即點即存）；家長端只會看到已開通的項目</p>
+        <div class="tag-row">
+          <van-tag
+            v-for="it in permItemOptions(permChild)"
+            :key="it"
+            round
+            size="large"
+            :type="hasPerm(permChild, it) ? 'primary' : 'default'"
+            :plain="!hasPerm(permChild, it)"
+            @click="togglePerm(permChild, it)"
+          >
+            {{ hasPerm(permChild, it) ? '✓ ' : '' }}{{ it }}
+          </van-tag>
+        </div>
+        <van-field v-model="permCustom" label="自訂項目" maxlength="30"
+          placeholder="未列出的服事項目">
+          <template #button>
+            <van-button size="small" type="primary" plain :loading="permSaving" @click="addCustomPerm">
+              ＋開通
+            </van-button>
+          </template>
+        </van-field>
+        <p class="hint pop-label">
+          {{ (permsByChild.get(permChild.id)?.length ?? 0) > 0
+            ? `已開通 ${permsByChild.get(permChild.id)!.length} 項`
+            : '尚未開通任何項目（家長端不會出現服事報名）' }}
+        </p>
       </div>
     </van-popup>
 
