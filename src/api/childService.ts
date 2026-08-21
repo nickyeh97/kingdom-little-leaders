@@ -1,9 +1,29 @@
 import { db } from '../lib/supabase'
-import type { ChildServiceRoster, ChildServiceSignup } from '../types'
+import type { ChildServicePermission, ChildServiceRoster, ChildServiceSignup } from '../types'
 
-/** 服事資格開關（P-03 進階）：該班老師或同工（RPC 內強制授權） */
-export async function setChildServiceEligible(childId: string, flag: boolean): Promise<void> {
-  const { error } = await db().rpc('set_child_service_eligible', { cid: childId, flag })
+// ---- 服事項目授權（v5 #3：逐項開通，取代整體開關）----
+
+/** 授權清單（RLS：家長只拿得到自己孩子的；老師/同工全看） */
+export async function listChildPermissions(): Promise<ChildServicePermission[]> {
+  const { data, error } = await db().from('child_service_permissions').select('*')
+  if (error) throw error
+  return data as ChildServicePermission[]
+}
+
+/** 開通某孩子的某服事項目（RLS：該班老師或同工）；children.service_eligible 由觸發器同步 */
+export async function addChildPermission(
+  childId: string,
+  item: string,
+  createdByName: string,
+): Promise<void> {
+  const { error } = await db()
+    .from('child_service_permissions')
+    .insert({ child_id: childId, item, created_by_name: createdByName })
+  if (error) throw error
+}
+
+export async function removeChildPermission(id: string): Promise<void> {
+  const { error } = await db().from('child_service_permissions').delete().eq('id', id)
   if (error) throw error
 }
 
