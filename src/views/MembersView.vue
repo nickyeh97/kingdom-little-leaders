@@ -376,19 +376,15 @@ async function removeChild() {
 
     <van-search v-model="keyword" placeholder="搜尋姓名⋯" shape="round" />
 
-    <div class="filters">
-      <van-tag
-        v-for="p in pills"
-        :key="p.key"
-        round
-        size="large"
-        :type="filter === p.key ? 'primary' : 'default'"
-        :plain="filter !== p.key"
-        @click="filter = p.key"
-      >
-        {{ p.label }}
-      </van-tag>
-    </div>
+    <!-- 篩選改 card 頁籤（比照服事頁）：PC/手機都好點（使用者回饋 2026-08-21） -->
+    <van-tabs
+      :active="filter"
+      type="card"
+      class="filter-tabs"
+      @update:active="(v: string | number) => (filter = v as typeof filter)"
+    >
+      <van-tab v-for="p in pills" :key="p.key" :name="p.key" :title="p.label" />
+    </van-tabs>
 
     <van-skeleton v-if="loading" title :row="6" />
 
@@ -632,11 +628,8 @@ async function removeChild() {
   margin: 0;
   font-size: 25px;
 }
-.filters {
-  display: flex;
-  gap: 8px;
+.filter-tabs {
   margin: 8px 0 14px;
-  flex-wrap: wrap;
 }
 .row {
   display: flex;
