@@ -225,9 +225,11 @@ function openEditor(date: string, classId: string) {
   editOpen.value = true
 }
 
-/** 當日報名者（跨班也列出，支援跨班支援），點一下帶入排班 */
+/** 當日報名者（v5 #1：僅列「正在編輯班別」的報名，班別劃分清晰），點一下帶入排班 */
 function candidateSignups(): TeacherServiceSignup[] {
-  return signupsAt.value.get(editDate.value) ?? []
+  return (signupsAt.value.get(editDate.value) ?? []).filter(
+    (s) => String(s.class_group_id) === String(editClassId.value),
+  )
 }
 
 function addFromSignup(s: TeacherServiceSignup) {
@@ -700,7 +702,7 @@ function assignmentLines(w: ServiceWeek): string[] {
           <span v-if="editAssignments.length === 0" class="hint">尚未排班</span>
         </div>
 
-        <p class="hint pop-label">從當日報名帶入</p>
+        <p class="hint pop-label">從當日報名帶入（僅列 {{ groupName.get(editClassId) }} 的報名）</p>
         <div class="tag-row">
           <van-tag
             v-for="s in candidateSignups()"
@@ -712,7 +714,9 @@ function assignmentLines(w: ServiceWeek): string[] {
           >
             ＋{{ s.teacher_name }}·{{ s.item }}
           </van-tag>
-          <span v-if="candidateSignups().length === 0" class="hint">當日尚無報名</span>
+          <span v-if="candidateSignups().length === 0" class="hint">
+            此班當日尚無報名（可於下方手動加入）
+          </span>
         </div>
 
         <p class="hint pop-label">手動加入</p>
