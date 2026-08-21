@@ -69,14 +69,22 @@ const signupsAt = computed(() => {
 function mySignups(date: string): TeacherServiceSignup[] {
   return (signupsAt.value.get(date) ?? []).filter((s) => s.teacher_id === me.value)
 }
-/** 服事表：該日期顯示的班別（同工看全部班別以便建立；老師只看已發布） */
+/** 班別劃分（v5 #1）：老師僅見自己被指派班別的內容；同工全視野 */
+const visibleClassIds = computed(() => new Set(myClasses.value.map((g) => g.id)))
+/** 服事表：該日期顯示的班別（同工看全部班別以便建立；老師只看自己班別的已發布） */
 function rosterClasses(date: string): ClassGroup[] {
   if (auth.can('admin')) return groups.value
-  return groups.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published)
+  return myClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published)
 }
-/** 摺疊卡標題徽章：該日已發布的班數 */
+/** 摺疊卡標題徽章：該日已發布的班數（依可見班別計算） */
 function publishedClassCount(date: string): number {
-  return groups.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published).length
+  return myClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published).length
+}
+/** 報名總覽（T-COM-02）：老師僅見自己班別的報名 */
+function signupsShown(date: string): TeacherServiceSignup[] {
+  return (signupsAt.value.get(date) ?? []).filter((s) =>
+    visibleClassIds.value.has(String(s.class_group_id)),
+  )
 }
 
 async function load() {
@@ -440,8 +448,8 @@ function assignmentLines(w: ServiceWeek): string[] {
               <van-tag v-if="mySignups(d).length" type="primary" plain>
                 我報 {{ mySignups(d).length }}
               </van-tag>
-              <van-tag v-if="(signupsAt.get(d) ?? []).length" plain>
-                共 {{ (signupsAt.get(d) ?? []).length }} 筆報名
+              <van-tag v-if="signupsShown(d).length" plain>
+                共 {{ signupsShown(d).length }} 筆報名
               </van-tag>
             </span>
           </div>
@@ -515,9 +523,9 @@ function assignmentLines(w: ServiceWeek): string[] {
         </template>
 
         <!-- C. 全部報名（T-COM-02） -->
-        <p class="blk-title">全部報名</p>
-        <template v-if="(signupsAt.get(d) ?? []).length">
-          <p v-for="sg in signupsAt.get(d)" :key="sg.id" class="svc-line small">
+        <p class="blk-title">{{ auth.can('admin') ? '全部報名' : '本班報名' }}</p>
+        <template v-if="signupsShown(d).length">
+          <p v-for="sg in signupsShown(d)" :key="sg.id" class="svc-line small">
             {{ sg.teacher_name }}｜{{ groupName.get(sg.class_group_id) }}｜{{ sg.item }}
             <span v-if="sg.note" class="hint">（{{ sg.note }}）</span>
           </p>

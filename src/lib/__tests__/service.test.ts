@@ -6,10 +6,8 @@ import {
 } from '../service'
 
 describe('服事排班設定', () => {
-  it('提供服事項目建議選項（字典未定案，僅建議非限定）', () => {
-    expect(SERVICE_ITEM_PRESETS.length).toBeGreaterThan(0)
-    expect(SERVICE_ITEM_PRESETS).toContain('敬拜')
-    expect(SERVICE_ITEM_PRESETS).toContain('信息')
+  it('服事項目收斂為三項（v5 #2：主責/助教/彈性時間，仍可自由輸入）', () => {
+    expect(SERVICE_ITEM_PRESETS).toEqual(['主責', '助教', '彈性時間'])
   })
 
   it('報名開放未來 8 次聚會', () => {

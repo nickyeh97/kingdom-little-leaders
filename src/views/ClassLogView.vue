@@ -4,12 +4,14 @@ import { showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import { listSessionLogsRange, upsertSessionLog } from '../api/records'
 import { listCurrentPlaylistSongs, upsertFamiliarity } from '../api/songs'
+import { downloadCsv } from '../lib/csv'
 import { FAMILIARITY_VALUES } from '../lib/familiarity'
 import { classHasIndex } from '../lib/performance'
 import {
   feedbackDeadline,
   isFeedbackOpen,
   lastGathering,
+  recentGatherings,
   weekdayName,
 } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
@@ -25,6 +27,8 @@ const yearStart = `${new Date().getFullYear()}-01-01`
 const today = lastGathering() // 最近一次聚會日（本堂）
 const dueDate = feedbackDeadline(today)
 const withinDue = isFeedbackOpen(today)
+/** 可補寫的聚會日（v5 #7）：近 12 次（含本堂），新到舊供挑選 */
+const backfillDates = recentGatherings(12).slice().reverse()
 
 /** 目前班別的全年紀錄（新到舊，連貫呈現） */
 const classLogs = computed(() =>
@@ -108,6 +112,43 @@ function openEditor(log: SessionLog | null) {
   loadFamSongs()
 }
 
+/** 補寫（v5 #7）：於編輯彈窗切換聚會日；已有紀錄的日期帶入該筆內容 */
+function pickDate(d: string) {
+  if (d === editDate.value) return
+  editDate.value = d
+  const existing = classLogs.value.find((l) => l.gathering_date === d)
+  if (existing) {
+    editing.value = existing
+    draft.value = {
+      content: existing.content,
+      song_progress: existing.song_progress,
+      feedback: existing.feedback,
+    }
+  } else {
+    editing.value = 'new'
+    draft.value = { content: '', song_progress: '', feedback: '' }
+  }
+  loadFamSongs()
+}
+
+/** 匯出本年課堂紀錄（自出席紀錄頁移入——v5 #6 動線調整） */
+function exportLogs() {
+  const rows: string[][] = [['日期', '班別', '老師', '教學內容', '詩歌進度', '課後反饋']]
+  const groupName = (id: string) => groups.value.find((g) => g.id === id)?.name ?? ''
+  for (const l of [...logs.value].sort((a, b) => a.gathering_date.localeCompare(b.gathering_date))) {
+    rows.push([
+      l.gathering_date,
+      groupName(l.class_group_id),
+      l.teacher_name,
+      l.content,
+      l.song_progress,
+      l.feedback,
+    ])
+  }
+  downloadCsv(`課堂紀錄_${yearStart}_${today}.csv`, rows)
+  showSuccessToast('已匯出，可存至教會 NAS 或匯入 Google Sheet')
+}
+
 async function save() {
   saving.value = true
   try {
@@ -167,6 +208,15 @@ async function save() {
     >
       {{ currentLog ? `編輯本堂紀錄（${today}）` : `填寫本堂紀錄（${today}）` }}
     </van-button>
+    <p v-if="auth.canClass(activeGroup)" class="hint backfill-tip">
+      漏填先前的課堂？點上方按鈕後，在彈窗內切換聚會日即可補寫。
+    </p>
+
+    <div class="export-row">
+      <van-button size="small" type="primary" plain @click="exportLogs">
+        匯出課堂紀錄（本年）
+      </van-button>
+    </div>
 
     <van-skeleton v-if="loading" title :row="5" />
     <template v-else>
@@ -197,6 +247,21 @@ async function save() {
       <div class="editor">
         <h3>{{ editDate }} 課堂紀錄</h3>
         <p class="hint">老師：{{ auth.profile?.display_name }}</p>
+
+        <!-- 補寫日期切換（v5 #7）：✓＝該日已有紀錄，點選帶入編輯 -->
+        <div class="date-row">
+          <van-tag
+            v-for="d in backfillDates"
+            :key="d"
+            round
+            size="large"
+            :type="editDate === d ? 'primary' : 'default'"
+            :plain="editDate !== d"
+            @click="pickDate(d)"
+          >
+            {{ classLogs.some((l) => l.gathering_date === d) ? '✓ ' : '' }}{{ d.slice(5).replace('-', '/') }}
+          </van-tag>
+        </div>
         <van-field v-model="draft.content" label="教學內容" type="textarea" rows="2" autosize
           maxlength="500" placeholder="今天教了什麼（經文、主題、活動）" />
         <van-field v-model="draft.song_progress" label="詩歌進度" type="textarea" rows="1" autosize
@@ -242,7 +307,23 @@ h2 {
   margin: 12px 0;
 }
 .fill-btn {
-  margin: 12px 0 16px;
+  margin: 12px 0 8px;
+}
+.backfill-tip {
+  margin: 0 0 10px;
+}
+.export-row {
+  margin: 0 0 14px;
+}
+.date-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  margin: 6px 0 4px;
+}
+.date-row .van-tag {
+  flex-shrink: 0;
 }
 .log-head {
   display: flex;

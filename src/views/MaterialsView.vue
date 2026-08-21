@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import {
@@ -32,10 +32,23 @@ const shown = computed(() =>
       : String(m.class_group_id) === activeTab.value,
   ),
 )
-/** 依目錄分組 */
+
+// ---- 類別篩選（v5 反饋 #5：內容變多後仍好瀏覽）----
+const activeCategory = ref('') // ''＝全部
+/** 篩選選項：預設類別在前、資料中出現的其他目錄在後 */
+const categoryOptions = computed(() => {
+  const inData = new Set(shown.value.map((m) => m.category))
+  const preset = MATERIAL_CATEGORY_PRESETS.filter((c) => inData.has(c))
+  const extra = [...inData].filter((c) => !MATERIAL_CATEGORY_PRESETS.includes(c)).sort()
+  return [...preset, ...extra]
+})
+watch(activeTab, () => (activeCategory.value = ''))
+
+/** 依目錄分組（套用類別篩選） */
 const byCategory = computed(() => {
   const map = new Map<string, Material[]>()
   for (const m of shown.value) {
+    if (activeCategory.value && m.category !== activeCategory.value) continue
     const list = map.get(m.category) ?? []
     list.push(m)
     map.set(m.category, list)
@@ -150,6 +163,30 @@ async function remove() {
       <van-tab v-for="t in tabItems" :key="t.id" :name="t.id" :title="t.name" />
     </van-tabs>
 
+    <!-- 類別篩選（v5 #5） -->
+    <div v-if="!loading && categoryOptions.length > 1" class="cat-filter">
+      <van-tag
+        round
+        size="large"
+        :type="activeCategory === '' ? 'primary' : 'default'"
+        :plain="activeCategory !== ''"
+        @click="activeCategory = ''"
+      >
+        全部
+      </van-tag>
+      <van-tag
+        v-for="c in categoryOptions"
+        :key="c"
+        round
+        size="large"
+        :type="activeCategory === c ? 'primary' : 'default'"
+        :plain="activeCategory !== c"
+        @click="activeCategory = activeCategory === c ? '' : c"
+      >
+        {{ c }}
+      </van-tag>
+    </div>
+
     <van-skeleton v-if="loading" title :row="5" />
     <template v-else>
       <div v-if="shown.length === 0" class="card hint">此分類尚無教材，點右上「＋新增」貼上連結</div>
@@ -232,6 +269,12 @@ h2 {
 }
 .tabs {
   margin: 12px 0;
+}
+.cat-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
 }
 .mat-head {
   display: flex;

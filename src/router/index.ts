@@ -7,6 +7,12 @@ const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
     {
+      // 忘記密碼重設頁（v5 #4）：由信中連結進入，連結會自動帶登入 session
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('../views/ResetPasswordView.vue'),
+    },
+    {
       path: '/',
       component: () => import('../components/TabbarLayout.vue'),
       meta: { requiresAuth: true },

@@ -108,6 +108,22 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
   }
 
+  /** 忘記密碼：寄送重設連結（v5 反饋 #4）；連結導回 /reset-password */
+  async function resetPassword(email: string) {
+    if (!supabase) throw new Error('Supabase 尚未設定')
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    if (error) throw error
+  }
+
+  /** 重設頁：以重設連結建立的 session 設定新密碼 */
+  async function updatePassword(password: string) {
+    if (!supabase) throw new Error('Supabase 尚未設定')
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+  }
+
   return {
     session,
     profile,
@@ -124,6 +140,8 @@ export const useAuthStore = defineStore('auth', () => {
     signUp,
     signInWithGoogle,
     signOut,
+    resetPassword,
+    updatePassword,
     loadProfile,
   }
 })

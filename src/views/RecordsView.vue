@@ -7,7 +7,6 @@ import {
   listFeedbackRange,
   listPlansRange,
   listScoresRange,
-  listSessionLogsRange,
 } from '../api/records'
 import { downloadCsv } from '../lib/csv'
 import { recordsRangeStart, upcomingGathering } from '../lib/gathering'
@@ -17,7 +16,6 @@ import type {
   Child,
   PerformanceScore,
   SessionFeedback,
-  SessionLog,
 } from '../types'
 
 const from = recordsRangeStart() // 近半年
@@ -28,7 +26,6 @@ const plans = ref<AttendancePlan[]>([])
 const checks = ref<CheckIn[]>([])
 const feedback = ref<SessionFeedback[]>([])
 const scores = ref<PerformanceScore[]>([])
-const logs = ref<SessionLog[]>([])
 const loading = ref(true)
 const openDates = ref<string[]>([])
 
@@ -95,14 +92,13 @@ const groups = computed<DateGroup[]>(() => {
 
 onMounted(async () => {
   try {
-    ;[children.value, plans.value, checks.value, feedback.value, scores.value, logs.value] =
+    ;[children.value, plans.value, checks.value, feedback.value, scores.value] =
       await Promise.all([
         listAllChildren(),
         listPlansRange(from, to),
         listCheckInsRange(from, to),
         listFeedbackRange(from, to),
         listScoresRange(from, to),
-        listSessionLogsRange(from, to),
       ])
   } catch (e) {
     showFailToast((e as Error).message)
@@ -140,17 +136,6 @@ function exportAttendance() {
   showSuccessToast('已匯出，可存至教會 NAS 或匯入 Google Sheet')
 }
 
-/** 匯出「課堂紀錄」：日期、老師、教學內容、詩歌進度、課後反饋 */
-function exportLogs() {
-  const rows: string[][] = [['日期', '班別', '老師', '教學內容', '詩歌進度', '課後反饋']]
-  const groupName = (id: string) =>
-    children.value.find((c) => c.class_group_id === id)?.class_groups?.name ?? ''
-  for (const l of [...logs.value].reverse()) {
-    rows.push([l.gathering_date, groupName(l.class_group_id), l.teacher_name, l.content, l.song_progress, l.feedback])
-  }
-  downloadCsv(`課堂紀錄_${from}_${to}.csv`, rows)
-  showSuccessToast('已匯出，可存至教會 NAS 或匯入 Google Sheet')
-}
 </script>
 
 <template>
@@ -158,11 +143,11 @@ function exportLogs() {
     <h2>出席紀錄（近半年）</h2>
     <p class="hint">{{ from }} ～ {{ to }}</p>
 
+    <!-- 課堂紀錄的匯出已移至「課堂紀錄」頁（v5 #6 動線調整） -->
     <div class="export-row">
       <van-button size="small" type="primary" plain @click="exportAttendance">
         匯出出席與學生狀況
       </van-button>
-      <van-button size="small" type="primary" plain @click="exportLogs">匯出課堂紀錄</van-button>
     </div>
 
     <van-skeleton v-if="loading" title :row="6" />
