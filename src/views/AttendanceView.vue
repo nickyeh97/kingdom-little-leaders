@@ -26,7 +26,7 @@ import type {
   ChildServiceSignup,
 } from '../types'
 
-/** 本週可填寫的聚會日（其餘日期唯讀；未來日期預留、尚未開放） */
+/** 本週與未來聚會日皆可填寫（v5 #0）；各週依各自截止日鎖定，過去唯讀 */
 const gathering = upcomingGathering()
 const open = isPlanOpen(gathering)
 const deadline = planDeadline(gathering)
@@ -63,10 +63,13 @@ const planAt = computed(() => {
   return map
 })
 
-/** 選到的日期屬於哪種呈現：本週可填寫／過去唯讀／未來未開放 */
-const mode = computed<'edit' | 'past' | 'future'>(() =>
-  selected.value === gathering ? 'edit' : selected.value < gathering ? 'past' : 'future',
+/** 選到的日期屬於哪種呈現：本週/未來可填寫（v5 #0）；過去唯讀 */
+const mode = computed<'edit' | 'past'>(() =>
+  selected.value >= gathering ? 'edit' : 'past',
 )
+/** 選定週各自的截止狀態與截止日 */
+const openSel = computed(() => isPlanOpen(selected.value))
+const deadlineSel = computed(() => planDeadline(selected.value))
 
 const attendingCount = computed(
   () => Object.values(statusMap.value).filter((s) => s === 'attending').length,
@@ -86,10 +89,10 @@ async function loadMonth() {
   ])
 }
 
-/** 以既有資料帶入本週的可編輯狀態（預設維持「未定」——v3 決議） */
+/** 以既有資料帶入選定週的可編輯狀態（預設維持「未定」——v3 決議） */
 function seedEditable() {
   for (const kid of children.value) {
-    const p = planAt.value.get(`${gathering}|${kid.id}`)
+    const p = planAt.value.get(`${selected.value}|${kid.id}`)
     statusMap.value[kid.id] = p?.status ?? 'undecided'
     noteMap.value[kid.id] = p?.note ?? ''
   }
@@ -110,6 +113,9 @@ onMounted(async () => {
 watch(anchor, () => {
   loadMonth().catch((e) => showFailToast((e as Error).message))
 })
+
+// 切換週次時，重新帶入該週已填的內容（未儲存的修改不保留）
+watch(selected, seedEditable)
 
 function selectDate(cell: { date: string; isGathering: boolean }) {
   if (cell.isGathering) selected.value = cell.date
@@ -180,7 +186,7 @@ async function submit() {
   saving.value = true
   try {
     await upsertPlans(
-      gathering,
+      selected.value,
       children.value.map((c) => ({
         child_id: c.id,
         status: statusMap.value[c.id],
@@ -203,7 +209,7 @@ async function submit() {
     <p class="hint">
       {{ open
         ? `本週 ${formatGathering(gathering)}，${deadline.toLocaleDateString('zh-TW')}（${weekdayName(deadline)}）23:59 前可修改`
-        : '本週已截止，如有變動請聯繫窗口' }}
+        : '本週已截止，如有變動請聯繫窗口' }}；未來聚會日也可提前填寫
     </p>
 
     <div class="card cal">
@@ -229,7 +235,7 @@ async function submit() {
           @click="selectDate(cell)"
         >
           <span class="num">{{ cell.day }}</span>
-          <span v-if="cell.isGathering && cell.date <= gathering" class="dots">
+          <span v-if="cell.isGathering" class="dots">
             <i v-for="c in children" :key="c.id" :class="dotClass(cell.date, c.id)" />
           </span>
         </div>
@@ -242,9 +248,16 @@ async function submit() {
 
     <van-skeleton v-if="loading" title :row="4" />
 
-    <!-- 本週：可填寫 -->
+    <!-- 本週與未來：可填寫（v5 #0） -->
     <template v-else-if="mode === 'edit'">
-      <h3 class="section-title">{{ formatGathering(gathering) }} · 本週勾選</h3>
+      <h3 class="section-title">
+        {{ formatGathering(selected) }} · {{ selected === gathering ? '本週勾選' : '預先勾選' }}
+      </h3>
+      <p class="hint week-due">
+        {{ openSel
+          ? `${deadlineSel.toLocaleDateString('zh-TW')}（${weekdayName(deadlineSel)}）23:59 前可修改`
+          : '此週已截止，如有變動請聯繫窗口' }}
+      </p>
       <div v-for="c in children" :key="c.id" class="card">
         <div class="kid">
           <strong>{{ c.name }}</strong>
@@ -256,7 +269,7 @@ async function submit() {
             :key="o.value"
             size="small"
             :type="statusMap[c.id] === o.value ? 'primary' : 'default'"
-            :disabled="!open"
+            :disabled="!openSel"
             @click="statusMap[c.id] = o.value"
           >
             {{ o.label }}
@@ -270,7 +283,7 @@ async function submit() {
           autosize
           maxlength="200"
           placeholder="給老師的話（選填），例：這週會晚 15 分鐘到"
-          :disabled="!open"
+          :disabled="!openSel"
         />
       </div>
 
@@ -287,10 +300,10 @@ async function submit() {
         type="primary"
         class="submit-btn"
         :loading="saving"
-        :disabled="!open"
+        :disabled="!openSel"
         @click="submit"
       >
-        送出本週出席（{{ attendingCount }} 位出席）
+        送出{{ selected === gathering ? '本週' : '該週' }}出席（{{ attendingCount }} 位出席）
       </van-button>
     </template>
 
@@ -321,12 +334,6 @@ async function submit() {
       </div>
       <div class="card hint">此為當週預先勾選的紀錄；實際到課以老師現場點名為準。</div>
     </template>
-
-    <!-- 未來的聚會日：出席預留未開放（服事報名照常開放） -->
-    <div v-else class="card hint">
-      {{ formatGathering(selected) }} 出席尚未開放填寫——每週開放勾選下一次聚會，
-      屆時會在首頁提醒您。
-    </div>
 
     <!-- 兒童服事報名（P-04）：本週與未來聚會日皆可報名；僅具資格的孩子 -->
     <template v-if="!loading && mode !== 'past' && eligibleChildren.length > 0">
@@ -534,6 +541,9 @@ h2 {
 }
 .card.hint {
   font-size: 17px;
+}
+.week-due {
+  margin: -4px 0 10px;
 }
 .submit-btn {
   height: 54px;

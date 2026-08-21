@@ -49,6 +49,39 @@ async function onGoogle() {
     showFailToast(`Google 登入失敗：${(e as Error).message}`)
   }
 }
+
+// ---- 忘記密碼（v5 反饋 #4）----
+const forgotOpen = ref(false)
+const forgotEmail = ref('')
+const forgotSending = ref(false)
+
+function openForgot() {
+  forgotEmail.value = email.value.trim()
+  forgotOpen.value = true
+}
+
+async function sendReset() {
+  const target = forgotEmail.value.trim()
+  if (!target) {
+    showFailToast('請填寫註冊時使用的 Email')
+    return
+  }
+  forgotSending.value = true
+  try {
+    await auth.resetPassword(target)
+    showSuccessToast('重設連結已寄出，請至信箱點擊後設定新密碼')
+    forgotOpen.value = false
+  } catch (e) {
+    const msg = (e as Error).message
+    showFailToast(
+      /rate limit/i.test(msg)
+        ? '寄信額度暫時已滿，請約一小時後再試，或聯繫兒主同工協助重設'
+        : `寄送失敗：${msg}`,
+    )
+  } finally {
+    forgotSending.value = false
+  }
+}
 </script>
 
 <template>
@@ -98,6 +131,8 @@ async function onGoogle() {
         {{ mode === 'login' ? '首次使用？註冊帳號' : '已有帳號？返回登入' }}
       </p>
 
+      <p v-if="mode === 'login'" class="switch-mode forgot" @click="openForgot">忘記密碼？</p>
+
       <div class="divider"><span>或</span></div>
 
       <van-button round block class="google-btn" @click="onGoogle">
@@ -118,6 +153,38 @@ async function onGoogle() {
     </div>
 
     <p class="hint center">未來將支援 LINE / Apple 登入</p>
+
+    <!-- 忘記密碼彈窗 -->
+    <van-popup
+      :show="forgotOpen"
+      round
+      closeable
+      position="bottom"
+      @update:show="(v: boolean) => (forgotOpen = v)"
+    >
+      <div class="forgot-editor">
+        <h3>重設密碼</h3>
+        <p class="hint forgot-desc">
+          輸入註冊時使用的 Email，我們會寄送重設密碼的連結給您。
+        </p>
+        <van-field
+          v-model="forgotEmail"
+          label="Email"
+          type="email"
+          placeholder="you@example.com"
+        />
+        <van-button
+          round
+          block
+          type="primary"
+          :loading="forgotSending"
+          class="forgot-btn"
+          @click="sendReset"
+        >
+          寄送重設連結
+        </van-button>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -136,6 +203,23 @@ async function onGoogle() {
 .brand h1 {
   font-size: 28px;
   margin: 12px 0 4px;
+}
+.forgot {
+  margin-top: 2px;
+}
+.forgot-editor {
+  padding: 20px 16px 28px;
+}
+.forgot-editor h3 {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 22px;
+}
+.forgot-desc {
+  margin: 0 16px 12px;
+}
+.forgot-btn {
+  margin-top: 14px;
 }
 .logo {
   width: 72px;

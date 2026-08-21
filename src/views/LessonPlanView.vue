@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
+import { showConfirmDialog, showFailToast, showSuccessToast, type PickerOption } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import {
   createLessonSegment,
@@ -112,7 +112,7 @@ async function createFromTemplate() {
 // ---- 段落編輯（分區塊：一段一存）----
 const editing = ref<LessonSegment | 'new' | null>(null)
 const draft = ref({
-  minutes: '' as string,
+  minutes: '' as string | number,
   start: '',
   item: '',
   content: '',
@@ -155,6 +155,32 @@ function openEditor(seg: LessonSegment | null) {
       review_text: '',
     }
   }
+}
+
+// 開始時間改用時間滾輪選擇（手機上比小輸入框好按）
+const timePickerOpen = ref(false)
+const startCols = ref<string[]>(['14', '00'])
+
+function openTimePicker() {
+  const [h, m] = (draft.value.start || LESSON_DEFAULT_START).split(':')
+  startCols.value = [h.padStart(2, '0'), (m ?? '00').padStart(2, '0')]
+  timePickerOpen.value = true
+}
+
+function onTimeConfirm({ selectedValues }: { selectedValues: string[] }) {
+  draft.value.start = selectedValues.join(':')
+  timePickerOpen.value = false
+}
+
+function clearStart() {
+  draft.value.start = ''
+  timePickerOpen.value = false
+}
+
+/** 分鐘滾輪只列 5 分鐘刻度，減少捲動 */
+function timeFilter(type: string, options: PickerOption[]): PickerOption[] {
+  if (type === 'minute') return options.filter((o) => Number(o.value) % 5 === 0)
+  return options
 }
 
 async function save() {
@@ -379,11 +405,27 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
           placeholder="或自行輸入（如：防災演習）" />
 
         <p class="hint pop-label">
-          時間{{ timePreview ? `：${timePreview}` : '（填分鐘數與開始時間自動計算）' }}
+          時間{{ timePreview ? `：${timePreview}` : '（設定長度與開始時間自動計算）' }}
         </p>
-        <div class="time-grid">
-          <van-field v-model="draft.minutes" type="digit" label="分鐘" placeholder="10" />
-          <van-field v-model="draft.start" label="開始" placeholder="14:00" />
+        <div class="time-card">
+          <div class="time-block">
+            <span class="t-label">時間長度（分鐘）</span>
+            <van-stepper
+              v-model="draft.minutes"
+              :min="0"
+              :max="180"
+              :step="5"
+              theme="round"
+              button-size="42px"
+              input-width="64px"
+            />
+          </div>
+          <button type="button" class="time-block time-btn" @click="openTimePicker">
+            <span class="t-label">開始時間</span>
+            <span class="t-value" :class="{ placeholder: !draft.start }">
+              {{ draft.start || '點此選擇' }} ▾
+            </span>
+          </button>
         </div>
 
         <van-field v-model="draft.content" label="內容" type="textarea" rows="3" autosize
@@ -400,6 +442,27 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         </van-button>
         <van-button v-if="editing !== 'new'" round block plain type="danger" class="del-btn" @click="remove">
           刪除段落
+        </van-button>
+      </div>
+    </van-popup>
+
+    <!-- 開始時間滾輪（5 分鐘刻度） -->
+    <van-popup
+      :show="timePickerOpen"
+      round
+      position="bottom"
+      @update:show="(v: boolean) => (timePickerOpen = v)"
+    >
+      <div class="picker-wrap">
+        <van-time-picker
+          v-model="startCols"
+          title="開始時間"
+          :filter="timeFilter"
+          @confirm="onTimeConfirm"
+          @cancel="timePickerOpen = false"
+        />
+        <van-button plain block size="small" class="clear-time-btn" @click="clearStart">
+          不指定開始時間（只填長度）
         </van-button>
       </div>
     </van-popup>
@@ -576,9 +639,53 @@ h2 {
   gap: 8px;
   margin: 0 16px 8px;
 }
-.time-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* 時間輸入：大點擊目標（手機優先） */
+.time-card {
+  display: flex;
+  gap: 10px;
+  margin: 0 16px 6px;
+}
+.time-block {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #dde4df;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.time-btn {
+  font: inherit;
+  cursor: pointer;
+}
+.time-btn:active {
+  background: var(--kll-primary-soft);
+}
+.t-label {
+  font-size: 15px;
+  color: var(--kll-sub);
+}
+.t-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--kll-primary-dark);
+  font-variant-numeric: tabular-nums;
+  line-height: 42px;
+}
+.t-value.placeholder {
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--kll-sub);
+}
+.picker-wrap {
+  padding-bottom: 16px;
+}
+.clear-time-btn {
+  margin: 0 16px;
+  width: calc(100% - 32px);
 }
 .save-btn {
   margin-top: 14px;
