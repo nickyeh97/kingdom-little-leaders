@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
+import { showConfirmDialog, showFailToast, showSuccessToast, type PickerOption } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import {
   createLessonSegment,
@@ -178,7 +178,7 @@ function clearStart() {
 }
 
 /** 分鐘滾輪只列 5 分鐘刻度，減少捲動 */
-function timeFilter(type: string, options: { text: string; value: string }[]) {
+function timeFilter(type: string, options: PickerOption[]): PickerOption[] {
   if (type === 'minute') return options.filter((o) => Number(o.value) % 5 === 0)
   return options
 }
