@@ -1,6 +1,7 @@
 # 神國小領袖操作手冊 v1（2026-08-24，8/29 老師座談會用）
 
 > 網頁版（可分享、含流程圖）：https://claude.ai/code/artifact/9a68af32-e76b-464b-8649-853df32f5fb3
+> 座談會投影用流程圖（FigJam，可編輯）：https://www.figma.com/board/x82mTYHqVqhhZzNNAWUNq6
 > 「柒個核心概念」為草稿，**待組長確認後定稿**。
 
 ## 三步驟開始使用
