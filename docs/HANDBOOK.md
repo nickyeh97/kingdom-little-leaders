@@ -2,7 +2,8 @@
 
 > 網頁版（可分享）：https://claude.ai/code/artifact/9a68af32-e76b-464b-8649-853df32f5fb3
 > 依規格書整理的逐頁說明；「壹、核心概念」為草稿，**待組長確認後定稿**。
-> 實機畫面導覽（Figma）：截圖完成後補連結。
+> 實機畫面導覽（Figma，24 張實機截圖＋按鈕標註）：https://www.figma.com/design/rSIo9OJrA9Wy1a1SNML2TZ?node-id=89-2
+> 座談會投影用流程圖（FigJam）：https://www.figma.com/board/x82mTYHqVqhhZzNNAWUNq6
 
 ## 三步驟開始使用
 
