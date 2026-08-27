@@ -88,7 +88,7 @@ async function sendReset() {
   <div class="login-page">
     <div class="brand">
       <div class="logo" />
-      <h1>兒童主日學整合平台</h1>
+      <h1>國度領袖兒童部整合平台</h1>
       <p class="hint">神國小領袖 · Kingdom Little Leaders</p>
     </div>
 

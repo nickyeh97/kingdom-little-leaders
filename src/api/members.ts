@@ -29,3 +29,12 @@ export async function deleteProfile(profileId: string): Promise<void> {
   const { error } = await db().from('profiles').delete().eq('id', profileId)
   if (error) throw error
 }
+
+/** 本人修改顯示稱呼（v7 #1；RLS：本人只能改自己的 display_name） */
+export async function updateDisplayName(profileId: string, displayName: string): Promise<void> {
+  const { error } = await db()
+    .from('profiles')
+    .update({ display_name: displayName })
+    .eq('id', profileId)
+  if (error) throw error
+}

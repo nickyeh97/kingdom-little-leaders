@@ -9,8 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: '兒童主日學整合平台',
-        short_name: '兒主平台',
+        name: '國度領袖兒童部整合平台',
+        short_name: '兒童部平台',
         description: 'Kingdom Little Leaders — 出席、簽到、詩歌、公告',
         lang: 'zh-TW',
         theme_color: '#1F8A70',

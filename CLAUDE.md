@@ -9,7 +9,7 @@
 
 ## 專案概觀
 
-**兒童主日學整合平台（Web APP / PWA）**，隸屬於 TBOJ（The Book of James）信仰實踐計畫（雅各書 1:27、2:17），總計畫願景見主 repo [`nickyeh97/TBOJ`](https://github.com/nickyeh97/TBOJ)。
+**國度領袖兒童部整合平台（Web APP / PWA）**，隸屬於 TBOJ（The Book of James）信仰實踐計畫（雅各書 1:27、2:17），總計畫願景見主 repo [`nickyeh97/TBOJ`](https://github.com/nickyeh97/TBOJ)。
 
 以單一平台整合：出席預先統計、現場簽到、老師備課資源、敬拜歌單佈達、服事經歷卡、家長公告與雙向互動。
 
