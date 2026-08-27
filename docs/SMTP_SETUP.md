@@ -5,6 +5,11 @@
 > 決議（2026-08-26）：寄信服務＝Brevo（免費 300 封/天、單一寄件人驗證、無需自有網域）；
 > 註冊確認信（Confirm email）**維持關閉**——審核制把關，SMTP 服務「忘記密碼」與未來通知。
 
+## 執行紀錄
+
+- ✅ 2026-08-26 設定完成：寄件人驗證、SMTP 金鑰、Supabase 填入、速率 60/hr、模板中文化；
+  「忘記密碼」實測收信成功並完成改密碼。
+
 ## 步驟
 
 1. **註冊 Brevo＋驗證寄件人**：brevo.com 註冊 → Senders, Domains & Dedicated IPs → Senders → Add a sender

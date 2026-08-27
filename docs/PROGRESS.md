@@ -3,7 +3,7 @@
 > **本文件是跨 session／跨協作者的進度單一事實來源（Single Source of Truth）。**
 > 更新規則（見 CLAUDE.md 工作流程慣例）：**每完成一次 Sprint、或有外部設定完成/需求異動時，必須更新本文件。**
 >
-> 最後更新：2026-08-21（**Sprint 05 結案**：v5 反饋 8 項全數上線、migration 08-11 已執行；追加聚會流程範本＋名單頁籤改版）
+> 最後更新：2026-08-26（自訂 SMTP（Brevo）上線實測通過；8/29 座談會教材備齊：操作手冊＋Figma 實機導覽＋FigJam 流程圖＋成果報告）
 
 ## 目前狀態一句話
 
@@ -30,6 +30,8 @@
 - [x] 刪除會員（防刪自己）；防自我提權/自我審核（RLS 層強制）
 - [x] 資料庫 migrations 已全數執行至 `2026-08-11_child_service_permissions.sql`
 - [x] 忘記密碼：登入頁寄重設連結 → `/reset-password` 設新密碼（v5 #4）
+- [x] 自訂 SMTP（Brevo）：寄信額度 300 封/天、速率 60/hr、重設密碼模板中文化；
+  2026-08-26 設定完成並實測通過（指南：`docs/SMTP_SETUP.md`；確認信維持關閉）
 
 ### 家長端
 
@@ -78,7 +80,6 @@
 
 ### 整合與技術項
 
-- [ ] 自訂 SMTP（Brevo，開學家長潮前執行）——設定指南已備：`docs/SMTP_SETUP.md`；確認信維持關閉
 - [ ] 站內邀請建帳號＋徹底刪除 Auth 帳號（需 Supabase Edge Function／service role）
 - [ ] Google Sheet 自動同步（🔒 **等組長通知取得教會 Google 雲端授權**）
 - [ ] LINE 登入（Edge Function 自訂 OIDC）、Apple 登入
