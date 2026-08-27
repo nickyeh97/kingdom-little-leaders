@@ -78,6 +78,7 @@
 
 ### 整合與技術項
 
+- [ ] 自訂 SMTP（Brevo，開學家長潮前執行）——設定指南已備：`docs/SMTP_SETUP.md`；確認信維持關閉
 - [ ] 站內邀請建帳號＋徹底刪除 Auth 帳號（需 Supabase Edge Function／service role）
 - [ ] Google Sheet 自動同步（🔒 **等組長通知取得教會 Google 雲端授權**）
 - [ ] LINE 登入（Edge Function 自訂 OIDC）、Apple 登入
