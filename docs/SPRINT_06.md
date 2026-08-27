@@ -4,7 +4,7 @@
 
 ## 狀態
 
-✅ 程式完成（migration `2026-08-12_weekly_songs_and_service_items.sql` 待執行——僅 #1 本週歌曲需要）
+✅ 結案（migration `2026-08-12_weekly_songs_and_service_items.sql` 已執行）
 
 | # | 項目 | 內容 |
 | --- | --- | --- |
@@ -18,12 +18,13 @@
 
 ## 待辦
 
-- [ ] 使用者實測 → merge → 執行 migration 08-12
-- [ ] 手冊（HANDBOOK/artifact）課堂紀錄與兒童服事項目描述同步更新（merge 後）
+- [x] 使用者實測 → merge → 執行 migration 08-12
+- [ ] 手冊（HANDBOOK/artifact）同步更新：課堂紀錄（只剩交接備註）、兒童服事六項、
+      老師服事五項、平台新名稱、自訂稱呼
 
 ## 追加：v7 四項（2026-08-28）
 
-✅ 程式完成（**無 migration**）
+✅ 結案（**無 migration**；2026-08-28 實測通過並上線）
 
 | # | 項目 | 內容 |
 | --- | --- | --- |
