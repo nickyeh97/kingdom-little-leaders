@@ -8,7 +8,7 @@ import {
   updateAnnouncement,
 } from '../api/announcements'
 import { listMyChildren, listPlans } from '../api/attendance'
-import { listCheckIns, listClassGroups, listFeedback } from '../api/checkin'
+import { listCheckIns, listClassGroups } from '../api/checkin'
 import { listChildRosters } from '../api/childService'
 import { listSessionLogsRange } from '../api/records'
 import { listServiceWeeks } from '../api/service'
@@ -26,7 +26,7 @@ import {
   weekdayName,
 } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
-import type { Announcement, Child, ClassGroup } from '../types'
+import type { Announcement, ClassGroup } from '../types'
 
 const auth = useAuthStore()
 const announcements = ref<Announcement[]>([])
@@ -57,8 +57,6 @@ const needPlan = ref(false)
 const gathering = upcomingGathering()
 const deadline = planDeadline(gathering)
 
-/** 家長：上週各孩子的課堂表情回饋（指數僅老師/同工可見——v4 決議 2） */
-const lastFeedback = ref<{ child: Child; moods: string[] }[]>([])
 /** 老師：上堂課的課堂紀錄尚未填寫（兩天內提醒） */
 const needClassLog = ref(false)
 /** 老師：已發布的服事安排（站內通知——v4 裁決 D） */
@@ -78,10 +76,9 @@ onMounted(async () => {
     if (canPostAnn.value) classGroups.value = await listClassGroups()
     if (auth.can('parent')) {
       const svcDates = upcomingGatherings(4)
-      const [children, plans, feedback, kidRosters] = await Promise.all([
+      const [children, plans, kidRosters] = await Promise.all([
         listMyChildren(),
         listPlans(gathering),
-        listFeedback(lastGathering()),
         listChildRosters(svcDates[0], svcDates[svcDates.length - 1]),
       ])
       const myKidIds = new Set(children.map((c) => c.id))
@@ -102,10 +99,6 @@ onMounted(async () => {
         const planned = new Set(plans.map((p) => p.child_id))
         needPlan.value = children.some((c) => !planned.has(c.id))
       }
-      const byChild = new Map(feedback.map((f) => [f.child_id, f.moods]))
-      lastFeedback.value = children
-        .filter((c) => (byChild.get(c.id) ?? []).length > 0)
-        .map((c) => ({ child: c, moods: byChild.get(c.id)! }))
     }
     // 同工：本週教案填寫狀況（教案更新的站內通知）＋會議待辦逾期
     if (auth.can('admin')) {
@@ -234,9 +227,9 @@ async function removeAnn() {
 <template>
   <div class="page">
     <header class="top">
-      <div>
+      <div class="greet" @click="$router.push({ name: 'me' })">
         <h2>平安，{{ auth.profile?.display_name ?? '' }} 👋</h2>
-        <p class="hint">{{ new Date().toLocaleDateString('zh-TW') }}</p>
+        <p class="hint">{{ new Date().toLocaleDateString('zh-TW') }}・點這裡可修改稱呼</p>
       </div>
       <div class="role-tags">
         <van-tag v-for="r in auth.roles" :key="r" round type="primary" size="medium">
@@ -307,21 +300,6 @@ async function removeAnn() {
       @click="$router.push({ name: 'service' })"
     />
 
-    <template v-if="lastFeedback.length > 0">
-      <h3 class="section-title">上週課堂回饋</h3>
-      <p class="hint fb-hint">僅您能看到自己孩子的回饋</p>
-      <div v-for="f in lastFeedback" :key="f.child.id" class="card">
-        <div class="fb-head">
-          <strong>{{ f.child.name }}</strong>
-          <span class="hint">{{ f.child.class_groups?.name ?? '' }}</span>
-        </div>
-        <div class="mood-tags">
-          <van-tag v-for="m in f.moods" :key="m" round type="primary" plain size="medium">
-            {{ m }}
-          </van-tag>
-        </div>
-      </div>
-    </template>
 
     <div class="section-row">
       <h3 class="section-title">兒主公告</h3>
@@ -430,6 +408,9 @@ async function removeAnn() {
   margin: 0;
   font-size: 25px;
 }
+.greet {
+  cursor: pointer;
+}
 /* 窄螢幕（iPhone SE）：多角色標籤允許換行，不擠壓標題 */
 .role-tags {
   display: flex;
@@ -438,20 +419,6 @@ async function removeAnn() {
   justify-content: flex-end;
   flex-shrink: 0;
   max-width: 40%;
-}
-.mood-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.fb-hint {
-  margin: -6px 0 10px;
-}
-.fb-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
 }
 .section-row {
   display: flex;

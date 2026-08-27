@@ -1,10 +1,43 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showConfirmDialog } from 'vant'
+import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
+import { updateDisplayName } from '../api/members'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+// ---- 顯示稱呼（v7 #1：使用者可自行設定）----
+const editingName = ref(false)
+const nameDraft = ref('')
+const savingName = ref(false)
+
+function openNameEditor() {
+  nameDraft.value = auth.profile?.display_name ?? ''
+  editingName.value = true
+}
+
+async function saveName() {
+  const name = nameDraft.value.trim()
+  const id = auth.profile?.id
+  if (!id) return
+  if (!name) {
+    showFailToast('請填寫稱呼')
+    return
+  }
+  savingName.value = true
+  try {
+    await updateDisplayName(id, name)
+    await auth.loadProfile()
+    showSuccessToast('已更新稱呼')
+    editingName.value = false
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    savingName.value = false
+  }
+}
 
 async function logout() {
   try {
@@ -24,6 +57,9 @@ async function logout() {
       <div class="avatar" />
       <strong>{{ auth.profile?.display_name }}</strong>
       <p class="hint">{{ auth.session?.user.email }}</p>
+      <van-button size="small" plain type="primary" class="name-btn" @click="openNameEditor">
+        ✎ 修改稱呼
+      </van-button>
     </div>
     <van-cell-group inset v-if="auth.can('admin')">
       <van-cell
@@ -81,6 +117,26 @@ async function logout() {
       <van-cell title="版本" value="0.1.0（開發中）" />
       <van-cell title="登出" is-link @click="logout" />
     </van-cell-group>
+
+    <!-- 修改稱呼（v7 #1） -->
+    <van-popup
+      :show="editingName"
+      round
+      closeable
+      position="bottom"
+      @update:show="(v: boolean) => (editingName = v)"
+    >
+      <div class="editor">
+        <h3>修改稱呼</h3>
+        <p class="hint name-hint">
+          這是平台上顯示給其他人看的名字（例：家榛媽媽、王老師）
+        </p>
+        <van-field v-model="nameDraft" label="稱呼" maxlength="20" placeholder="例：王老師" />
+        <van-button round block type="primary" :loading="savingName" class="save-btn" @click="saveName">
+          儲存
+        </van-button>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -101,5 +157,22 @@ h2 {
   height: 64px;
   border-radius: 50%;
   background: var(--kll-primary-soft);
+}
+.name-btn {
+  margin-top: 10px;
+}
+.editor {
+  padding: 20px 16px 28px;
+}
+.editor h3 {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 22px;
+}
+.name-hint {
+  margin: 0 16px 12px;
+}
+.save-btn {
+  margin-top: 14px;
 }
 </style>

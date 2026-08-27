@@ -8,16 +8,13 @@ import {
   listChildScores,
   listClassChildren,
   listClassGroups,
-  listFeedback,
   listScores,
   removeCheckIn,
   upsertCheckIn,
-  upsertFeedback,
   upsertScore,
 } from '../api/checkin'
 import { listAllChildren } from '../api/records'
 import { updateChild } from '../api/roster'
-import { MOOD_OPTIONS, moodKey } from '../lib/moods'
 import { SCORE_DEFAULT, classHasIndex } from '../lib/performance'
 import { formatGathering, recordsRangeStart, upcomingGathering } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
@@ -39,7 +36,6 @@ const children = ref<Child[]>([])
 const allChildren = ref<Child[]>([])
 const planMap = ref(new Map<string, AttendancePlan>())
 const checkMap = ref(new Map<string, CheckIn>())
-const moodsMap = ref(new Map<string, string[]>())
 const scoreMap = ref(new Map<string, { focus: number | null; cooperation: number | null }>())
 const loading = ref(true)
 
@@ -88,17 +84,15 @@ async function loadClass() {
   if (!activeGroup.value) return
   loading.value = true
   try {
-    const [kids, plans, checks, feedback, scores] = await Promise.all([
+    const [kids, plans, checks, scores] = await Promise.all([
       listClassChildren(activeGroup.value),
       listPlans(gathering),
       listCheckIns(gathering),
-      listFeedback(gathering),
       listScores(gathering),
     ])
     children.value = kids
     planMap.value = new Map(plans.map((p) => [p.child_id, p]))
     checkMap.value = new Map(checks.map((c) => [c.child_id, c]))
-    moodsMap.value = new Map(feedback.map((f) => [f.child_id, f.moods]))
     scoreMap.value = new Map(
       scores.map((s) => [s.child_id, { focus: s.focus, cooperation: s.cooperation }]),
     )
@@ -177,22 +171,14 @@ async function markScore(child: Child, dim: 'focus' | 'cooperation', value: numb
   }
 }
 
-// ---- 詳情編輯（表情回饋＋老師交接備註）----
+// ---- 詳情編輯（老師交接備註；表情回饋已停用——v7 #2 改為老師親口鼓勵）----
 const editing = ref<Child | null>(null)
-const draftMoods = ref<string[]>([])
 const draftNote = ref('')
 const savingDetail = ref(false)
 
 function openDetail(child: Child) {
   editing.value = child
-  draftMoods.value = [...(moodsMap.value.get(child.id) ?? [])]
   draftNote.value = checkMap.value.get(child.id)?.note ?? ''
-}
-
-function toggleMood(key: string) {
-  draftMoods.value = draftMoods.value.includes(key)
-    ? draftMoods.value.filter((m) => m !== key)
-    : [...draftMoods.value, key]
 }
 
 async function saveDetail() {
@@ -200,11 +186,6 @@ async function saveDetail() {
   if (!child) return
   savingDetail.value = true
   try {
-    await upsertFeedback(child.id, gathering, draftMoods.value)
-    const nextMoods = new Map(moodsMap.value)
-    nextMoods.set(child.id, [...draftMoods.value])
-    moodsMap.value = nextMoods
-
     const note = draftNote.value.trim() || null
     const current = checkMap.value.get(child.id)
     // 備註跟著當日紀錄走：尚未簽到/請假時，先以「出席」建立紀錄
@@ -397,9 +378,6 @@ async function pickChild(child: Child) {
         <p v-if="planMap.get(c.id)?.note" class="parent-note">
           💬 家長：{{ planMap.get(c.id)?.note }}
         </p>
-        <p v-if="(moodsMap.get(c.id) ?? []).length" class="moods">
-          {{ (moodsMap.get(c.id) ?? []).join('、') }}
-        </p>
         <p v-if="checkMap.get(c.id)?.note" class="teacher-note">
           📝 {{ checkMap.get(c.id)?.note }}
         </p>
@@ -426,20 +404,9 @@ async function pickChild(child: Child) {
     >
       <div class="editor" v-if="editing">
         <h3>{{ editing.name }} 的課堂紀錄</h3>
-        <p class="hint">課堂表現（家長看得到，取代成績的鼓勵回饋）</p>
-        <div class="mood-grid">
-          <van-tag
-            v-for="m in MOOD_OPTIONS"
-            :key="m.label"
-            round
-            size="large"
-            :type="draftMoods.includes(moodKey(m)) ? 'primary' : 'default'"
-            :plain="!draftMoods.includes(moodKey(m))"
-            @click="toggleMood(moodKey(m))"
-          >
-            {{ m.emoji }} {{ m.label }}
-          </van-tag>
-        </div>
+        <p class="hint">
+          課堂表現的鼓勵請當面親口告訴孩子；這裡只記錄給老師之間的交接備註。
+        </p>
         <p class="hint">老師交接備註（僅老師可見，家長不會看到）</p>
         <van-field
           v-model="draftNote"
@@ -607,7 +574,6 @@ async function pickChild(child: Child) {
   font-weight: 700;
 }
 .parent-note,
-.moods,
 .teacher-note {
   margin: 8px 0 0;
   font-size: 17px;
@@ -616,9 +582,6 @@ async function pickChild(child: Child) {
 }
 .parent-note {
   background: var(--kll-primary-soft);
-}
-.moods {
-  background: var(--kll-amber-soft);
 }
 .teacher-note {
   background: var(--kll-bg);
@@ -643,11 +606,6 @@ async function pickChild(child: Child) {
 }
 .center {
   text-align: center;
-}
-.mood-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 .note-field {
   background: var(--kll-bg);
