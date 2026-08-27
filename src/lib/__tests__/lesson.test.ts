@@ -51,8 +51,9 @@ describe('教案時間工具', () => {
     expect(totalMinutes(['5分鐘 1400-1405', '30分鐘', '亂填'])).toBe(35)
   })
 
-  it('標準流程範本共 100 分鐘（對應現行 1.5 小時＋彈性）', () => {
-    expect(totalMinutes(LESSON_TEMPLATE.map((t) => `${t.minutes}分鐘`))).toBe(100)
-    expect(LESSON_TEMPLATE[0].item).toBe('組別分工服事')
+  it('標準流程＝課程流程 11 項共 88 分鐘（v6 #5a）', () => {
+    expect(LESSON_TEMPLATE).toHaveLength(11)
+    expect(totalMinutes(LESSON_TEMPLATE.map((t) => `${t.minutes}分鐘`))).toBe(88)
+    expect(LESSON_TEMPLATE[0].item).toBe('服事分工')
   })
 })

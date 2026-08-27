@@ -70,6 +70,17 @@ const currentSongs = computed<Song[]>(() =>
     .map((ps) => songById.value.get(ps.song_id))
     .filter((s): s is Song => Boolean(s)),
 )
+/** 本週歌曲（v6 #1：歌單內勾選多首，置頂顯示） */
+const weeklyIds = computed(
+  () =>
+    new Set(
+      (currentPlaylist.value?.playlist_songs ?? [])
+        .filter((ps) => ps.is_weekly)
+        .map((ps) => ps.song_id),
+    ),
+)
+const weeklySongs = computed(() => currentSongs.value.filter((s) => weeklyIds.value.has(s.id)))
+const restSongs = computed(() => currentSongs.value.filter((s) => !weeklyIds.value.has(s.id)))
 /** 曲庫其餘歌曲（敬拜過的歌單；新→舊） */
 const otherSongs = computed(() => {
   const inCurrent = new Set(currentSongs.value.map((s) => s.id))
@@ -221,7 +232,15 @@ const plEditing = ref<SongPlaylist | 'new' | null>(null)
 const plDraft = ref({ title: '', start_date: '', end_date: '' })
 /** 勾選順序即歌單順序 */
 const plSongIds = ref<string[]>([])
+/** 本週歌曲（可複選；v6 #1） */
+const plWeeklyIds = ref<string[]>([])
 const plSaving = ref(false)
+
+function togglePlWeekly(id: string) {
+  plWeeklyIds.value = plWeeklyIds.value.includes(id)
+    ? plWeeklyIds.value.filter((x) => x !== id)
+    : [...plWeeklyIds.value, id]
+}
 
 function openPlEditor() {
   if (!auth.can('admin')) return
@@ -236,12 +255,18 @@ function openPlEditor() {
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((ps) => ps.song_id)
     : []
+  plWeeklyIds.value = pl
+    ? (pl.playlist_songs ?? []).filter((ps) => ps.is_weekly).map((ps) => ps.song_id)
+    : []
 }
 
 function togglePlSong(id: string) {
-  plSongIds.value = plSongIds.value.includes(id)
-    ? plSongIds.value.filter((x) => x !== id)
-    : [...plSongIds.value, id]
+  if (plSongIds.value.includes(id)) {
+    plSongIds.value = plSongIds.value.filter((x) => x !== id)
+    plWeeklyIds.value = plWeeklyIds.value.filter((x) => x !== id)
+  } else {
+    plSongIds.value = [...plSongIds.value, id]
+  }
 }
 
 async function savePl() {
@@ -263,7 +288,13 @@ async function savePl() {
       id = (plEditing.value as SongPlaylist).id
       await updatePlaylist(id, input)
     }
-    await setPlaylistSongs(id, plSongIds.value)
+    await setPlaylistSongs(
+      id,
+      plSongIds.value.map((song_id) => ({
+        song_id,
+        is_weekly: plWeeklyIds.value.includes(song_id),
+      })),
+    )
     await load()
     showSuccessToast('歌單已儲存')
     plEditing.value = null
@@ -322,7 +353,37 @@ async function removePl() {
       <div v-if="currentSongs.length === 0" class="card hint">
         {{ activeGroupName }}目前沒有發布中的歌單
       </div>
-      <div v-for="(s, i) in currentSongs" :key="s.id" class="card">
+
+      <!-- 本週歌曲（v6 #1：歌單內勾選、置頂顯示） -->
+      <template v-if="weeklySongs.length > 0">
+        <div v-for="s in weeklySongs" :key="'w' + s.id" class="card weekly-card">
+          <div class="song-head">
+            <van-tag type="warning" class="weekly-tag">本週歌曲</van-tag>
+            <strong class="title">{{ s.title }}</strong>
+            <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
+          </div>
+          <div class="song-actions">
+            <van-button v-if="s.dance_url" size="small" type="warning" plain icon="play-circle-o"
+              @click="openUrl(s.dance_url)">
+              有動作
+            </van-button>
+            <van-button v-if="s.youtube_url" size="small" type="danger" plain icon="play-circle-o"
+              @click="openUrl(s.youtube_url)">
+              純歌詞
+            </van-button>
+            <van-button v-if="s.lyrics" size="small" plain @click="toggleLyrics(s.id)">
+              {{ openLyrics.includes(s.id) ? '收合歌詞' : '看歌詞' }}
+            </van-button>
+            <van-button v-if="canEditFam" size="small" plain type="primary" @click="openFamEditor(s)">
+              熟悉度
+            </van-button>
+          </div>
+          <p v-if="famLine(s)" class="hint fam-line">{{ famLine(s) }}</p>
+          <p v-if="openLyrics.includes(s.id)" class="lyrics">{{ s.lyrics }}</p>
+        </div>
+      </template>
+
+      <div v-for="(s, i) in restSongs" :key="s.id" class="card">
         <div class="song-head">
           <span class="num">{{ i + 1 }}</span>
           <strong class="title">{{ s.title }}</strong>
@@ -434,6 +495,22 @@ async function removePl() {
             {{ plSongIds.includes(s.id) ? `${plSongIds.indexOf(s.id) + 1}. ` : '' }}{{ s.title }}
           </van-tag>
         </div>
+        <template v-if="plSongIds.length > 0">
+          <p class="hint pl-hint">本週歌曲（可複選，會置頂顯示）：</p>
+          <div class="pl-songs">
+            <van-tag
+              v-for="sid in plSongIds"
+              :key="'wk' + sid"
+              round
+              size="large"
+              :type="plWeeklyIds.includes(sid) ? 'warning' : 'default'"
+              :plain="!plWeeklyIds.includes(sid)"
+              @click="togglePlWeekly(sid)"
+            >
+              {{ plWeeklyIds.includes(sid) ? '★ ' : '' }}{{ songById.get(sid)?.title ?? '' }}
+            </van-tag>
+          </div>
+        </template>
         <van-button round block type="primary" :loading="plSaving" class="save-btn" @click="savePl">
           儲存歌單
         </van-button>
@@ -528,6 +605,12 @@ h2 {
 }
 .fam-line {
   margin: 10px 0 0;
+}
+.weekly-card {
+  border: 2px solid var(--kll-amber);
+}
+.weekly-tag {
+  flex-shrink: 0;
 }
 .lyrics {
   margin: 10px 0 0;

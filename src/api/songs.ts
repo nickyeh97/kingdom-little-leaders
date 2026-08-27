@@ -40,7 +40,7 @@ export async function deleteSong(id: string): Promise<void> {
 export async function listPlaylists(): Promise<SongPlaylist[]> {
   const { data, error } = await db()
     .from('song_playlists')
-    .select('*, playlist_songs(song_id, sort_order)')
+    .select('*, playlist_songs(song_id, sort_order, is_weekly)')
     .order('start_date', { ascending: false })
   if (error) throw error
   return data as SongPlaylist[]
@@ -74,17 +74,20 @@ export async function deletePlaylist(id: string): Promise<void> {
 }
 
 /** 重設歌單曲目（依傳入順序寫 sort_order） */
-export async function setPlaylistSongs(playlistId: string, songIds: string[]): Promise<void> {
+export async function setPlaylistSongs(
+  playlistId: string,
+  entries: { song_id: string; is_weekly: boolean }[],
+): Promise<void> {
   const client = db()
   const { error: delError } = await client
     .from('playlist_songs')
     .delete()
     .eq('playlist_id', playlistId)
   if (delError) throw delError
-  if (songIds.length === 0) return
+  if (entries.length === 0) return
   const { error } = await client
     .from('playlist_songs')
-    .insert(songIds.map((song_id, i) => ({ playlist_id: playlistId, song_id, sort_order: i })))
+    .insert(entries.map((e, i) => ({ playlist_id: playlistId, ...e, sort_order: i })))
   if (error) throw error
 }
 

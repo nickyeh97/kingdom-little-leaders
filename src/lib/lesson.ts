@@ -56,16 +56,19 @@ export function totalMinutes(texts: string[]): number {
 }
 
 /** 標準流程範本（源自現行共編 Excel 常見段落；一鍵建立後再改內容） */
+/** 標準流程＝「課程流程」11 項（兒童班；v6 反饋 #5a，時長比照聚會流程頁建議） */
 export const LESSON_TEMPLATE: { minutes: number; item: string }[] = [
-  { minutes: 5, item: '組別分工服事' },
+  { minutes: 5, item: '服事分工' },
+  { minutes: 2, item: '預告/倒數計時' },
+  { minutes: 3, item: '班級公約' },
+  { minutes: 3, item: '國度領袖兒童宣言' },
   { minutes: 10, item: '破冰' },
   { minutes: 10, item: '敬拜' },
-  { minutes: 5, item: '收奉獻＋禱告' },
+  { minutes: 5, item: '奉獻' },
   { minutes: 30, item: '信息' },
-  { minutes: 20, item: '遊戲/活動' },
-  { minutes: 5, item: '背金句' },
   { minutes: 5, item: '結束禱告' },
   { minutes: 10, item: '彈性時間' },
+  { minutes: 5, item: '環境整理' },
 ]
 
 /** 預設開課時間（週六下午；可於範本建立後自行調整） */

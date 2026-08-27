@@ -133,17 +133,10 @@ function pickDate(d: string) {
 
 /** 匯出本年課堂紀錄（自出席紀錄頁移入——v5 #6 動線調整） */
 function exportLogs() {
-  const rows: string[][] = [['日期', '班別', '老師', '教學內容', '詩歌進度', '課後反饋']]
+  const rows: string[][] = [['日期', '班別', '老師', '課後反饋']]
   const groupName = (id: string) => groups.value.find((g) => g.id === id)?.name ?? ''
   for (const l of [...logs.value].sort((a, b) => a.gathering_date.localeCompare(b.gathering_date))) {
-    rows.push([
-      l.gathering_date,
-      groupName(l.class_group_id),
-      l.teacher_name,
-      l.content,
-      l.song_progress,
-      l.feedback,
-    ])
+    rows.push([l.gathering_date, groupName(l.class_group_id), l.teacher_name, l.feedback])
   }
   downloadCsv(`課堂紀錄_${yearStart}_${today}.csv`, rows)
   showSuccessToast('已匯出，可存至教會 NAS 或匯入 Google Sheet')
@@ -185,7 +178,7 @@ async function save() {
 <template>
   <div class="page">
     <h2>課堂紀錄</h2>
-    <p class="hint">教學內容、詩歌進度與課後反饋（給下一堂的老師），全年連貫呈現</p>
+    <p class="hint">課後反饋與交接（給下一堂的老師）＋詩歌熟悉度，全年連貫呈現</p>
 
     <van-tabs v-model:active="activeGroup" type="card" class="tabs">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
@@ -231,9 +224,8 @@ async function save() {
           <strong>{{ l.gathering_date }}</strong>
           <span class="hint">{{ l.teacher_name }}</span>
         </div>
-        <p v-if="l.content"><span class="label">教學內容</span>{{ l.content }}</p>
-        <p v-if="l.song_progress"><span class="label">詩歌進度</span>{{ l.song_progress }}</p>
         <p v-if="l.feedback" class="fb"><span class="label">課後反饋</span>{{ l.feedback }}</p>
+        <p v-if="!l.feedback" class="hint">（尚未填寫課後反饋）</p>
       </div>
     </template>
 
@@ -262,11 +254,8 @@ async function save() {
             {{ classLogs.some((l) => l.gathering_date === d) ? '✓ ' : '' }}{{ d.slice(5).replace('-', '/') }}
           </van-tag>
         </div>
-        <van-field v-model="draft.content" label="教學內容" type="textarea" rows="2" autosize
-          maxlength="500" placeholder="今天教了什麼（經文、主題、活動）" />
-        <van-field v-model="draft.song_progress" label="詩歌進度" type="textarea" rows="1" autosize
-          maxlength="300" placeholder="練了哪些詩歌、進度到哪" />
-        <van-field v-model="draft.feedback" label="課後反饋" type="textarea" rows="2" autosize
+        <!-- v6 #3：教學內容/詩歌進度欄位停用（教學內容看教案、詩歌進度看熟悉度）；舊資料保留不動 -->
+        <van-field v-model="draft.feedback" label="課後反饋" type="textarea" rows="3" autosize
           maxlength="500" placeholder="給下一堂老師的提醒與交接" />
 
         <template v-if="showFam && famSongs.length > 0">

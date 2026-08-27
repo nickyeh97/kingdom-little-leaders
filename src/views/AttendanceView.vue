@@ -294,7 +294,7 @@ async function submit() {
           rows="1"
           autosize
           maxlength="200"
-          placeholder="給老師的話（選填），例：這週會晚 15 分鐘到"
+          placeholder="給老師的話（選填），例：這週會帶奉獻、會晚 15 分鐘到"
           :disabled="!openSel"
         />
       </div>
@@ -303,7 +303,7 @@ async function submit() {
         尚未綁定孩子，請聯繫兒主窗口協助綁定。
       </div>
 
-      <div class="card hint">勾選結果僅供同工預備教材與點心，臨時變動也沒關係 😊</div>
+      <div class="card hint">勾選結果僅供同工預備課程與材料，臨時變動也沒關係 😊</div>
 
       <van-button
         v-if="children.length > 0"
