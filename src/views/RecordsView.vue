@@ -90,6 +90,24 @@ const groups = computed<DateGroup[]>(() => {
   return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date))
 })
 
+/** 每個日期段落內依班別分組＋各班統計（v6 #4） */
+function classSections(g: DateGroup) {
+  const byClass = new Map<string, { name: string; rows: DateGroup['rows'] }>()
+  for (const r of g.rows) {
+    const name = r.child.class_groups?.name ?? '未分班'
+    if (!byClass.has(name)) byClass.set(name, { name, rows: [] })
+    byClass.get(name)!.rows.push(r)
+  }
+  return [...byClass.values()]
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'))
+    .map((c) => ({
+      ...c,
+      planned: c.rows.filter((r) => r.plan?.status === 'attending').length,
+      present: c.rows.filter((r) => r.check?.status === 'present').length,
+      leave: c.rows.filter((r) => r.check?.status === 'leave').length,
+    }))
+}
+
 onMounted(async () => {
   try {
     ;[children.value, plans.value, checks.value, feedback.value, scores.value] =
@@ -164,10 +182,14 @@ function exportAttendance() {
               </span>
             </div>
           </template>
-          <div v-for="r in g.rows" :key="r.child.id" class="rec-row">
+          <template v-for="c in classSections(g)" :key="c.name">
+            <div class="cls-head">
+              <strong>{{ c.name }}</strong>
+              <span class="hint">預計 {{ c.planned }}｜簽到 {{ c.present }}｜請假 {{ c.leave }}｜共 {{ c.rows.length }} 位</span>
+            </div>
+            <div v-for="r in c.rows" :key="r.child.id" class="rec-row">
             <div class="rec-head">
               <strong>{{ r.child.name }}</strong>
-              <span class="hint">{{ r.child.class_groups?.name }}</span>
               <van-tag v-if="r.plan" plain size="medium" :type="r.plan.status === 'attending' ? 'primary' : 'default'">
                 預·{{ planLabel[r.plan.status] }}
               </van-tag>
@@ -185,7 +207,8 @@ function exportAttendance() {
             </p>
             <p v-if="r.moods.length" class="hint">{{ r.moods.join('、') }}</p>
             <p v-if="r.check?.note" class="hint">📝 {{ r.check.note }}</p>
-          </div>
+            </div>
+          </template>
         </van-collapse-item>
       </van-collapse>
       <p class="hint note">
@@ -210,6 +233,19 @@ h2 {
   display: flex;
   align-items: baseline;
   gap: 10px;
+}
+.cls-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 12px 0 2px;
+  padding: 6px 10px;
+  background: var(--kll-primary-soft);
+  border-radius: 8px;
+}
+.cls-head strong {
+  font-size: 18px;
+  color: var(--kll-primary-dark);
 }
 .rec-row {
   padding: 8px 0;

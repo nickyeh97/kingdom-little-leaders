@@ -339,13 +339,11 @@ function canEditPerm(c: Child): boolean {
 }
 
 const permChild = ref<Child | null>(null)
-const permCustom = ref('')
 const permSaving = ref(false)
 
 function openPermEditor(c: Child) {
   if (!canEditPerm(c)) return
   permChild.value = c
-  permCustom.value = ''
 }
 /** 此孩子在編輯器顯示的項目：建議五項 ∪ 已授權的自訂項目 */
 function permItemOptions(c: Child): string[] {
@@ -379,21 +377,7 @@ async function togglePerm(c: Child, item: string) {
     permSaving.value = false
   }
 }
-async function addCustomPerm() {
-  const item = permCustom.value.trim()
-  const c = permChild.value
-  if (!c) return
-  if (!item) {
-    showFailToast('請輸入項目名稱')
-    return
-  }
-  if (hasPerm(c, item)) {
-    showFailToast('此項目已開通')
-    return
-  }
-  await togglePerm(c, item)
-  permCustom.value = ''
-}
+
 
 interface KidDraftAssignment {
   child_id: string | null
@@ -499,7 +483,20 @@ function assignmentLines(w: ServiceWeek): string[] {
     <van-skeleton v-if="loading" title :row="6" />
 
     <!-- ============ 老師服事：每個聚會日一張摺疊卡 ============ -->
-    <van-collapse v-else-if="activeTab === 'teacher'" v-model="openDates">
+    <template v-else-if="activeTab === 'teacher'">
+      <!-- 兩個月報名總覽（v6 #7a）：不用逐張點開就看得到誰報了什麼 -->
+      <div class="card">
+        <p class="blk-title ov-title">未來 {{ dates.length }} 週報名總覽</p>
+        <div v-for="d in dates" :key="'ov' + d" class="ov-row">
+          <span class="ov-date">{{ d.slice(5).replace('-', '/') }}</span>
+          <span v-if="signupsShown(d).length" class="ov-list">
+            {{ signupsShown(d).map((sg) => `${sg.teacher_name}·${sg.item}`).join('、') }}
+          </span>
+          <span v-else class="hint">尚無報名</span>
+        </div>
+      </div>
+
+    <van-collapse v-model="openDates">
       <van-collapse-item v-for="d in dates" :key="d" :name="d">
         <template #title>
           <div class="date-title">
@@ -596,6 +593,7 @@ function assignmentLines(w: ServiceWeek): string[] {
         <p v-else class="hint svc-empty">尚無人報名</p>
       </van-collapse-item>
     </van-collapse>
+    </template>
 
     <!-- ============ 兒童服事（只有兒童相關內容） ============ -->
     <template v-else>
@@ -789,7 +787,7 @@ function assignmentLines(w: ServiceWeek): string[] {
           </template>
         </van-field>
 
-        <van-cell title="發布（老師可見）" center>
+        <van-cell title="發布" label="發布後老師可見；未發布僅同工（管理員）可見" center>
           <template #value><van-switch v-model="editDraft.published" size="24" /></template>
         </van-cell>
 
@@ -823,14 +821,7 @@ function assignmentLines(w: ServiceWeek): string[] {
             {{ hasPerm(permChild, it) ? '✓ ' : '' }}{{ it }}
           </van-tag>
         </div>
-        <van-field v-model="permCustom" label="自訂項目" maxlength="30"
-          placeholder="未列出的服事項目">
-          <template #button>
-            <van-button size="small" type="primary" plain :loading="permSaving" @click="addCustomPerm">
-              ＋開通
-            </van-button>
-          </template>
-        </van-field>
+        <!-- v6 #6a：項目固定六項，自訂新增暫時隱藏（既有自訂授權仍會顯示於上方可取消） -->
         <p class="hint pop-label">
           {{ (permsByChild.get(permChild.id)?.length ?? 0) > 0
             ? `已開通 ${permsByChild.get(permChild.id)!.length} 項`
@@ -905,7 +896,7 @@ function assignmentLines(w: ServiceWeek): string[] {
           </template>
         </van-field>
 
-        <van-cell title="發布（家長與老師可見）" center>
+        <van-cell title="發布" label="發布後家長與老師可見；未發布僅同工（管理員）可見" center>
           <template #value><van-switch v-model="kidEditPublished" size="24" /></template>
         </van-cell>
 
@@ -939,6 +930,29 @@ h2 {
   gap: 6px;
   flex-wrap: wrap;
 }
+.ov-title {
+  margin-top: 0;
+}
+.ov-row {
+  display: flex;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--kll-primary-soft);
+  font-size: 15px;
+}
+.ov-row:last-child {
+  border-bottom: none;
+}
+.ov-date {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--kll-primary-dark);
+  font-variant-numeric: tabular-nums;
+  width: 44px;
+}
+.ov-list {
+  color: var(--kll-text);
+}
 .blk-title {
   margin: 14px 0 6px;
   font-size: 15px;
@@ -952,7 +966,30 @@ h2 {
   justify-content: space-between;
   gap: 10px;
 }
-.blk-row .blk-title {
+.blk-row .ov-title {
+  margin-top: 0;
+}
+.ov-row {
+  display: flex;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--kll-primary-soft);
+  font-size: 15px;
+}
+.ov-row:last-child {
+  border-bottom: none;
+}
+.ov-date {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--kll-primary-dark);
+  font-variant-numeric: tabular-nums;
+  width: 44px;
+}
+.ov-list {
+  color: var(--kll-text);
+}
+.blk-title {
   margin: 14px 0 6px;
 }
 .elig-title {

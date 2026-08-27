@@ -183,6 +183,25 @@ function timeFilter(type: string, options: PickerOption[]): PickerOption[] {
   return options
 }
 
+/**
+ * 時間連動（v6 #5b）：以第一段的開始時間為錨，依各段分鐘數鏈式重算每段起訖；
+ * 遇到沒填分鐘數的段落即中斷（無法推算結束時間）。只回寫有變動的段落。
+ */
+async function reflowTimes() {
+  const list = await listLessonSegments(activeGroup.value, selectedDate.value)
+  let start: string | null = null
+  const updates: { id: string; time_text: string }[] = []
+  for (const seg of list) {
+    const t = parseTimeText(seg.time_text)
+    if (t.minutes == null) break
+    if (start == null) start = t.start || LESSON_DEFAULT_START
+    const nextText = composeTimeText(t.minutes, start)
+    if (nextText !== seg.time_text) updates.push({ id: seg.id, time_text: nextText })
+    start = addToClock(start, t.minutes)
+  }
+  for (const u of updates) await updateLessonSegment(u.id, { time_text: u.time_text })
+}
+
 async function save() {
   if (!draft.value.item.trim() && !draft.value.content.trim()) {
     showFailToast('請至少填寫項目或內容')
@@ -209,6 +228,7 @@ async function save() {
     } else if (editing.value) {
       await updateLessonSegment(editing.value.id, base)
     }
+    await reflowTimes()
     await load()
     showSuccessToast('已儲存')
     editing.value = null
@@ -229,6 +249,7 @@ async function remove() {
   }
   try {
     await deleteLessonSegment(target.id)
+    await reflowTimes()
     await load()
     showSuccessToast('已刪除')
     editing.value = null
@@ -247,6 +268,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
       updateLessonSegment(seg.id, { sort_order: other.sort_order }),
       updateLessonSegment(other.id, { sort_order: seg.sort_order }),
     ])
+    await reflowTimes()
     await load()
   } catch (e) {
     showFailToast((e as Error).message)

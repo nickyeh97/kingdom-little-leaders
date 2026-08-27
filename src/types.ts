@@ -111,7 +111,7 @@ export interface SongPlaylist {
   title: string
   start_date: string
   end_date: string
-  playlist_songs?: { song_id: string; sort_order: number; songs?: Song }[]
+  playlist_songs?: { song_id: string; sort_order: number; is_weekly?: boolean; songs?: Song }[]
 }
 
 /** 兩維熟悉度（班別 × 歌曲；1–5：1＝不熟、5＝熟悉；含填寫人/填寫日期/上課日期） */

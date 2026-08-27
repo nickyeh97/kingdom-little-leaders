@@ -244,7 +244,6 @@ const savingChild = ref(false)
 
 function openChildEditor(c: Child | null) {
   editingChild.value = c ?? 'new'
-  permCustom.value = ''
   childDraft.value = c
     ? {
         name: c.name,
@@ -260,7 +259,6 @@ function openChildEditor(c: Child | null) {
 
 // ---- 服事項目授權（v5 #3：孩子×項目；即點即存，該班老師或同工）----
 const childPerms = ref<ChildServicePermission[]>([])
-const permCustom = ref('')
 const permSaving = ref(false)
 
 function permsOf(childId: string): ChildServicePermission[] {
@@ -294,19 +292,7 @@ async function togglePerm(childId: string, item: string) {
     permSaving.value = false
   }
 }
-async function addCustomPerm(childId: string) {
-  const item = permCustom.value.trim()
-  if (!item) {
-    showFailToast('請輸入項目名稱')
-    return
-  }
-  if (hasPerm(childId, item)) {
-    showFailToast('此項目已開通')
-    return
-  }
-  await togglePerm(childId, item)
-  permCustom.value = ''
-}
+
 
 function toggleParent(id: string) {
   childDraft.value.parentIds = childDraft.value.parentIds.includes(id)
@@ -569,15 +555,7 @@ async function removeChild() {
               {{ hasPerm((editingChild as Child).id, it) ? '✓ ' : '' }}{{ it }}
             </van-tag>
           </div>
-          <van-field v-model="permCustom" label="自訂項目" maxlength="30"
-            placeholder="未列出的服事項目">
-            <template #button>
-              <van-button size="small" type="primary" plain :loading="permSaving"
-                @click="addCustomPerm((editingChild as Child).id)">
-                ＋開通
-              </van-button>
-            </template>
-          </van-field>
+          <!-- v6 #6a：項目固定六項，自訂新增暫時隱藏（既有自訂授權仍顯示於上方可取消） -->
         </template>
         <p v-else class="hint bind-title">服事項目授權：儲存孩子資料後即可設定</p>
         <p class="hint bind-title">綁定家長（可多選）</p>
