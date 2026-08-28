@@ -88,6 +88,17 @@ describe('路由守衛：登入與標籤式授權', () => {
     expect(router.currentRoute.value.name).toBe('me')
   })
 
+  it('異象頁：全員可看——未審核的新成員也進得去（v8 #1）', async () => {
+    loginAs(['parent'], false)
+    await router.push({ name: 'vision' })
+    expect(router.currentRoute.value.name).toBe('vision')
+  })
+
+  it('邊際：未登入者仍看不到異象頁 → 導向登入頁', async () => {
+    await router.push({ name: 'vision' })
+    expect(router.currentRoute.value.name).toBe('login')
+  })
+
   it('組長情境：三標籤齊全可進所有頁面', async () => {
     loginAs(['admin', 'teacher', 'parent'])
     for (const name of ['attendance', 'checkin', 'songs', 'members', 'me'] as const) {
