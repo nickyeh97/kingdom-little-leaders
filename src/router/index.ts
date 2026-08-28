@@ -90,6 +90,12 @@ const router = createRouter({
           component: () => import('../views/ClassLogView.vue'),
           meta: { roles: ['teacher', 'admin'] },
         },
+        {
+          // 國度領袖兒童異象（計畫核心）：全員可看，未審核者也看得到
+          path: 'vision',
+          name: 'vision',
+          component: () => import('../views/VisionView.vue'),
+        },
         { path: 'me', name: 'me', component: () => import('../views/ProfileView.vue') },
       ],
     },
