@@ -61,6 +61,14 @@ async function logout() {
         ✎ 修改稱呼
       </van-button>
     </div>
+    <van-cell-group inset>
+      <van-cell
+        title="國度領袖兒童異象"
+        label="培育神國小領袖，活出天父美好的計畫"
+        is-link
+        @click="$router.push({ name: 'vision' })"
+      />
+    </van-cell-group>
     <van-cell-group inset v-if="auth.can('admin')">
       <van-cell
         title="名單與權限"
@@ -108,7 +116,7 @@ async function logout() {
       />
       <van-cell
         title="課堂紀錄（本年）"
-        label="教學內容、詩歌進度、課後反饋"
+        label="課後反饋與交接＋詩歌熟悉度"
         is-link
         @click="$router.push({ name: 'class-log' })"
       />
