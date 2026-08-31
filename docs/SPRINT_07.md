@@ -186,6 +186,15 @@
   #4 教案範本改依聚會流程　⚠️ **需執行 migration `2026-09-01_class_docs_minutes.sql`**
 - ⏳ 第三批（#2 Sheet 匯入）待續
 
+### 第二批驗收回饋與修正（2026-08-31）
+
+| 回饋 | 處理 |
+| --- | --- |
+| 公告表單沒調整到 | **查證：repo 內沒有任何右對齊設定**。用專案自己的 CSS 跑 Vant 實測，`.van-field__control` 的 `text-align` 是 `left`；`git log -S input-align` 全歷史也查無設定。組長畫面為 `localhost:5173` 的本機分支（`claude/sprint-04`，未推上遠端），推測含本機改動；sprint7 的 `label-align="top"` 已讓標籤在上、輸入從左緣開始 |
+| 教案應是未來 12 週、不是半年 | 日期改為**近 3＋未來 12**（近 3 保留補填「課後執行」的能力，更早的走匯出） |
+| 教案「項目」標籤要同步聚會流程 | 段落編輯的建議項目改讀該班流程（`itemPresets`），無流程資料才用內建清單 |
+| 三處要能匯出近一季 | 教案／老師服事（排班＋報名）／兒童服事安排各加「匯出近一季（12 週）」CSV；新增 `listLessonSegmentsRange()` |
+
 ### 第二批實作備註
 
 - #3：`class_docs` 新增 `minutes int`（migration `2026-09-01_class_docs_minutes.sql`，

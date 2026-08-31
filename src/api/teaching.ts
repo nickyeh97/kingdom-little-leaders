@@ -17,6 +17,24 @@ export async function listLessonSegments(
   return data as LessonSegment[]
 }
 
+/** 區間內某班的所有教案段落（匯出近一季用；依日期、順序排序） */
+export async function listLessonSegmentsRange(
+  classGroupId: string,
+  from: string,
+  to: string,
+): Promise<LessonSegment[]> {
+  const { data, error } = await db()
+    .from('lesson_segments')
+    .select('*')
+    .eq('class_group_id', classGroupId)
+    .gte('gathering_date', from)
+    .lte('gathering_date', to)
+    .order('gathering_date')
+    .order('sort_order')
+  if (error) throw error
+  return data as LessonSegment[]
+}
+
 /** 該日期各班教案列數（首頁同工通知／頁面徽章用） */
 export async function listLessonSegmentsByDate(gatheringDate: string): Promise<LessonSegment[]> {
   const { data, error } = await db()

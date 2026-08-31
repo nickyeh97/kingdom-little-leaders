@@ -7,6 +7,7 @@ import {
   deleteLessonSegment,
   listClassDocs,
   listLessonSegments,
+  listLessonSegmentsRange,
   updateLessonSegment,
 } from '../api/teaching'
 import {
@@ -24,6 +25,7 @@ import {
   parseTimeText,
   totalMinutes,
 } from '../lib/lesson'
+import { downloadCsv } from '../lib/csv'
 import { classHasIndex } from '../lib/performance'
 import { LESSON_ITEM_PRESETS } from '../lib/teaching'
 import { useAuthStore } from '../stores/auth'
@@ -31,8 +33,12 @@ import type { ClassDoc, ClassGroup, LessonSegment } from '../types'
 import { classColor } from '../lib/classColor'
 
 const auth = useAuthStore()
-/** 可選聚會日：近 12 次＋未來 12 次（去重、由舊到新；v9 #9，原為各 3 次） */
-const dates = [...new Set([...recentGatherings(12), ...upcomingGatherings(12)])]
+/**
+ * 可選聚會日：**近 3 次＋未來 12 次**（v9 #9 修正）。
+ * 教案是往前規劃用的，未來開到 12 週；過去只留 3 次供補填「課後執行」，
+ * 更早的紀錄走「匯出近一季」而不是把選單拉成半年那麼長。
+ */
+const dates = [...new Set([...recentGatherings(3), ...upcomingGatherings(12)])]
 const selectedDate = ref(upcomingGathering())
 
 const groups = ref<ClassGroup[]>([])
@@ -101,6 +107,46 @@ const templateItems = computed(() =>
     : (LESSON_TEMPLATE as { minutes: number | null; item: string }[]),
 )
 const templateSource = computed(() => (flowDocs.value.length > 0 ? '本班聚會流程' : '內建標準流程'))
+/** 段落「項目」的建議標籤同樣同步聚會流程（v9 追加），沒有流程資料才用內建清單 */
+const itemPresets = computed(() =>
+  flowDocs.value.length > 0 ? flowDocs.value.map((d) => d.title) : LESSON_ITEM_PRESETS,
+)
+
+/** 匯出近一季（12 次聚會）的教案，供存 NAS 或匯入 Google Sheet（v9 追加） */
+const pastQuarter = recentGatherings(12)
+const exporting = ref(false)
+async function exportQuarter() {
+  if (exporting.value || !activeGroup.value) return
+  exporting.value = true
+  try {
+    const from = pastQuarter[0]
+    const to = pastQuarter[pastQuarter.length - 1]
+    const list = await listLessonSegmentsRange(activeGroup.value, from, to)
+    const name = groups.value.find((g) => g.id === activeGroup.value)?.name ?? ''
+    const rows: string[][] = [
+      ['日期', '班別', '順序', '時間', '項目', '內容', '老師', '教材預備', '課後執行'],
+    ]
+    for (const seg of list) {
+      rows.push([
+        seg.gathering_date,
+        name,
+        String(seg.sort_order + 1),
+        seg.time_text,
+        seg.item,
+        seg.content,
+        seg.teacher_text,
+        seg.materials_text,
+        seg.review_text,
+      ])
+    }
+    downloadCsv(`教案_${name}_${from}_${to}.csv`, rows)
+    showSuccessToast('已匯出近一季，可存 NAS 或匯入 Google Sheet')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    exporting.value = false
+  }
+}
 
 const creatingTemplate = ref(false)
 async function createFromTemplate() {
@@ -362,6 +408,11 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
       </van-tag>
     </div>
 
+    <van-button size="small" plain type="primary" class="export-btn" :loading="exporting"
+      @click="exportQuarter">
+      匯出近一季（12 週）教案
+    </van-button>
+
     <van-skeleton v-if="loading" title :row="5" />
     <template v-else>
       <div class="plan-head card">
@@ -475,7 +526,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         <p class="hint pop-label">項目</p>
         <div class="tag-row">
           <van-tag
-            v-for="it in LESSON_ITEM_PRESETS"
+            v-for="it in itemPresets"
             :key="it"
             round
             size="large"
@@ -559,6 +610,9 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
 </template>
 
 <style scoped>
+.export-btn {
+  margin: 4px 0 10px;
+}
 h2 {
   margin: 0 0 4px;
   font-size: 25px;

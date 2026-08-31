@@ -20,7 +20,8 @@ import {
   setAssignments,
   upsertServiceWeek,
 } from '../api/service'
-import { formatGathering, upcomingGatherings } from '../lib/gathering'
+import { downloadCsv } from '../lib/csv'
+import { formatGathering, recentGatherings, upcomingGatherings } from '../lib/gathering'
 import {
   CHILD_SERVICE_ITEM_PRESETS,
   SERVICE_ITEM_PRESETS,
@@ -41,6 +42,75 @@ const auth = useAuthStore()
 const dates = upcomingGatherings(SIGNUP_WEEKS_AHEAD)
 
 const activeTab = ref<'teacher' | 'kids'>('teacher')
+
+// ---- 匯出近一季紀錄（v9 追加：老師服事排班／兒童服事安排）----
+/** 近 12 次聚會＝約一季；由舊到新，最後一筆是最近一次聚會 */
+const pastQuarter = recentGatherings(12)
+const exporting = ref(false)
+
+/** 匯出用的班名查詢（頁面另有同名的 groupName Map，故另取名） */
+function className(id: string): string {
+  return groups.value.find((g) => g.id === id)?.name ?? ''
+}
+
+/** 老師服事：排班（同工安排）與報名（老師自填）各自成列，一次看完一季 */
+async function exportTeacherService() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const from = pastQuarter[0]
+    const to = pastQuarter[pastQuarter.length - 1]
+    const [pastWeeks, pastSignups] = await Promise.all([listServiceWeeks(from, to), listSignups(from, to)])
+    const rows: string[][] = [
+      ['日期', '班別', '類型', '姓名', '項目', '主題', '詩歌', '彈性時間', '已發布'],
+    ]
+    for (const w of [...pastWeeks].sort((a, b) => a.gathering_date.localeCompare(b.gathering_date))) {
+      const assignments = w.service_assignments ?? []
+      if (assignments.length === 0) {
+        rows.push([w.gathering_date, className(w.class_group_id), '排班', '', '', w.topic, w.songs_text, w.flex_text, w.published ? '是' : '否'])
+      }
+      for (const a of [...assignments].sort((x, y) => x.sort_order - y.sort_order)) {
+        rows.push([w.gathering_date, className(w.class_group_id), '排班', a.teacher_name, a.item, w.topic, w.songs_text, w.flex_text, w.published ? '是' : '否'])
+      }
+    }
+    for (const sg of [...pastSignups].sort((a, b) => a.gathering_date.localeCompare(b.gathering_date))) {
+      rows.push([sg.gathering_date, className(sg.class_group_id), '報名', sg.teacher_name, sg.item, '', '', '', ''])
+    }
+    downloadCsv(`老師服事_${from}_${to}.csv`, rows)
+    showSuccessToast('已匯出近一季，可存 NAS 或匯入 Google Sheet')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    exporting.value = false
+  }
+}
+
+/** 兒童服事：同工排定的安排（含未發布，供同工自己備查） */
+async function exportChildService() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const from = pastQuarter[0]
+    const to = pastQuarter[pastQuarter.length - 1]
+    const pastRosters = await listChildRosters(from, to)
+    const rows: string[][] = [['日期', '班別', '孩子', '項目', '已發布']]
+    for (const r of [...pastRosters].sort((a, b) => a.gathering_date.localeCompare(b.gathering_date))) {
+      const assignments = [...(r.child_service_assignments ?? [])].sort((x, y) => x.sort_order - y.sort_order)
+      if (assignments.length === 0) {
+        rows.push([r.gathering_date, className(r.class_group_id), '', '', r.published ? '是' : '否'])
+      }
+      for (const a of assignments) {
+        rows.push([r.gathering_date, className(r.class_group_id), a.child_name, a.item, r.published ? '是' : '否'])
+      }
+    }
+    downloadCsv(`兒童服事_${from}_${to}.csv`, rows)
+    showSuccessToast('已匯出近一季，可存 NAS 或匯入 Google Sheet')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    exporting.value = false
+  }
+}
 /** 摺疊卡展開狀態：預設展開本週 */
 const openDates = ref<string[]>([dates[0]])
 const kidOpenDates = ref<string[]>([dates[0]])
@@ -484,6 +554,10 @@ function assignmentLines(w: ServiceWeek): string[] {
 
     <!-- ============ 老師服事：每個聚會日一張摺疊卡 ============ -->
     <template v-else-if="activeTab === 'teacher'">
+      <van-button size="small" plain type="primary" class="export-btn" :loading="exporting"
+        @click="exportTeacherService">
+        匯出近一季（12 週）排班與報名
+      </van-button>
       <!-- 兩個月報名總覽（v6 #7a）：不用逐張點開就看得到誰報了什麼 -->
       <div class="card">
         <p class="blk-title ov-title">未來 {{ dates.length }} 週報名總覽</p>
@@ -597,6 +671,10 @@ function assignmentLines(w: ServiceWeek): string[] {
 
     <!-- ============ 兒童服事（只有兒童相關內容） ============ -->
     <template v-else>
+      <van-button size="small" plain type="primary" class="export-btn" :loading="exporting"
+        @click="exportChildService">
+        匯出近一季（12 週）兒童服事安排
+      </van-button>
       <!-- 服事資格管理（v5 #3：孩子×項目逐項授權；該班老師或同工可開關） -->
       <div class="card">
         <div class="blk-row">
@@ -909,6 +987,9 @@ function assignmentLines(w: ServiceWeek): string[] {
 </template>
 
 <style scoped>
+.export-btn {
+  margin-bottom: 10px;
+}
 h2 {
   margin: 0 0 4px;
   font-size: 25px;
