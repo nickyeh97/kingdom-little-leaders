@@ -8,6 +8,9 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 
+/** 版本號來自 package.json（vite define 注入），不必兩處手動同步 */
+const appVersion = __APP_VERSION__
+
 // ---- 顯示稱呼（v7 #1：使用者可自行設定）----
 const editingName = ref(false)
 const nameDraft = ref('')
@@ -122,7 +125,7 @@ async function logout() {
       />
     </van-cell-group>
     <van-cell-group inset>
-      <van-cell title="版本" value="0.1.0（開發中）" />
+      <van-cell title="版本" :value="appVersion" />
       <van-cell title="登出" is-link @click="logout" />
     </van-cell-group>
 

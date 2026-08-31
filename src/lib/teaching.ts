@@ -18,3 +18,27 @@ export const LESSON_ITEM_PRESETS = [
 ]
 
 export const MATERIAL_CATEGORY_PRESETS = ['影片', 'PPT', '講義', '學習單', '其他']
+
+/**
+ * 首頁提醒用：上堂課「有上課、但還沒填課堂紀錄」的班別（v9 驗收回饋 2026-08-31 修訂）。
+ *
+ * - 有點名紀錄＝那天有上課（沿用「有點名動作」作為有上課的代理判斷，CLAUDE.md 決議 2）
+ * - 同班只要有人填了就算填過，不必每位老師各填一份
+ * - **不看是誰點的名**：只要沒填，同工與該班老師都該被提醒（不是只有按點名的那個人）
+ *
+ * `canSee(classGroupId)` 由呼叫端決定誰看得到：同工看全部班別，老師看自己被指派的班。
+ */
+export function classesMissingLog(
+  checks: { class_group_id: string }[],
+  logs: { class_group_id: string }[],
+  canSee: (classGroupId: string) => boolean,
+): string[] {
+  const logged = new Set(logs.map((l) => l.class_group_id))
+  const missing: string[] = []
+  for (const c of checks) {
+    if (logged.has(c.class_group_id)) continue
+    if (!canSee(c.class_group_id)) continue
+    if (!missing.includes(c.class_group_id)) missing.push(c.class_group_id)
+  }
+  return missing
+}

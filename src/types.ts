@@ -231,6 +231,8 @@ export interface ClassDoc {
   title: string
   content: string
   extra: string
+  /** 建議時間（分鐘；v9 #3）——教案範本依此帶入每段時長 */
+  minutes: number | null
   sort_order: number
 }
 

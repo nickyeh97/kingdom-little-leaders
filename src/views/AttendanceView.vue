@@ -11,6 +11,7 @@ import {
 } from '../api/childService'
 import { addMonths, monthGrid, monthOf, monthRange, monthTitle } from '../lib/calendar'
 import { WEEKDAY_NAMES } from '../lib/config'
+import { classTagStyle } from '../lib/classColor'
 import {
   formatGathering,
   isPlanOpen,
@@ -273,7 +274,7 @@ async function submit() {
       <div v-for="c in children" :key="c.id" class="card">
         <div class="kid">
           <strong>{{ c.name }}</strong>
-          <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+          <van-tag :style="classTagStyle(c.class_groups?.name)">{{ c.class_groups?.name ?? '' }}</van-tag>
         </div>
         <div class="seg">
           <van-button
@@ -328,7 +329,7 @@ async function submit() {
       <div v-for="c in children" :key="c.id" class="card">
         <div class="kid">
           <strong>{{ c.name }}</strong>
-          <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+          <van-tag :style="classTagStyle(c.class_groups?.name)">{{ c.class_groups?.name ?? '' }}</van-tag>
           <van-tag
             class="status-tag"
             :type="planAt.get(`${selected}|${c.id}`)?.status === 'attending'
@@ -353,7 +354,7 @@ async function submit() {
       <div v-for="c in eligibleChildren" :key="c.id" class="card">
         <div class="kid">
           <strong>{{ c.name }}</strong>
-          <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+          <van-tag :style="classTagStyle(c.class_groups?.name)">{{ c.class_groups?.name ?? '' }}</van-tag>
         </div>
         <div class="svc-tags">
           <van-tag

@@ -55,6 +55,17 @@ export function totalMinutes(texts: string[]): number {
   return texts.reduce((sum, t) => sum + (parseTimeText(t).minutes ?? 0), 0)
 }
 
+/**
+ * 教案範本改依該班的聚會流程（v9 #4）。
+ * 傳入該班 kind='flow' 的項目（已依 sort_order 排序），沒有資料時呼叫端退回 LESSON_TEMPLATE。
+ * 沒填分鐘的項目時長留空——時間連動遇到空值本來就會停止推算，不會亂算後面的段落。
+ */
+export function templateFromFlows(
+  flows: { title: string; minutes: number | null }[],
+): { minutes: number | null; item: string }[] {
+  return flows.map((f) => ({ minutes: f.minutes, item: f.title }))
+}
+
 /** 標準流程範本（源自現行共編 Excel 常見段落；一鍵建立後再改內容） */
 /** 標準流程＝「課程流程」11 項（兒童班；v6 反饋 #5a，時長比照聚會流程頁建議） */
 export const LESSON_TEMPLATE: { minutes: number; item: string }[] = [

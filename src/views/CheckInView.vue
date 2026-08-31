@@ -17,6 +17,7 @@ import { listAllChildren } from '../api/records'
 import { updateChild } from '../api/roster'
 import { SCORE_DEFAULT, classHasIndex } from '../lib/performance'
 import { formatGathering, recordsRangeStart, upcomingGathering } from '../lib/gathering'
+import { classColor, classTagStyle } from '../lib/classColor'
 import { useAuthStore } from '../stores/auth'
 import type {
   AttendancePlan,
@@ -31,6 +32,10 @@ const auth = useAuthStore()
 const gathering = upcomingGathering()
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
+/** 班別頁籤依班別上色（v9 #1）：兒童＝太陽色、幼童＝天藍、幼幼＝嫩綠 */
+const activeClassColor = computed(() =>
+  classColor(groups.value.find((g) => g.id === activeGroup.value)?.name),
+)
 const children = ref<Child[]>([])
 /** 全校名冊（現場加入挑人＋跨班加入者顯示姓名用） */
 const allChildren = ref<Child[]>([])
@@ -310,7 +315,7 @@ async function pickChild(child: Child) {
       <span class="hint">{{ formatGathering(gathering) }}</span>
     </header>
 
-    <van-tabs v-model:active="activeGroup" type="card" class="tabs">
+    <van-tabs v-model:active="activeGroup" type="card" class="tabs" :color="activeClassColor">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
     </van-tabs>
 
@@ -331,7 +336,8 @@ async function pickChild(child: Child) {
           <div class="info">
             <strong class="kid-name" @click="openHistory(c)">
               {{ c.name }}
-              <van-tag v-if="c.class_group_id !== activeGroup" plain type="warning" class="cross-tag">
+              <van-tag v-if="c.class_group_id !== activeGroup" class="cross-tag"
+                :style="classTagStyle(c.class_groups?.name)">
                 {{ c.class_groups?.name ?? '他班' }}
               </van-tag>
               ›
@@ -477,7 +483,7 @@ async function pickChild(child: Child) {
         <div v-for="c in pickCandidates.slice(0, 30)" :key="c.id" class="pick-row">
           <div class="pick-info">
             <strong>{{ c.name }}</strong>
-            <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+            <van-tag :style="classTagStyle(c.class_groups?.name)">{{ c.class_groups?.name ?? '' }}</van-tag>
           </div>
           <div class="pick-actions">
             <van-button size="small" plain type="primary" @click="pickChild(c)">今日加入</van-button>

@@ -5,7 +5,9 @@ import { listClassGroups } from '../api/checkin'
 import {
   createLessonSegment,
   deleteLessonSegment,
+  listClassDocs,
   listLessonSegments,
+  listLessonSegmentsRange,
   updateLessonSegment,
 } from '../api/teaching'
 import {
@@ -17,24 +19,37 @@ import {
 import {
   LESSON_DEFAULT_START,
   LESSON_TEMPLATE,
+  templateFromFlows,
   addToClock,
   composeTimeText,
   parseTimeText,
   totalMinutes,
 } from '../lib/lesson'
+import { downloadCsv } from '../lib/csv'
 import { classHasIndex } from '../lib/performance'
 import { LESSON_ITEM_PRESETS } from '../lib/teaching'
 import { useAuthStore } from '../stores/auth'
-import type { ClassGroup, LessonSegment } from '../types'
+import type { ClassDoc, ClassGroup, LessonSegment } from '../types'
+import { classColor } from '../lib/classColor'
 
 const auth = useAuthStore()
-/** 近 3 次＋未來 3 次聚會日（去重、由舊到新） */
-const dates = [...new Set([...recentGatherings(3), ...upcomingGatherings(3)])]
+/**
+ * 可選聚會日：**近 3 次＋未來 12 次**（v9 #9 修正）。
+ * 教案是往前規劃用的，未來開到 12 週；過去只留 3 次供補填「課後執行」，
+ * 更早的紀錄走「匯出近一季」而不是把選單拉成半年那麼長。
+ */
+const dates = [...new Set([...recentGatherings(3), ...upcomingGatherings(12)])]
 const selectedDate = ref(upcomingGathering())
 
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
+/** 班別頁籤依班別上色（v9 #1）：兒童＝太陽色、幼童＝天藍、幼幼＝嫩綠 */
+const activeClassColor = computed(() =>
+  classColor(groups.value.find((g) => g.id === activeGroup.value)?.name),
+)
 const segments = ref<LessonSegment[]>([])
+/** 該班的聚會流程：教案範本的來源（v9 #4），沒有資料才退回內建 11 段 */
+const flowDocs = ref<ClassDoc[]>([])
 const loading = ref(true)
 
 /** 可否編輯目前班別（該班老師或同工；分區塊共編以段落為單位） */
@@ -55,7 +70,12 @@ async function load() {
   if (!activeGroup.value) return
   loading.value = true
   try {
-    segments.value = await listLessonSegments(activeGroup.value, selectedDate.value)
+    const [segs, docs] = await Promise.all([
+      listLessonSegments(activeGroup.value, selectedDate.value),
+      listClassDocs(activeGroup.value),
+    ])
+    segments.value = segs
+    flowDocs.value = docs.filter((d) => d.kind === 'flow')
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -77,19 +97,70 @@ onMounted(async () => {
 
 watch([activeGroup, selectedDate], load)
 
-/** 一鍵以標準流程建立本日教案（源自現行共編常見段落，之後逐段改內容） */
+/**
+ * 一鍵建立本日教案的範本（v9 #4）：優先用該班「聚會流程與運作要點」的項目，
+ * 這樣同工在流程頁增減段落，教案範本就會跟著變；該班沒有流程資料才退回內建 11 段。
+ */
+const templateItems = computed(() =>
+  flowDocs.value.length > 0
+    ? templateFromFlows(flowDocs.value)
+    : (LESSON_TEMPLATE as { minutes: number | null; item: string }[]),
+)
+const templateSource = computed(() => (flowDocs.value.length > 0 ? '本班聚會流程' : '內建標準流程'))
+/** 段落「項目」的建議標籤同樣同步聚會流程（v9 追加），沒有流程資料才用內建清單 */
+const itemPresets = computed(() =>
+  flowDocs.value.length > 0 ? flowDocs.value.map((d) => d.title) : LESSON_ITEM_PRESETS,
+)
+
+/** 匯出近一季（12 次聚會）的教案，供存 NAS 或匯入 Google Sheet（v9 追加） */
+const pastQuarter = recentGatherings(12)
+const exporting = ref(false)
+async function exportQuarter() {
+  if (exporting.value || !activeGroup.value) return
+  exporting.value = true
+  try {
+    const from = pastQuarter[0]
+    const to = pastQuarter[pastQuarter.length - 1]
+    const list = await listLessonSegmentsRange(activeGroup.value, from, to)
+    const name = groups.value.find((g) => g.id === activeGroup.value)?.name ?? ''
+    const rows: string[][] = [
+      ['日期', '班別', '順序', '時間', '項目', '內容', '老師', '教材預備', '課後執行'],
+    ]
+    for (const seg of list) {
+      rows.push([
+        seg.gathering_date,
+        name,
+        String(seg.sort_order + 1),
+        seg.time_text,
+        seg.item,
+        seg.content,
+        seg.teacher_text,
+        seg.materials_text,
+        seg.review_text,
+      ])
+    }
+    downloadCsv(`教案_${name}_${from}_${to}.csv`, rows)
+    showSuccessToast('已匯出近一季，可存 NAS 或匯入 Google Sheet')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    exporting.value = false
+  }
+}
+
 const creatingTemplate = ref(false)
 async function createFromTemplate() {
   if (creatingTemplate.value) return
   creatingTemplate.value = true
   try {
-    let start = LESSON_DEFAULT_START
+    // 流程項目沒填分鐘時無法推算後續起訖，該段起就只留分鐘數/留空（時間連動的既有行為一致）
+    let start: string | null = LESSON_DEFAULT_START
     let order = 0
-    for (const t of LESSON_TEMPLATE) {
+    for (const t of templateItems.value) {
       await createLessonSegment({
         class_group_id: activeGroup.value,
         gathering_date: selectedDate.value,
-        time_text: composeTimeText(t.minutes, start),
+        time_text: start ? composeTimeText(t.minutes, start) : composeTimeText(t.minutes, ''),
         item: t.item,
         content: '',
         teacher_text: '',
@@ -98,7 +169,7 @@ async function createFromTemplate() {
         sort_order: order++,
         updated_by_name: auth.profile?.display_name ?? '',
       })
-      start = addToClock(start, t.minutes)
+      start = start && t.minutes != null ? addToClock(start, t.minutes) : null
     }
     await load()
     showSuccessToast('已建立標準流程，點各段落填寫內容')
@@ -239,6 +310,44 @@ async function save() {
   }
 }
 
+/**
+ * 複製此段落（v9 #5）：老師常要寫內容/老師/時間/教材相近的段落。
+ * 插在原段落之後並把後面的順序往後挪；課後執行（review_text）屬當堂實況，不複製。
+ * 複製完直接開啟新段落，接著改就好。
+ */
+const duplicating = ref(false)
+async function duplicate() {
+  const target = editing.value
+  if (!target || target === 'new' || duplicating.value) return
+  duplicating.value = true
+  try {
+    const idx = segments.value.findIndex((s) => s.id === target.id)
+    for (const seg of segments.value.slice(idx + 1).reverse()) {
+      await updateLessonSegment(seg.id, { sort_order: seg.sort_order + 1 })
+    }
+    const created = await createLessonSegment({
+      class_group_id: activeGroup.value,
+      gathering_date: selectedDate.value,
+      time_text: target.time_text,
+      item: target.item,
+      content: target.content,
+      teacher_text: target.teacher_text,
+      materials_text: target.materials_text,
+      review_text: '',
+      sort_order: target.sort_order + 1,
+      updated_by_name: auth.profile?.display_name ?? '',
+    })
+    await reflowTimes()
+    await load()
+    openEditor(segments.value.find((s) => s.id === created.id) ?? created)
+    showSuccessToast('已複製，可直接修改')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    duplicating.value = false
+  }
+}
+
 async function remove() {
   const target = editing.value
   if (!target || target === 'new') return
@@ -281,7 +390,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
     <h2>教案</h2>
     <p class="hint">每班每聚會日一份；各段落獨立填寫（不同老師編各自負責的段落）</p>
 
-    <van-tabs v-model:active="activeGroup" type="card" class="tabs">
+    <van-tabs v-model:active="activeGroup" type="card" class="tabs" :color="activeClassColor">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
     </van-tabs>
 
@@ -298,6 +407,11 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         {{ d.slice(5).replace('-', '/') }}
       </van-tag>
     </div>
+
+    <van-button size="small" plain type="primary" class="export-btn" :loading="exporting"
+      @click="exportQuarter">
+      匯出近一季（12 週）教案
+    </van-button>
 
     <van-skeleton v-if="loading" title :row="5" />
     <template v-else>
@@ -322,7 +436,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
       <!-- 空白日：引導建立 -->
       <div v-if="segments.length === 0 && canEdit" class="card empty">
         <p class="empty-title">這一天還沒有教案</p>
-        <p class="hint">可以套用標準流程再逐段修改，或從空白開始</p>
+        <p class="hint">可以套用標準流程再逐段修改，或從空白開始（範本來源：{{ templateSource }}）</p>
         <van-button
           round
           block
@@ -331,7 +445,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
           class="tpl-btn"
           @click="createFromTemplate"
         >
-          ⚡ 以標準流程建立（{{ LESSON_TEMPLATE.length }} 段）
+          ⚡ 以標準流程建立（{{ templateItems.length }} 段）
         </van-button>
         <van-button round block plain type="primary" @click="openEditor(null)">
           從空白新增第一段
@@ -412,7 +526,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         <p class="hint pop-label">項目</p>
         <div class="tag-row">
           <van-tag
-            v-for="it in LESSON_ITEM_PRESETS"
+            v-for="it in itemPresets"
             :key="it"
             round
             size="large"
@@ -462,6 +576,10 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         <van-button round block type="primary" :loading="saving" class="save-btn" @click="save">
           儲存此段落
         </van-button>
+        <van-button v-if="editing !== 'new'" round block plain type="primary" class="dup-btn"
+          :loading="duplicating" @click="duplicate">
+          複製此段落
+        </van-button>
         <van-button v-if="editing !== 'new'" round block plain type="danger" class="del-btn" @click="remove">
           刪除段落
         </van-button>
@@ -492,6 +610,9 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
 </template>
 
 <style scoped>
+.export-btn {
+  margin: 4px 0 10px;
+}
 h2 {
   margin: 0 0 4px;
   font-size: 25px;
@@ -711,6 +832,9 @@ h2 {
 }
 .save-btn {
   margin-top: 14px;
+}
+.dup-btn {
+  margin-top: 8px;
 }
 .del-btn {
   margin-top: 8px;

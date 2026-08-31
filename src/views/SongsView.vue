@@ -17,6 +17,7 @@ import {
 import { FAMILIARITY_VALUES, familiarityText } from '../lib/familiarity'
 import { classHasIndex } from '../lib/performance'
 import { upcomingGathering } from '../lib/gathering'
+import { normalizeUrl } from '../lib/url'
 import { useAuthStore } from '../stores/auth'
 import type { ClassGroup, Song, SongFamiliarity, SongPlaylist } from '../types'
 
@@ -117,8 +118,13 @@ const canEditFam = computed(
     (auth.can('admin') || auth.canClass(activeGroup.value)),
 )
 
-function openUrl(url: string | null) {
-  if (url) window.open(url, '_blank')
+/**
+ * 連結改用 <a target="_blank">（v9 #6）。
+ * 原本以 window.open 由程式開視窗，遇到頁面處於舊版/異常狀態或瀏覽器封鎖快顯時會靜默失效；
+ * 真實連結導覽不受這些影響，也支援長按/右鍵「在新分頁開啟」。
+ */
+function linkOf(url: string | null) {
+  return normalizeUrl(url)
 }
 function toggleLyrics(id: string) {
   openLyrics.value = openLyrics.value.includes(id)
@@ -193,8 +199,8 @@ async function save() {
   try {
     const input = {
       title: draft.value.title.trim(),
-      dance_url: draft.value.dance_url.trim() || null,
-      youtube_url: draft.value.youtube_url.trim() || null,
+      dance_url: normalizeUrl(draft.value.dance_url) || null,
+      youtube_url: normalizeUrl(draft.value.youtube_url) || null,
       lyrics: draft.value.lyrics.trim() || null,
     }
     if (editing.value === 'new') await createSong(input)
@@ -363,14 +369,14 @@ async function removePl() {
             <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
           </div>
           <div class="song-actions">
-            <van-button v-if="s.dance_url" size="small" type="warning" plain icon="play-circle-o"
-              @click="openUrl(s.dance_url)">
-              有動作
-            </van-button>
-            <van-button v-if="s.youtube_url" size="small" type="danger" plain icon="play-circle-o"
-              @click="openUrl(s.youtube_url)">
-              純歌詞
-            </van-button>
+            <a v-if="linkOf(s.dance_url)" class="link-btn dance" :href="linkOf(s.dance_url)"
+              target="_blank" rel="noopener noreferrer">
+              <van-icon name="play-circle-o" />有動作
+            </a>
+            <a v-if="linkOf(s.youtube_url)" class="link-btn lyric" :href="linkOf(s.youtube_url)"
+              target="_blank" rel="noopener noreferrer">
+              <van-icon name="play-circle-o" />純歌詞
+            </a>
             <van-button v-if="s.lyrics" size="small" plain @click="toggleLyrics(s.id)">
               {{ openLyrics.includes(s.id) ? '收合歌詞' : '看歌詞' }}
             </van-button>
@@ -390,14 +396,14 @@ async function removePl() {
           <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
         </div>
         <div class="song-actions">
-          <van-button v-if="s.dance_url" size="small" type="warning" plain icon="play-circle-o"
-            @click="openUrl(s.dance_url)">
-            有動作
-          </van-button>
-          <van-button v-if="s.youtube_url" size="small" type="danger" plain icon="play-circle-o"
-            @click="openUrl(s.youtube_url)">
-            純歌詞
-          </van-button>
+          <a v-if="linkOf(s.dance_url)" class="link-btn dance" :href="linkOf(s.dance_url)"
+            target="_blank" rel="noopener noreferrer">
+            <van-icon name="play-circle-o" />有動作
+          </a>
+          <a v-if="linkOf(s.youtube_url)" class="link-btn lyric" :href="linkOf(s.youtube_url)"
+            target="_blank" rel="noopener noreferrer">
+            <van-icon name="play-circle-o" />純歌詞
+          </a>
           <van-button v-if="s.lyrics" size="small" plain @click="toggleLyrics(s.id)">
             {{ openLyrics.includes(s.id) ? '收合歌詞' : '看歌詞' }}
           </van-button>
@@ -417,14 +423,14 @@ async function removePl() {
           <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
         </div>
         <div class="song-actions">
-          <van-button v-if="s.dance_url" size="small" type="warning" plain icon="play-circle-o"
-            @click="openUrl(s.dance_url)">
-            有動作
-          </van-button>
-          <van-button v-if="s.youtube_url" size="small" type="danger" plain icon="play-circle-o"
-            @click="openUrl(s.youtube_url)">
-            純歌詞
-          </van-button>
+          <a v-if="linkOf(s.dance_url)" class="link-btn dance" :href="linkOf(s.dance_url)"
+            target="_blank" rel="noopener noreferrer">
+            <van-icon name="play-circle-o" />有動作
+          </a>
+          <a v-if="linkOf(s.youtube_url)" class="link-btn lyric" :href="linkOf(s.youtube_url)"
+            target="_blank" rel="noopener noreferrer">
+            <van-icon name="play-circle-o" />純歌詞
+          </a>
           <van-button v-if="s.lyrics" size="small" plain @click="toggleLyrics(s.id)">
             {{ openLyrics.includes(s.id) ? '收合歌詞' : '看歌詞' }}
           </van-button>
@@ -554,6 +560,30 @@ async function removePl() {
 </template>
 
 <style scoped>
+/* 外觀比照 Vant small plain button，但實體是連結（v9 #6） */
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.link-btn.dance {
+  color: var(--van-warning-color, #ff976a);
+}
+.link-btn.lyric {
+  color: var(--van-danger-color, #ee0a24);
+}
+.link-btn:active {
+  opacity: 0.7;
+}
 h2 {
   margin: 0 0 4px;
   font-size: 25px;
