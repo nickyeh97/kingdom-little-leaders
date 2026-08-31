@@ -339,9 +339,11 @@ async function removeAnn() {
     >
       <div class="ann-editor">
         <h3>{{ editingAnn === 'new' ? '發布公告' : '編輯公告' }}</h3>
-        <van-field v-model="annDraft.title" label="標題" maxlength="60" placeholder="例：下主日合班敬拜通知" />
-        <van-field v-model="annDraft.body" label="內容" type="textarea" rows="3" autosize maxlength="1000"
-          placeholder="公告內容" />
+        <!-- v9 #7：標籤在上、輸入框整寬，文字從左緣開始（原本標籤佔左半邊，輸入區被擠到右側） -->
+        <van-field v-model="annDraft.title" label="標題" label-align="top" maxlength="60"
+          placeholder="例：下主日合班敬拜通知" />
+        <van-field v-model="annDraft.body" label="內容" label-align="top" type="textarea" rows="3"
+          autosize maxlength="1000" placeholder="公告內容" />
         <van-cell title="對象" center>
           <template #value>
             <van-tag

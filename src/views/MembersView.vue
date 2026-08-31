@@ -10,6 +10,7 @@ import {
   removeChildPermission,
 } from '../api/childService'
 import { CHILD_SERVICE_ITEM_PRESETS } from '../lib/service'
+import { classTagStyle } from '../lib/classColor'
 import { useAuthStore } from '../stores/auth'
 import {
   createChild,
@@ -414,7 +415,7 @@ async function removeChild() {
               : '尚未綁定家長' }}
           </span>
         </div>
-        <van-tag plain type="primary">{{ c.class_groups?.name ?? '' }}</van-tag>
+        <van-tag :style="classTagStyle(c.class_groups?.name)">{{ c.class_groups?.name ?? '' }}</van-tag>
         <span class="more">⋯</span>
       </div>
       <div v-if="filteredChildren.length === 0" class="card hint">沒有符合的孩子</div>

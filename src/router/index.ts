@@ -4,6 +4,9 @@ import type { UserRole } from '../types'
 
 const router = createRouter({
   history: createWebHistory(),
+  // 換頁一律回到頂端（v9 #8）：手機從下方分頁切換時，若沿用捲動位置會看不到上方內容。
+  // 不還原 savedPosition——分頁切換是「換頁」而非「返回」。
+  scrollBehavior: () => ({ top: 0 }),
   routes: [
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
     {

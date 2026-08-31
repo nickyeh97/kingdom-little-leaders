@@ -16,10 +16,15 @@ import {
 } from '../lib/gathering'
 import { useAuthStore } from '../stores/auth'
 import type { ClassGroup, SessionLog, Song } from '../types'
+import { classColor } from '../lib/classColor'
 
 const auth = useAuthStore()
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
+/** 班別頁籤依班別上色（v9 #1）：兒童＝太陽色、幼童＝天藍、幼幼＝嫩綠 */
+const activeClassColor = computed(() =>
+  classColor(groups.value.find((g) => g.id === activeGroup.value)?.name),
+)
 const logs = ref<SessionLog[]>([])
 const loading = ref(true)
 
@@ -180,7 +185,7 @@ async function save() {
     <h2>課堂紀錄</h2>
     <p class="hint">課後反饋與交接（給下一堂的老師）＋詩歌熟悉度，全年連貫呈現</p>
 
-    <van-tabs v-model:active="activeGroup" type="card" class="tabs">
+    <van-tabs v-model:active="activeGroup" type="card" class="tabs" :color="activeClassColor">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
     </van-tabs>
 

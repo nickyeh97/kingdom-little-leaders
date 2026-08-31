@@ -26,14 +26,19 @@ import { classHasIndex } from '../lib/performance'
 import { LESSON_ITEM_PRESETS } from '../lib/teaching'
 import { useAuthStore } from '../stores/auth'
 import type { ClassGroup, LessonSegment } from '../types'
+import { classColor } from '../lib/classColor'
 
 const auth = useAuthStore()
-/** 近 3 次＋未來 3 次聚會日（去重、由舊到新） */
-const dates = [...new Set([...recentGatherings(3), ...upcomingGatherings(3)])]
+/** 可選聚會日：近 12 次＋未來 12 次（去重、由舊到新；v9 #9，原為各 3 次） */
+const dates = [...new Set([...recentGatherings(12), ...upcomingGatherings(12)])]
 const selectedDate = ref(upcomingGathering())
 
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
+/** 班別頁籤依班別上色（v9 #1）：兒童＝太陽色、幼童＝天藍、幼幼＝嫩綠 */
+const activeClassColor = computed(() =>
+  classColor(groups.value.find((g) => g.id === activeGroup.value)?.name),
+)
 const segments = ref<LessonSegment[]>([])
 const loading = ref(true)
 
@@ -281,7 +286,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
     <h2>教案</h2>
     <p class="hint">每班每聚會日一份；各段落獨立填寫（不同老師編各自負責的段落）</p>
 
-    <van-tabs v-model:active="activeGroup" type="card" class="tabs">
+    <van-tabs v-model:active="activeGroup" type="card" class="tabs" :color="activeClassColor">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
     </van-tabs>
 

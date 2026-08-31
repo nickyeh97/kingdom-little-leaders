@@ -16,8 +16,8 @@ describe('服事排班設定', () => {
     ])
   })
 
-  it('報名開放未來 8 次聚會', () => {
-    expect(SIGNUP_WEEKS_AHEAD).toBe(8)
+  it('報名開放未來 12 次聚會', () => {
+    expect(SIGNUP_WEEKS_AHEAD).toBe(12)
   })
 
   it('兒童服事有獨立的建議選項（源自教案分工服事）', () => {

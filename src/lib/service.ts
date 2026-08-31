@@ -11,8 +11,8 @@ export const SERVICE_ITEM_PRESETS = [
   '彈性時間',
 ]
 
-/** 服事報名開放範圍：未來 N 次聚會 */
-export const SIGNUP_WEEKS_AHEAD = 8
+/** 服事報名開放範圍：未來 N 次聚會（v9 #9：8 → 12） */
+export const SIGNUP_WEEKS_AHEAD = 12
 
 /** 兒童服事固定項目（v6 反饋 #6，2026-08-27 定案；自訂新增暫時隱藏） */
 export const CHILD_SERVICE_ITEM_PRESETS = [

@@ -2,12 +2,18 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import pkg from './package.json'
 
 export default defineConfig({
+  // 版本號以 package.json 為單一來源，介面顯示不會與之走鐘（v9 #10）
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // v9 #11：改 prompt 模式＋自行註冊（main.ts），有新版時提示使用者再重載，
+      // 不在填寫表單時強制刷新；autoUpdate 會造成「舊頁面 × 新資產」混版
+      registerType: 'prompt',
+      injectRegister: null,
       manifest: {
         name: '國度領袖兒童部整合平台',
         short_name: '兒童部平台',

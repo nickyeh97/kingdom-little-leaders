@@ -189,4 +189,18 @@
 
 ## 狀態
 
-✅ 範圍與決議齊備，可開工（依上述三批推進）。
+- ✅ **第一批已完成**（2026-08-31）：#1 班別顏色、#6 詩歌連結、#7 公告版面、#8 回到頂端、
+  #9 開到 12 週、#10 版本號 0.2.0、#11 PWA 更新機制
+- ⏳ 第二批（教案 #5 → #3 → #4）、第三批（#2 匯入）待續
+
+### 第一批實作備註
+
+- #1：`src/lib/classColor.ts` 依班名對應顏色；標籤改淺底深字（`classTagStyle`），
+  班別頁籤以 `classColor` 上色（點名/聚會流程/課堂紀錄/教案），出席紀錄的班別小標同步。
+- #6：新增 `src/lib/url.ts` 正規化；`SongsView` 六處按鈕改為 `<a target="_blank" rel="noopener">`，
+  儲存時也會正規化。`normalizeUrl` 只放行 http/https（`javascript:` 等一律擋掉）。
+- #10：版本號改由 `package.json` 經 vite `define` 注入（`__APP_VERSION__`），避免兩處手動同步走鐘。
+- #11：`vite.config.ts` 改 `registerType: 'prompt'` ＋ `injectRegister: null`，
+  由 `main.ts` 的 `registerSW` 接手：每小時與回到前景時檢查更新、有新版才提示使用者重載；
+  另加 `router.onError` 動態載入失敗自動重載一次（sessionStorage 防迴圈）與全域錯誤提示。
+  建置後確認 `sw.js` 已無自動 `skipWaiting`/`clientsClaim`（只剩使用者確認後的 SKIP_WAITING 訊息）。

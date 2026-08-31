@@ -88,6 +88,13 @@ describe('路由守衛：登入與標籤式授權', () => {
     expect(router.currentRoute.value.name).toBe('me')
   })
 
+  it('換頁一律回到頁面頂端（v9 #8）', () => {
+    // 手機從下方分頁切換時若沿用捲動位置，會看不到上方內容
+    const behavior = router.options.scrollBehavior
+    expect(behavior).toBeTypeOf('function')
+    expect(behavior?.({} as never, {} as never, null)).toEqual({ top: 0 })
+  })
+
   it('異象頁：全員可看——未審核的新成員也進得去（v8 #1）', async () => {
     loginAs(['parent'], false)
     await router.push({ name: 'vision' })

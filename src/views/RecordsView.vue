@@ -8,6 +8,7 @@ import {
   listPlansRange,
   listScoresRange,
 } from '../api/records'
+import { classTagStyle } from '../lib/classColor'
 import { downloadCsv } from '../lib/csv'
 import { recordsRangeStart, upcomingGathering } from '../lib/gathering'
 import type {
@@ -183,7 +184,7 @@ function exportAttendance() {
             </div>
           </template>
           <template v-for="c in classSections(g)" :key="c.name">
-            <div class="cls-head">
+            <div class="cls-head" :style="classTagStyle(c.name)">
               <strong>{{ c.name }}</strong>
               <span class="hint">預計 {{ c.planned }}｜簽到 {{ c.present }}｜請假 {{ c.leave }}｜共 {{ c.rows.length }} 位</span>
             </div>
@@ -240,7 +241,6 @@ h2 {
   gap: 10px;
   margin: 12px 0 2px;
   padding: 6px 10px;
-  background: var(--kll-primary-soft);
   border-radius: 8px;
 }
 .cls-head strong {
