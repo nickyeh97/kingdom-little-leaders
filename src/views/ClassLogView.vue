@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import { listSessionLogsRange, upsertSessionLog } from '../api/records'
@@ -19,6 +20,7 @@ import type { ClassGroup, SessionLog, Song } from '../types'
 import { classColor } from '../lib/classColor'
 
 const auth = useAuthStore()
+const route = useRoute()
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
 /** 班別頁籤依班別上色（v9 #1）：兒童＝太陽色、幼童＝天藍、幼幼＝嫩綠 */
@@ -57,7 +59,10 @@ async function load() {
 onMounted(async () => {
   try {
     groups.value = await listClassGroups()
-    activeGroup.value = groups.value[0]?.id ?? ''
+    // 首頁提醒可帶 ?class=<班別 id> 直接切到那一班（v9 驗收回饋）
+    const wanted = String(route.query.class ?? '')
+    activeGroup.value =
+      (wanted && groups.value.some((g) => g.id === wanted) ? wanted : groups.value[0]?.id) ?? ''
     await load()
   } catch (e) {
     showFailToast((e as Error).message)

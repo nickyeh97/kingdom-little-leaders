@@ -190,9 +190,10 @@
 
 | 回饋 | 處理 |
 | --- | --- |
-| 公告表單沒調整到 | **查證：repo 內沒有任何右對齊設定**。用專案自己的 CSS 跑 Vant 實測，`.van-field__control` 的 `text-align` 是 `left`；`git log -S input-align` 全歷史也查無設定。組長畫面為 `localhost:5173` 的本機分支（`claude/sprint-04`，未推上遠端），推測含本機改動；sprint7 的 `label-align="top"` 已讓標籤在上、輸入從左緣開始 |
+| 公告表單沒調整到 | **前次查證不完整，結論已修正**：只驗了 `style.css` 與 Vant 預設，漏看 `HomeView.vue` 自己的 scoped CSS。真兇是為 iPhone SE 標籤換行加的 `.ann-editor :deep(.van-cell__value){display:flex;justify-content:flex-end}`——`van-field` 的容器也帶 `.van-cell__value`，於是標題/內容輸入框被推到右側並縮成內容寬。改為只限定「對象/標籤」兩列（`.tag-cell`）。實測：修正前輸入框 `left=411 / width=265`，修正後 `left=24 / width=652` |
 | 教案應是未來 12 週、不是半年 | 日期改為**近 3＋未來 12**（近 3 保留補填「課後執行」的能力，更早的走匯出） |
 | 教案「項目」標籤要同步聚會流程 | 段落編輯的建議項目改讀該班流程（`itemPresets`），無流程資料才用內建清單 |
+| 課堂紀錄已填卻仍提醒 | 提醒文案只說「上堂課的課堂紀錄還沒填」、沒講哪一班——實際是**另一班**未填（同班已有人填的班本來就不會被列入）。改為**指名班別**並可點擊直達該班（`class-log?class=<id>`）；判定抽成 `classesMissingLog()` 純函式並補邊際測試 |
 | 三處要能匯出近一季 | 教案／老師服事（排班＋報名）／兒童服事安排各加「匯出近一季（12 週）」CSV；新增 `listLessonSegmentsRange()` |
 
 ### 第二批實作備註

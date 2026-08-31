@@ -15,6 +15,7 @@ import { listServiceWeeks } from '../api/service'
 import { listMeetings } from '../api/meetings'
 import { listLessonSegmentsByDate } from '../api/teaching'
 import { classHasIndex } from '../lib/performance'
+import { classesMissingLog } from '../lib/teaching'
 import {
   feedbackDeadline,
   isFeedbackOpen,
@@ -57,8 +58,8 @@ const needPlan = ref(false)
 const gathering = upcomingGathering()
 const deadline = planDeadline(gathering)
 
-/** 老師：上堂課的課堂紀錄尚未填寫（兩天內提醒） */
-const needClassLog = ref(false)
+/** 老師：上堂課我點過名、但還沒填課堂紀錄的班別（兩天內提醒；空陣列＝不提醒） */
+const missingLogClasses = ref<{ id: string; name: string }[]>([])
 /** 老師：已發布的服事安排（站內通知——v4 裁決 D） */
 const myServiceDates = ref<string[]>([])
 /** 家長：孩子被排上已發布的兒童服事表 */
@@ -142,12 +143,15 @@ onMounted(async () => {
         listCheckIns(lastG),
         listSessionLogsRange(lastG, lastG),
       ])
-      // 點名紀錄自帶「點名所屬班別」（含跨班現場加入）
-      const myClasses = new Set(
-        checks.filter((c) => c.checked_by === me).map((c) => c.class_group_id),
-      )
-      const logged = new Set(logs.map((l) => l.class_group_id))
-      needClassLog.value = [...myClasses].some((id) => !logged.has(id))
+      // 點名紀錄自帶「點名所屬班別」（含跨班現場加入）；同班有人填過就算填過
+      const missing = classesMissingLog(checks, logs, me)
+      if (missing.length > 0 && classGroups.value.length === 0) {
+        classGroups.value = await listClassGroups()
+      }
+      missingLogClasses.value = missing.map((id) => ({
+        id,
+        name: classGroups.value.find((g) => g.id === id)?.name ?? '',
+      }))
     }
   } catch (e) {
     showFailToast((e as Error).message)
@@ -244,14 +248,15 @@ async function removeAnn() {
       text="帳號審核中——請通知兒主同工核准，通過後即可使用完整功能"
     />
 
+    <!-- 指名是哪一班還沒填，並直接跳到該班（v9 驗收回饋：同班已有人填就不該再提醒） -->
     <van-notice-bar
-      v-if="needClassLog"
+      v-if="missingLogClasses.length > 0"
       left-icon="edit"
       mode="link"
       color="#7a5300"
       background="#fef1d9"
-      :text="`上堂課（${lastG}）的課堂紀錄還沒填——${feedbackDue.toLocaleDateString('zh-TW')}（${weekdayName(feedbackDue)}）23:59 前完成`"
-      @click="$router.push({ name: 'class-log' })"
+      :text="`上堂課（${lastG}）${missingLogClasses.map((c) => c.name).join('、')}的課堂紀錄還沒填——${feedbackDue.toLocaleDateString('zh-TW')}（${weekdayName(feedbackDue)}）23:59 前完成`"
+      @click="$router.push({ name: 'class-log', query: { class: missingLogClasses[0].id } })"
     />
 
     <van-notice-bar
@@ -344,7 +349,7 @@ async function removeAnn() {
           placeholder="例：下主日合班敬拜通知" />
         <van-field v-model="annDraft.body" label="內容" label-align="top" type="textarea" rows="3"
           autosize maxlength="1000" placeholder="公告內容" />
-        <van-cell title="對象" center>
+        <van-cell title="對象" center class="tag-cell">
           <template #value>
             <van-tag
               v-for="opt in annClassOptions"
@@ -360,7 +365,7 @@ async function removeAnn() {
             </van-tag>
           </template>
         </van-cell>
-        <van-cell title="標籤" center>
+        <van-cell title="標籤" center class="tag-cell">
           <template #value>
             <van-tag
               v-for="t in ['公告', '重要']"
@@ -441,8 +446,12 @@ async function removeAnn() {
 .tag-opt {
   margin: 0;
 }
-/* 窄螢幕（iPhone SE）：cell 內的選項標籤允許換行，避免溢出 */
-.ann-editor :deep(.van-cell__value) {
+/*
+ * 窄螢幕（iPhone SE）：選項標籤允許換行，避免溢出。
+ * 只套在「對象/標籤」這兩列——van-field 的容器也帶 .van-cell__value，
+ * 先前沒限定範圍，連標題/內容的輸入框都被 justify-content: flex-end 推到右邊（v9 #7）。
+ */
+.ann-editor :deep(.tag-cell .van-cell__value) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
