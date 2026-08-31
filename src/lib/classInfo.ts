@@ -10,6 +10,36 @@ export interface ClassDocTemplate {
   extra: string
 }
 
+/** 從「必做・約5分鐘」這類文字取出分鐘數；取不到回 null（v9 #3 舊資料相容） */
+export function parseMinutes(text: string | null | undefined): number | null {
+  const m = (text ?? '').match(/(\d+)\s*分/)
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * 去掉「必做・約5分鐘」裡的時間文字，只留必要性（v9 #3）。
+ * 時間改由 minutes 欄位呈現，避免同一張卡片出現兩次時間。
+ */
+export function stripMinutes(text: string | null | undefined): string {
+  return (text ?? '')
+    .replace(/[・·、,\s]*約?\s*\d+\s*分鐘?/g, '')
+    .replace(/^[・·、,\s]+|[・·、,\s]+$/g, '')
+    .trim()
+}
+
+/**
+ * 在第 insertAt 個位置插入一項時，後面既有項目要挪到的新順序（v9 #3）。
+ * 回傳需要更新的項目；新項目本身用 insertAt 當 sort_order。
+ */
+export function planInsert<T extends { id: string }>(
+  existing: T[],
+  insertAt: number,
+): { id: string; sort_order: number }[] {
+  return existing
+    .slice(insertAt)
+    .map((d, i) => ({ id: d.id, sort_order: insertAt + i + 1 }))
+}
+
 export const FLOW_TEMPLATE: ClassDocTemplate[] = [
   {
     title: '服事分工',

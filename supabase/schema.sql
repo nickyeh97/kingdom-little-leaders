@@ -385,6 +385,7 @@ create table class_docs (
   title text not null,
   content text not null default '',
   extra text not null default '',
+  minutes int,                          -- 建議時間（分鐘；v9 #3，教案範本依此帶入）
   sort_order int not null default 0
 );
 create index idx_class_docs on class_docs (class_group_id, kind);

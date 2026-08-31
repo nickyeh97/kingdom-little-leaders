@@ -8,7 +8,13 @@ import {
   listClassDocs,
   updateClassDoc,
 } from '../api/teaching'
-import { FLOW_TEMPLATE, GUIDE_TEMPLATE } from '../lib/classInfo'
+import {
+  FLOW_TEMPLATE,
+  GUIDE_TEMPLATE,
+  parseMinutes,
+  planInsert,
+  stripMinutes,
+} from '../lib/classInfo'
 import { classHasIndex } from '../lib/performance'
 import { useAuthStore } from '../stores/auth'
 import type { ClassDoc, ClassGroup } from '../types'
@@ -64,6 +70,8 @@ async function createFromTemplate() {
         class_group_id: activeGroup.value,
         kind: 'flow',
         ...t,
+        extra: stripMinutes(t.extra),
+        minutes: parseMinutes(t.extra),
         sort_order: order++,
       })
     }
@@ -87,20 +95,53 @@ async function createFromTemplate() {
 
 // ---- 同工編輯 ----
 const editing = ref<ClassDoc | 'new' | null>(null)
-const draft = ref<{ kind: 'flow' | 'guide'; title: string; content: string; extra: string }>({
+const draft = ref<{
+  kind: 'flow' | 'guide'
+  title: string
+  content: string
+  extra: string
+  minutes: string
+}>({
   kind: 'flow',
   title: '',
   content: '',
   extra: '',
+  minutes: '',
 })
 const saving = ref(false)
+
+// ---- 插入位置（v9 #3：像表單向下插入一列）----
+/** 0＝放在最前面；N＝排在第 N 項之後 */
+const insertAt = ref(0)
+const positionPickerOpen = ref(false)
+const siblings = computed(() => (draft.value.kind === 'flow' ? flows.value : guides.value))
+const positionOptions = computed(() => [
+  { text: '放在最前面', value: 0 },
+  ...siblings.value.map((d, i) => ({ text: `在「${d.title}」之後`, value: i + 1 })),
+])
+const insertAtLabel = computed(
+  () => positionOptions.value.find((o) => o.value === insertAt.value)?.text ?? '放在最後',
+)
+function onPositionConfirm({ selectedValues }: { selectedValues: number[] }) {
+  insertAt.value = Number(selectedValues[0] ?? 0)
+  positionPickerOpen.value = false
+}
 
 function openEditor(doc: ClassDoc | null, kind: 'flow' | 'guide' = 'flow') {
   if (!auth.can('admin')) return
   editing.value = doc ?? 'new'
   draft.value = doc
-    ? { kind: doc.kind, title: doc.title, content: doc.content, extra: doc.extra }
-    : { kind, title: '', content: '', extra: kind === 'flow' ? '必做' : '' }
+    ? {
+        kind: doc.kind,
+        title: doc.title,
+        content: doc.content,
+        extra: doc.extra,
+        // 舊資料的時間還在 extra 文字裡，讀不到 minutes 就從文字解析（v9 #3）
+        minutes: String(doc.minutes ?? parseMinutes(doc.extra) ?? ''),
+      }
+    : { kind, title: '', content: '', extra: kind === 'flow' ? '必做' : '', minutes: '' }
+  // 新增預設排在最後
+  insertAt.value = doc ? 0 : (kind === 'flow' ? flows.value.length : guides.value.length)
 }
 
 async function save() {
@@ -110,16 +151,26 @@ async function save() {
   }
   saving.value = true
   try {
+    const minutes = draft.value.minutes.trim() ? Number(draft.value.minutes) : null
+    const base = {
+      kind: draft.value.kind,
+      title: draft.value.title.trim(),
+      content: draft.value.content,
+      extra: draft.value.extra,
+      minutes,
+    }
     if (editing.value === 'new') {
-      const siblings = docs.value.filter((d) => d.kind === draft.value.kind)
+      // 插入指定位置：後面的既有項目先往後挪，新項目再佔住這個位置（v9 #3）
+      for (const u of planInsert(siblings.value, insertAt.value).reverse()) {
+        await updateClassDoc(u.id, { sort_order: u.sort_order })
+      }
       await createClassDoc({
         class_group_id: activeGroup.value,
-        ...draft.value,
-        title: draft.value.title.trim(),
-        sort_order: (siblings[siblings.length - 1]?.sort_order ?? -1) + 1,
+        ...base,
+        sort_order: insertAt.value,
       })
     } else if (editing.value) {
-      await updateClassDoc(editing.value.id, { ...draft.value, title: draft.value.title.trim() })
+      await updateClassDoc(editing.value.id, base)
     }
     await load()
     showSuccessToast('已儲存')
@@ -196,6 +247,7 @@ async function remove() {
           <van-tag v-if="d.extra" :type="d.extra.includes('選做') || d.extra === '彈性' ? 'warning' : 'primary'" plain>
             {{ d.extra }}
           </van-tag>
+          <van-tag v-if="d.minutes != null" plain>約 {{ d.minutes }} 分鐘</van-tag>
         </div>
         <p v-if="d.content" class="doc-body">{{ d.content }}</p>
       </div>
@@ -239,7 +291,24 @@ async function remove() {
           v-model="draft.extra"
           :label="draft.kind === 'flow' ? '方式' : '備註'"
           maxlength="30"
-          :placeholder="draft.kind === 'flow' ? '例：必做・約10分鐘 / 選做' : '選填'"
+          :placeholder="draft.kind === 'flow' ? '例：必做 / 選做' : '選填'"
+        />
+        <!-- v9 #3：建議時間改為獨立欄位，教案範本會依此帶入每段時長 -->
+        <van-field
+          v-if="draft.kind === 'flow'"
+          v-model="draft.minutes"
+          type="digit"
+          label="建議分鐘"
+          maxlength="3"
+          placeholder="例：10（選填；教案範本會用到）"
+        />
+        <!-- v9 #3：新增時可決定插入在哪一項之後 -->
+        <van-cell
+          v-if="editing === 'new'"
+          title="插入位置"
+          :value="insertAtLabel"
+          is-link
+          @click="positionPickerOpen = true"
         />
         <van-button round block type="primary" :loading="saving" class="save-btn" @click="save">
           儲存
@@ -248,6 +317,15 @@ async function remove() {
           刪除
         </van-button>
       </div>
+    </van-popup>
+
+    <van-popup v-model:show="positionPickerOpen" position="bottom" round>
+      <van-picker
+        :columns="positionOptions"
+        :model-value="[insertAt]"
+        @confirm="onPositionConfirm"
+        @cancel="positionPickerOpen = false"
+      />
     </van-popup>
   </div>
 </template>

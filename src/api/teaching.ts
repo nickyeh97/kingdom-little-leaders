@@ -40,9 +40,10 @@ export interface LessonSegmentInput {
   updated_by_name: string
 }
 
-export async function createLessonSegment(input: LessonSegmentInput): Promise<void> {
-  const { error } = await db().from('lesson_segments').insert(input)
+export async function createLessonSegment(input: LessonSegmentInput): Promise<LessonSegment> {
+  const { data, error } = await db().from('lesson_segments').insert(input).select().single()
   if (error) throw error
+  return data as LessonSegment
 }
 
 export async function updateLessonSegment(
@@ -76,6 +77,7 @@ export interface ClassDocInput {
   title: string
   content: string
   extra: string
+  minutes?: number | null
   sort_order: number
 }
 
