@@ -14,34 +14,36 @@ describe('教學模組設定', () => {
   })
 })
 
-describe('首頁課堂紀錄提醒：只提醒真的沒填的班（v9 驗收回饋）', () => {
-  const me = 'u1'
+describe('首頁課堂紀錄提醒：沒填就提醒同工與該班老師（v9 驗收回饋修訂）', () => {
+  const all = () => true
+  const onlyKid = (id: string) => id === 'kid'
 
-  it('我點名的班已有人填 → 不提醒（同班一份即可，不必每位老師各填）', () => {
-    const checks = [{ class_group_id: 'kid', checked_by: me }]
-    const logs = [{ class_group_id: 'kid' }] // 由別位老師填寫
-    expect(classesMissingLog(checks, logs, me)).toEqual([])
+  it('該班已有人填 → 不提醒（同班一份即可）', () => {
+    const checks = [{ class_group_id: 'kid' }]
+    expect(classesMissingLog(checks, [{ class_group_id: 'kid' }], all)).toEqual([])
   })
 
-  it('只回報「我點過名且該班沒紀錄」的班別', () => {
-    const checks = [
-      { class_group_id: 'kid', checked_by: me },
-      { class_group_id: 'toddler', checked_by: me },
-    ]
-    expect(classesMissingLog(checks, [{ class_group_id: 'kid' }], me)).toEqual(['toddler'])
+  it('同工看得到所有沒填的班別', () => {
+    const checks = [{ class_group_id: 'kid' }, { class_group_id: 'toddler' }]
+    expect(classesMissingLog(checks, [{ class_group_id: 'kid' }], all)).toEqual(['toddler'])
+    expect(classesMissingLog(checks, [], all)).toEqual(['kid', 'toddler'])
   })
 
-  it('邊際：別人點名的班不算我的責任', () => {
-    const checks = [{ class_group_id: 'toddler', checked_by: 'other' }]
-    expect(classesMissingLog(checks, [], me)).toEqual([])
+  it('老師只被自己被指派的班提醒（不是被指派的班不打擾）', () => {
+    const checks = [{ class_group_id: 'kid' }, { class_group_id: 'toddler' }]
+    expect(classesMissingLog(checks, [], onlyKid)).toEqual(['kid'])
   })
 
-  it('邊際：同班多筆點名只回報一次；未登入回空陣列', () => {
-    const checks = [
-      { class_group_id: 'kid', checked_by: me },
-      { class_group_id: 'kid', checked_by: me },
-    ]
-    expect(classesMissingLog(checks, [], me)).toEqual(['kid'])
-    expect(classesMissingLog(checks, [], undefined)).toEqual([])
+  it('關鍵：不看是誰點的名——別人點的名，該班老師與同工照樣被提醒', () => {
+    // checks 不再帶 checked_by，任何一筆點名都代表「那天有上課」
+    const checks = [{ class_group_id: 'kid' }]
+    expect(classesMissingLog(checks, [], all)).toEqual(['kid'])
+    expect(classesMissingLog(checks, [], onlyKid)).toEqual(['kid'])
+  })
+
+  it('邊際：同班多筆點名只回報一次；沒有點名（沒上課）就不提醒', () => {
+    const checks = [{ class_group_id: 'kid' }, { class_group_id: 'kid' }]
+    expect(classesMissingLog(checks, [], all)).toEqual(['kid'])
+    expect(classesMissingLog([], [], all)).toEqual([])
   })
 })

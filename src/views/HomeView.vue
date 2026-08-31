@@ -136,15 +136,14 @@ onMounted(async () => {
         ),
       ].sort()
     }
-    // 老師：上堂課（兩天內）若有自己點名過的班別還沒填課堂紀錄 → 提醒
-    if (auth.can('teacher') && isFeedbackOpen(lastG)) {
-      const me = auth.session?.user.id
+    // 上堂課（兩天內）有上課卻還沒填課堂紀錄的班別 → 提醒同工與該班老師
+    if ((auth.can('teacher') || auth.can('admin')) && isFeedbackOpen(lastG)) {
       const [checks, logs] = await Promise.all([
         listCheckIns(lastG),
         listSessionLogsRange(lastG, lastG),
       ])
-      // 點名紀錄自帶「點名所屬班別」（含跨班現場加入）；同班有人填過就算填過
-      const missing = classesMissingLog(checks, logs, me)
+      // 不看是誰點的名：只要該班沒填，同工（全班別）與該班老師都要收到提醒
+      const missing = classesMissingLog(checks, logs, (id) => auth.can('admin') || auth.canClass(id))
       if (missing.length > 0 && classGroups.value.length === 0) {
         classGroups.value = await listClassGroups()
       }
