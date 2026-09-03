@@ -231,3 +231,57 @@
   由 `main.ts` 的 `registerSW` 接手：每小時與回到前景時檢查更新、有新版才提示使用者重載；
   另加 `router.onError` 動態載入失敗自動重載一次（sessionStorage 防迴圈）與全域錯誤提示。
   建置後確認 `sw.js` 已無自動 `skipWaiting`/`clientsClaim`（只剩使用者確認後的 SKIP_WAITING 訊息）。
+
+---
+
+# 追加需求（v10，2026-09-03）
+
+組長於 Sprint 07 上線（v0.2.0）後追加的家長端擴充。第 3 項待組長補齊。
+
+## 一覽
+
+| # | 需求 | 狀態 |
+| --- | --- | --- |
+| v10-1 | 家長可看組織架構與分工＋孩子班上的老師名單 | ✅ 已實作 |
+| v10-2 | 家長可查閱孩子上過的課程（簡易版教案） | ✅ 已實作 |
+| v10-3 | （待補） | ⏳ 等組長提供 |
+
+## v10-1｜組織架構與分工開放給家長＋班別老師名單
+
+**決議**：老師名單併進既有的「組織架構與分工」頁（不另開新頁），一個入口把整件事講完。
+
+- 路由 `org` 的授權由 `roles: ['teacher','admin']` 改為 `requiresApproval: true`——審核通過者皆可進入。
+- 架構圖維持圖片顯示（v8 #2 不變），下方新增老師名單區：家長看**自己孩子班別**、老師/同工看**全部班別**，班名以班別顏色標籤呈現（v9 #1）。
+- **個資**：`class_teachers()` RPC 只 `select display_name`，不回傳 email/phone；`profiles` 的 RLS（本人或 admin 可讀）完全不動，家長拿不到老師聯絡方式。頁尾明寫「名單僅顯示稱呼；聯絡方式請透過同工或班級群組取得」。
+- 未審核的老師不列入名單（`p.approved` 過濾）。
+
+## v10-2｜孩子上過的課程（家長版簡易教案）
+
+**決議（組長 2026-09-03 確認）**：回看**最近 4 次**聚會；每段顯示**項目＋內容＋帶班老師**，並附**當天的詩歌**。
+
+- 新頁 `/my-lessons`（`ParentLessonView.vue`），`roles: ['parent']`；「我的」新增家長專區入口。
+- 資料走 `parent_lesson_segments(from_date, to_date)` RPC，資料庫層即限定：
+  - 只有**自己綁定孩子**所屬的班別（`my_child_class_ids()`）
+  - 只到 `current_date` 為止——**未來的課不預告**，避免變成進度壓力（守則紅燈 #2）
+  - 依班名排除**幼幼班**（v4 決議 8：幼幼班無教案模組）
+  - 欄位只回 `item / content / teacher_text`；**時間、教材預備、課後執行不外流**（比照 `parent_checkin_marks` 不回傳 `note`）
+- 「注重在小孩上的課程而非流程」→ 只有項目沒有內容的流程列（報到、點心、下課）不列出（`isCourseSegment`）。
+- 詩歌採**期間歌單**對應：找該班 `start_date ≤ 該日 ≤ end_date` 的歌單列出曲目（歌單是雙月期間制，非逐週），沒有涵蓋的歌單就不顯示詩歌區塊。連結沿用 v9 #6 的 `<a target="_blank">` ＋ `normalizeUrl`。
+
+## 技術異動
+
+| 檔案 | 內容 |
+| --- | --- |
+| `supabase/migrations/2026-09-03_parent_view.sql` | 新增 `my_child_class_ids()`、`class_teachers()`、`parent_lesson_segments()` 三個 security definer 函式（同步寫回 `supabase/rls.sql`） |
+| `src/api/roster.ts` | `listClassTeachers()` |
+| `src/api/teaching.ts` | `listParentLessonSegments(from, to)` |
+| `src/lib/parentLesson.ts` | `isCourseSegment`／`groupParentLessons`／`songsForDate`／`teachersOfClass`＋`PARENT_LESSON_COUNT` |
+| `src/views/OrgView.vue` | 架構圖下方加老師名單區 |
+| `src/views/ParentLessonView.vue` | 新頁 |
+| `src/router/index.ts` | `org` 改 `requiresApproval`、新增 `my-lessons` |
+| `src/views/ProfileView.vue` | 組織架構移出同工專區、新增家長專區入口 |
+| 測試 | `parentLesson.test.ts`（12 項）、`guard.test.ts` 新增 4 項授權/邊際 |
+
+## 外部依賴
+
+- **需組長於 Supabase SQL Editor 執行 `supabase/migrations/2026-09-03_parent_view.sql`**，否則家長端兩頁會取不到資料。

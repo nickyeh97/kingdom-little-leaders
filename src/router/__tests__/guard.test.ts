@@ -106,9 +106,33 @@ describe('路由守衛：登入與標籤式授權', () => {
     expect(router.currentRoute.value.name).toBe('login')
   })
 
+  it('組織架構頁：家長也進得去（v10 #1）——老師名單由 RPC 依角色過濾', async () => {
+    loginAs(['parent'])
+    await router.push({ name: 'org' })
+    expect(router.currentRoute.value.name).toBe('org')
+  })
+
+  it('邊際：未審核者仍進不了組織架構頁', async () => {
+    loginAs(['parent'], false)
+    await router.push({ name: 'org' })
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('孩子上過的課程：家長可進（v10 #2）', async () => {
+    loginAs(['parent'])
+    await router.push({ name: 'my-lessons' })
+    expect(router.currentRoute.value.name).toBe('my-lessons')
+  })
+
+  it('邊際：沒有家長標籤的老師/同工進不了「孩子上過的課程」', async () => {
+    loginAs(['teacher', 'admin'])
+    await router.push({ name: 'my-lessons' })
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
   it('組長情境：三標籤齊全可進所有頁面', async () => {
     loginAs(['admin', 'teacher', 'parent'])
-    for (const name of ['attendance', 'checkin', 'songs', 'members', 'me'] as const) {
+    for (const name of ['attendance', 'checkin', 'songs', 'members', 'org', 'my-lessons', 'me'] as const) {
       await router.push({ name })
       expect(router.currentRoute.value.name).toBe(name)
     }

@@ -208,6 +208,25 @@ export interface ChildServiceAssignment {
 }
 
 /** 教案段落（每班每聚會日；欄位依現行共編 Excel；分區塊共編） */
+/** 班別老師名單（家長只拿得到自己孩子的班別；只有稱呼，沒有聯絡方式——見 class_teachers()） */
+export interface ClassTeacher {
+  class_group_id: string
+  teacher_name: string
+}
+
+/**
+ * 家長版簡易教案的一個段落（v10 #2）。
+ * 刻意不含 time_text / materials_text / review_text——那是同工內部欄位。
+ */
+export interface ParentLessonSegment {
+  class_group_id: string
+  gathering_date: string
+  sort_order: number
+  item: string
+  content: string
+  teacher_name: string
+}
+
 export interface LessonSegment {
   id: string
   class_group_id: string

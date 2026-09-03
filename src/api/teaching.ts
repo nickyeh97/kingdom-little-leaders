@@ -1,5 +1,5 @@
 import { db } from '../lib/supabase'
-import type { ClassDoc, LessonSegment, Material } from '../types'
+import type { ClassDoc, LessonSegment, Material, ParentLessonSegment } from '../types'
 
 // ---- 教案（分區塊共編：以「列」為單位各自儲存）----
 
@@ -75,6 +75,23 @@ export async function updateLessonSegment(
 export async function deleteLessonSegment(id: string): Promise<void> {
   const { error } = await db().from('lesson_segments').delete().eq('id', id)
   if (error) throw error
+}
+
+/**
+ * 家長版簡易教案（v10 #2）：走 parent_lesson_segments() RPC。
+ * RPC 已在資料庫層限定「自己孩子的班別 × 已上過的日期 × 非幼幼班」，
+ * 且只回項目/內容/帶班老師——前端不需要、也拿不到教材預備與課後執行。
+ */
+export async function listParentLessonSegments(
+  from: string,
+  to: string,
+): Promise<ParentLessonSegment[]> {
+  const { data, error } = await db().rpc('parent_lesson_segments', {
+    from_date: from,
+    to_date: to,
+  })
+  if (error) throw error
+  return (data ?? []) as ParentLessonSegment[]
 }
 
 // ---- 聚會流程／運作要點（每班一份，同工維護）----

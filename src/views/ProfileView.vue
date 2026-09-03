@@ -71,6 +71,21 @@ async function logout() {
         is-link
         @click="$router.push({ name: 'vision' })"
       />
+      <van-cell
+        v-if="auth.isApproved"
+        title="組織架構與分工"
+        label="兒主團隊組別、職務，與孩子班上的老師"
+        is-link
+        @click="$router.push({ name: 'org' })"
+      />
+    </van-cell-group>
+    <van-cell-group inset v-if="auth.can('parent')">
+      <van-cell
+        title="孩子上過的課程"
+        label="最近 4 次主日，孩子班上教了什麼"
+        is-link
+        @click="$router.push({ name: 'my-lessons' })"
+      />
     </van-cell-group>
     <van-cell-group inset v-if="auth.can('admin')">
       <van-cell
@@ -104,12 +119,6 @@ async function logout() {
         label="大會/同工/班別會議紀錄與待辦追蹤"
         is-link
         @click="$router.push({ name: 'meetings' })"
-      />
-      <van-cell
-        title="組織架構與分工"
-        label="兒主團隊組別、職務與名單"
-        is-link
-        @click="$router.push({ name: 'org' })"
       />
       <van-cell
         title="出席紀錄（近半年）"

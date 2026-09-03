@@ -1,5 +1,5 @@
 import { db } from '../lib/supabase'
-import type { Child } from '../types'
+import type { Child, ClassTeacher } from '../types'
 
 export interface FamilyLink {
   parent_id: string
@@ -72,4 +72,14 @@ export async function setChildParents(childId: string, parentIds: string[]): Pro
     const { error } = await client.from('family_links').insert(rows)
     if (error) throw error
   }
+}
+
+/**
+ * 班別老師名單（v10 #1）：走 class_teachers() RPC，不直接查 profiles。
+ * 同工拿到全部班別、家長只拿到自己孩子的班別；回傳只有稱呼，沒有聯絡方式。
+ */
+export async function listClassTeachers(): Promise<ClassTeacher[]> {
+  const { data, error } = await db().rpc('class_teachers')
+  if (error) throw error
+  return (data ?? []) as ClassTeacher[]
 }
