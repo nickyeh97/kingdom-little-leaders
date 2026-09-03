@@ -254,8 +254,11 @@ async function submit() {
         </div>
       </div>
       <p class="cal-legend hint">
-        ●<span class="lg-attend">出席</span> ●<span class="lg-leave">請假</span>
-        ●<span class="lg-none">未定/未填</span> · 點聚會日查看
+        <!-- 圓點要跟文字同色，否則圖例對不上月曆上的點 -->
+        <span class="lg-attend">●出席</span>
+        <span class="lg-leave">●請假</span>
+        <span class="lg-none">●未定/未填</span>
+        · 點聚會日查看
       </p>
     </div>
 
@@ -263,7 +266,7 @@ async function submit() {
 
     <!-- 本週與未來：可填寫（v5 #0） -->
     <template v-else-if="mode === 'edit'">
-      <h3 class="section-title">
+      <h3 class="section-title" style="--sec: var(--kll-green)">
         {{ formatGathering(selected) }} · {{ selected === gathering ? '本週勾選' : '預先勾選' }}
       </h3>
       <p class="hint week-due">
@@ -322,7 +325,7 @@ async function submit() {
 
     <!-- 過去的聚會日：唯讀 -->
     <template v-else-if="mode === 'past'">
-      <h3 class="section-title">{{ formatGathering(selected) }} · 當週勾選紀錄</h3>
+      <h3 class="section-title" style="--sec: var(--kll-primary)">{{ formatGathering(selected) }} · 當週勾選紀錄</h3>
       <div v-if="children.length === 0" class="card hint">
         尚未綁定孩子，請聯繫兒童部窗口協助綁定。
       </div>
@@ -350,7 +353,7 @@ async function submit() {
 
     <!-- 兒童服事報名（P-04）：本週與未來聚會日皆可報名；僅具資格的孩子 -->
     <template v-if="!loading && mode !== 'past' && eligibleChildren.length > 0">
-      <h3 class="section-title">兒童服事報名 · {{ formatGathering(selected) }}</h3>
+      <h3 class="section-title" style="--sec: var(--kll-orange)">兒童服事報名 · {{ formatGathering(selected) }}</h3>
       <div v-for="c in eligibleChildren" :key="c.id" class="card">
         <div class="kid">
           <strong>{{ c.name }}</strong>
@@ -377,7 +380,7 @@ async function submit() {
 
     <!-- 兒童服事表（P-05）：發布後顯示自己孩子班別的安排 -->
     <template v-if="!loading && selectedRosters.length > 0">
-      <h3 class="section-title">兒童服事表 · {{ formatGathering(selected) }}</h3>
+      <h3 class="section-title" style="--sec: var(--kll-pink)">兒童服事表 · {{ formatGathering(selected) }}</h3>
       <div v-for="r in selectedRosters" :key="r.id" class="card">
         <div class="kid">
           <strong>{{ rosterClassName(r) }}</strong>
@@ -503,7 +506,7 @@ h2 {
   margin: 0 8px 0 2px;
 }
 .lg-leave {
-  color: var(--kll-amber);
+  color: #a86a12; /* 圖例是文字，需 4.43:1；月曆上的圓點才用亮一階的 --kll-amber */
   margin: 0 8px 0 2px;
 }
 .lg-none {

@@ -393,7 +393,7 @@ async function removePl() {
     <van-skeleton v-if="loading" title :row="4" />
     <template v-else>
       <div class="section-row">
-        <h3 class="section-title">
+        <h3 class="section-title" style="--sec: var(--kll-orange)">
           {{ currentPlaylist ? `${currentPlaylist.title}歌單` : '當期歌單' }}
         </h3>
         <van-button v-if="auth.can('admin')" size="small" plain @click="openPlEditor">
@@ -466,7 +466,7 @@ async function removePl() {
         <p v-if="openLyrics.includes(s.id)" class="lyrics">{{ s.lyrics }}</p>
       </div>
 
-      <h3 class="section-title">所有歌曲（敬拜過的歌單）</h3>
+      <h3 class="section-title" style="--sec: var(--kll-green)">所有歌曲（敬拜過的歌單）</h3>
       <div v-if="otherSongs.length === 0" class="card hint">曲庫沒有其他歌曲</div>
       <div v-for="s in otherSongs" :key="s.id" class="card">
         <div class="song-head">
@@ -648,17 +648,18 @@ async function removePl() {
   padding: 0 12px;
   border: 1px solid currentColor;
   border-radius: 4px;
-  background: #fffdfb;
+  background: var(--kll-card);
   font-size: 14px;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
 }
 .link-btn.dance {
-  color: var(--van-warning-color, #ff976a);
+  color: var(--kll-orange-text);
 }
 .link-btn.lyric {
-  color: var(--van-danger-color, #ee0a24);
+  /* 原為 YouTube 紅；紅不在師母指定的色盤內（白粉橘綠紫），改用綠 */
+  color: var(--kll-green-text);
 }
 .link-btn:active {
   opacity: 0.7;

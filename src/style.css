@@ -1,25 +1,46 @@
 :root {
-  /* ---- 暖色系色票（v11 #7，2026-09-03）----
-     來源：師母指定參考 nypreschoolandkidsclub.com 的用色
-     （暖橘 #db662a、金黃 #f7a722、暖底 #feece0、輔助綠 #598f78）。
-     主色改用略深的 #c4551e：參考站原色 #db662a 配白字對比只有 3.53:1，
-     本平台字級刻意放大就是因為長輩看不清，按鈕上的白字不能再吃力——
-     #c4551e 對白字 4.50:1（WCAG AA），色相與原色一致，看起來仍是同一個橘。 */
-  --kll-primary: #c4551e; /* 主色：按鈕、選取、強調（白字 4.50:1） */
-  --kll-primary-bright: #db662a; /* 參考站原色：只用於裝飾底色，不承載文字 */
-  --kll-primary-dark: #9e4317;
-  --kll-primary-soft: #feece0; /* 暖橘淺底 */
-  --kll-primary-text: #8a3d12; /* 淺橘底上的深字（6.63:1） */
-  --kll-accent: #4e7f69; /* 語意綠（已簽到、成功）：參考站 #598f78 加深，白字 4.60:1 */
-  --kll-accent-soft: #e7f0ea;
-  --kll-bg: #fdf7f1; /* 全站暖白底 */
-  --kll-text: #2b2018; /* 暖黑（14.93:1） */
-  --kll-sub: #6e5d52; /* 暖灰次要文字（5.89:1） */
-  --kll-line: #eadfd4; /* 分隔線 */
-  --kll-border: #dccec0; /* 邊框 */
-  --kll-muted: #b8a99c; /* 停用/未定 */
-  --kll-amber: #f7a722;
-  --kll-amber-soft: #fef3dc;
+  /* ---- 多色暖調色票（v11 #7 二版，2026-09-03）----
+     來源：師母指定的 nypreschoolandkidsclub.com/activities/classes/
+     ——白底＋淺粉/淺橘/淺綠色塊分區，橘 #db662a、綠 #598f78、紫 #7462a2 當主題色。
+
+     兩個限制決定了主色：
+     (1) 班別色是橘（兒童）、藍（幼童）、綠（幼幼），平台主色若用橘或綠會跟班別標籤互搶；
+         參考站的**紫**不在班別色裡，且原色白字就有 5.24:1，直接用不必加深。
+     (2) 「不要一頁只有單一色」：粉/橘/綠/紫各自成套（底色＋深字），
+         分別掛在不同區塊與通知列上，同一頁至少會出現兩三種色。 */
+
+  /* 主色：互動元件（按鈕、選取、連結） */
+  --kll-primary: #7462a2; /* 參考站原色，白字 5.24:1 */
+  --kll-primary-dark: #5d4c8d;
+  --kll-primary-soft: #f3eefa;
+  --kll-primary-mid: #dad0ec; /* 參考站的淺紫塊 */
+  --kll-primary-text: #4a3d72; /* 淺紫底上的深字 8.37:1 */
+
+  /* 分區點綴：粉／橘／綠（底色不承載白字，深字版本才拿來寫字） */
+  --kll-pink: #e0799f;
+  --kll-pink-soft: #f9eef3;
+  --kll-pink-text: #8f3a5c; /* 6.34:1 */
+  --kll-orange: #db662a;
+  --kll-orange-soft: #feece0;
+  --kll-orange-text: #8a3d12; /* 6.63:1 */
+  --kll-green: #598f78;
+  --kll-green-soft: #f1f7e5;
+  --kll-green-text: #2f6b56; /* 5.71:1 */
+
+  /* 底色與文字 */
+  --kll-bg: #fdf9f7; /* 白中帶一點粉的頁底 */
+  --kll-card: #ffffff; /* 卡片維持純白，班別標籤的淺底才浮得出來 */
+  --kll-text: #2b2430; /* 14.36:1 */
+  --kll-sub: #6b6270; /* 5.57:1 */
+  --kll-line: #efe6ec;
+  --kll-border: #ded2da;
+  --kll-muted: #b7aebb;
+
+  /* 語意色（白字仍讀得清的深度） */
+  --kll-accent: #4e7f69; /* 成功／已簽到，白字 4.60:1 */
+  --kll-accent-soft: var(--kll-green-soft);
+  --kll-amber: #db8a1e; /* 小圓點等不承載文字處 */
+  --kll-amber-soft: #fdf0dc;
 
   /* 覆寫 Vant 主題色 */
   --van-primary-color: var(--kll-primary);
@@ -51,13 +72,12 @@
   --van-collapse-item-content-font-size: 18px;
   --van-checkbox-size: 24px;
 
-  /* Vant 語意色也跟著暖化，避免元件內建的藍綠跳出整體色調。
-     兩色都取「白字仍讀得清」的深度：success 4.60:1、warning 4.43:1；
-     參考站的亮金 #f7a722 白字只有 2.0:1，只留給不承載文字的小圓點。 */
+  /* Vant 語意色：都取「白字仍讀得清」的深度（success 4.60:1、warning 4.43:1）；
+     參考站的亮橘/亮金白字都不到 3:1，只留給不承載文字的小圓點。 */
   --van-success-color: var(--kll-accent);
   --van-warning-color: #a86a12;
-  --van-background-2: #fffdfb;
-  --van-cell-background: #fffdfb;
+  --van-background-2: var(--kll-card);
+  --van-cell-background: var(--kll-card);
   --van-border-color: var(--kll-line);
 }
 
@@ -82,7 +102,7 @@ body {
 }
 
 .card {
-  background: #fffdfb;
+  background: var(--kll-card);
   border-radius: 14px;
   padding: 14px 16px;
   margin-bottom: 12px;
@@ -92,6 +112,10 @@ body {
   font-size: 23px;
   font-weight: 700;
   margin: 16px 0 10px;
+  padding-left: 10px;
+  /* 左側色條：各區塊以 --sec 指定不同顏色，同一頁不會只有單一色 */
+  border-left: 5px solid var(--sec, var(--kll-primary));
+  line-height: 1.3;
 }
 
 .hint {

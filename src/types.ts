@@ -139,7 +139,10 @@ export interface Announcement {
   class_groups?: { name: string } | null
   pinned: boolean
   created_by: string
+  /** 發布日（建立時間；編輯不會改動） */
   created_at: string
+  /** 最後編輯時間（v11 #8；由資料庫觸發器維護） */
+  updated_at: string
 }
 
 /** 每週各班服事內容（C-01：日期/詩歌/主題/彈性時間；發布後老師可見） */

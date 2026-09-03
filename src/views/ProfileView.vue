@@ -88,6 +88,7 @@ async function logout() {
         ✎ 修改稱呼
       </van-button>
     </div>
+    <h3 class="section-title" style="--sec: var(--kll-primary)">關於兒童部</h3>
     <van-cell-group inset>
       <van-cell
         title="國度領袖兒童異象"
@@ -103,6 +104,9 @@ async function logout() {
         @click="$router.push({ name: 'org' })"
       />
     </van-cell-group>
+    <h3 v-if="auth.can('parent') || showServiceItems" class="section-title" style="--sec: var(--kll-pink)">
+      我的孩子
+    </h3>
     <van-cell-group inset v-if="auth.can('parent') || showServiceItems">
       <van-cell
         v-if="auth.can('parent')"
@@ -119,6 +123,7 @@ async function logout() {
         @click="$router.push({ name: 'child-service-items' })"
       />
     </van-cell-group>
+    <h3 v-if="auth.can('admin')" class="section-title" style="--sec: var(--kll-orange)">管理</h3>
     <van-cell-group inset v-if="auth.can('admin')">
       <van-cell
         title="名單與權限"
@@ -127,6 +132,9 @@ async function logout() {
         @click="$router.push({ name: 'members' })"
       />
     </van-cell-group>
+    <h3 v-if="auth.can('teacher') || auth.can('admin')" class="section-title" style="--sec: var(--kll-green)">
+      老師與同工
+    </h3>
     <van-cell-group inset v-if="auth.can('teacher') || auth.can('admin')">
       <van-cell
         title="教案"

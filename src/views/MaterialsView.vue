@@ -81,6 +81,17 @@ function canEdit(m: Material): boolean {
 
 // ---- 新增/編輯（老師可自由上傳共用——外連型）----
 const editing = ref<Material | 'new' | null>(null)
+/** 類別標題的色條輪替（v11 #7：避免整頁只有單一色） */
+const SECTION_COLORS = [
+  'var(--kll-primary)',
+  'var(--kll-orange)',
+  'var(--kll-green)',
+  'var(--kll-pink)',
+]
+function catColor(i: number): string {
+  return SECTION_COLORS[i % SECTION_COLORS.length]
+}
+
 const draft = ref({ class_group_id: null as string | null, category: '', title: '', url: '', note: '' })
 const saving = ref(false)
 
@@ -190,8 +201,8 @@ async function remove() {
     <van-skeleton v-if="loading" title :row="5" />
     <template v-else>
       <div v-if="shown.length === 0" class="card hint">此分類尚無教材，點右上「＋新增」貼上連結</div>
-      <template v-for="[cat, items] in byCategory" :key="cat">
-        <h3 class="section-title">{{ cat }}</h3>
+      <template v-for="([cat, items], i) in [...byCategory]" :key="cat">
+        <h3 class="section-title" :style="{ '--sec': catColor(i) }">{{ cat }}</h3>
         <div v-for="m in items" :key="m.id" class="card">
           <div class="mat-head">
             <strong class="mat-title" @click="openUrl(m.url)">🔗 {{ m.title }}</strong>

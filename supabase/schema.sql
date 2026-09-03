@@ -233,8 +233,19 @@ create table announcements (
   class_group_id uuid references class_groups (id),
   pinned boolean not null default false,
   created_by uuid not null default auth.uid() references profiles (id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()  -- 最後編輯時間（v11 #8）
 );
+
+-- 編輯公告時自動更新 updated_at（created_at 維持「發布日」不動）
+create or replace function public.touch_announcement()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+create trigger trg_touch_announcement before update on announcements
+  for each row execute function public.touch_announcement();
 
 create index idx_plans_gathering on attendance_plans (gathering_date);
 create index idx_checkins_gathering on check_ins (gathering_date);

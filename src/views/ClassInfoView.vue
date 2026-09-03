@@ -303,7 +303,7 @@ async function remove() {
       </div>
 
       <div class="sec-row">
-        <h3 class="section-title">聚會流程</h3>
+        <h3 class="section-title" style="--sec: var(--kll-orange)">聚會流程</h3>
         <div class="sec-actions">
           <van-button v-if="auth.can('admin')" size="mini" plain @click="openImport">
             ⬆ 從 Google Sheet 匯入
@@ -332,7 +332,7 @@ async function remove() {
       </div>
 
       <div class="sec-row">
-        <h3 class="section-title">運作詳細要點</h3>
+        <h3 class="section-title" style="--sec: var(--kll-green)">運作詳細要點</h3>
         <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(null, 'guide')">
           ＋新增
         </van-button>
