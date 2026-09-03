@@ -8,7 +8,8 @@
  * 守則檢核（`docs/DESIGN_PRINCIPLES.md`）：這頁是回顧孩子上過什麼課，
  * 不呈現孩子的表現、不做班級之間的比較，也不預告未來進度（避免變成進度壓力）。
  */
-import type { ClassTeacher, ParentLessonSegment, Song, SongPlaylist } from '../types'
+import type { WeeklySongRow } from '../api/songs'
+import type { ClassTeacher, ParentLessonSegment, Song } from '../types'
 
 /** 家長可回看的聚會次數（決議：只到最近 4 次） */
 export const PARENT_LESSON_COUNT = 4
@@ -59,23 +60,20 @@ export function groupParentLessons(segments: ParentLessonSegment[]): ParentLesso
 }
 
 /**
- * 那天的詩歌＝該班「期間歌單」涵蓋該日期的曲目（歌單是雙月期間制，非逐週）。
- * 找不到涵蓋的歌單就回空陣列，畫面不顯示詩歌區塊。
+ * 那天唱的詩歌（v11 #1）：直接取「排到該聚會日」的歌，不再用整個雙月歌單推估。
+ * 同一個函式也給詩歌頁用——傳入下次聚會日就是「下次要上課的歌」。
  */
 export function songsForDate(
-  playlists: SongPlaylist[],
+  weekly: WeeklySongRow[],
   songs: Song[],
   classGroupId: string,
   date: string,
 ): Song[] {
-  const playlist = playlists.find(
-    (p) => p.class_group_id === classGroupId && p.start_date <= date && p.end_date >= date,
-  )
-  if (!playlist) return []
   const byId = new Map(songs.map((s) => [s.id, s]))
-  return [...(playlist.playlist_songs ?? [])]
+  return weekly
+    .filter((w) => w.class_group_id === classGroupId && w.gathering_date === date)
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((entry) => byId.get(entry.song_id))
+    .map((w) => byId.get(w.song_id))
     .filter((s): s is Song => s != null)
 }
 

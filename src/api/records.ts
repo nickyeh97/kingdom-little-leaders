@@ -78,6 +78,8 @@ export async function upsertSessionLog(entry: {
   content: string
   song_progress: string
   feedback: string
+  flow_score: number | null
+  cooperation_score: number | null
 }): Promise<void> {
   const { error } = await db()
     .from('session_logs')

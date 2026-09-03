@@ -5,6 +5,7 @@ import { listClassGroups } from '../api/checkin'
 import {
   addChildPermission,
   listChildPermissions,
+  listChildServiceItems,
   listChildRosters,
   listChildSignups,
   removeChildPermission,
@@ -22,14 +23,11 @@ import {
 } from '../api/service'
 import { downloadCsv } from '../lib/csv'
 import { formatGathering, recentGatherings, upcomingGatherings } from '../lib/gathering'
-import {
-  CHILD_SERVICE_ITEM_PRESETS,
-  SERVICE_ITEM_PRESETS,
-  SIGNUP_WEEKS_AHEAD,
-} from '../lib/service'
+import { SERVICE_ITEM_PRESETS, SIGNUP_WEEKS_AHEAD, childServiceItemOptions } from '../lib/service'
 import { useAuthStore } from '../stores/auth'
 import type {
   Child,
+  ChildServiceItem,
   ChildServicePermission,
   ChildServiceRoster,
   ChildServiceSignup,
@@ -170,16 +168,25 @@ async function load() {
   try {
     const from = dates[0]
     const to = dates[dates.length - 1]
-    ;[groups.value, weeks.value, signups.value, allChildren.value, childSignups.value, childRosters.value, childPerms.value] =
-      await Promise.all([
-        listClassGroups(),
-        listServiceWeeks(from, to),
-        listSignups(from, to),
-        listAllChildren(),
-        listChildSignups(from, to),
-        listChildRosters(from, to),
-        listChildPermissions(),
-      ])
+    ;[
+      groups.value,
+      weeks.value,
+      signups.value,
+      allChildren.value,
+      childSignups.value,
+      childRosters.value,
+      childPerms.value,
+      serviceItems.value,
+    ] = await Promise.all([
+      listClassGroups(),
+      listServiceWeeks(from, to),
+      listSignups(from, to),
+      listAllChildren(),
+      listChildSignups(from, to),
+      listChildRosters(from, to),
+      listChildPermissions(),
+      listChildServiceItems(),
+    ])
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -408,6 +415,8 @@ function canEditPerm(c: Child): boolean {
   return auth.can('admin') || auth.canClass(String(c.class_group_id))
 }
 
+/** 兒童服事項目字典（v11 #4）：勾選按鈕的來源 */
+const serviceItems = ref<ChildServiceItem[]>([])
 const permChild = ref<Child | null>(null)
 const permSaving = ref(false)
 
@@ -415,10 +424,10 @@ function openPermEditor(c: Child) {
   if (!canEditPerm(c)) return
   permChild.value = c
 }
-/** 此孩子在編輯器顯示的項目：建議五項 ∪ 已授權的自訂項目 */
+/** 此孩子在編輯器顯示的項目：字典啟用項目 ∪ 已授權的舊項目（v11 #4） */
 function permItemOptions(c: Child): string[] {
   const granted = (permsByChild.value.get(c.id) ?? []).map((p) => p.item)
-  return [...CHILD_SERVICE_ITEM_PRESETS, ...granted.filter((i) => !CHILD_SERVICE_ITEM_PRESETS.includes(i))]
+  return childServiceItemOptions(serviceItems.value, granted)
 }
 function hasPerm(c: Child, item: string): boolean {
   return (permsByChild.value.get(c.id) ?? []).some((p) => p.item === item)

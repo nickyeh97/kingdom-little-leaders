@@ -7,9 +7,10 @@ import { listAllChildren } from '../api/records'
 import {
   addChildPermission,
   listChildPermissions,
+  listChildServiceItems,
   removeChildPermission,
 } from '../api/childService'
-import { CHILD_SERVICE_ITEM_PRESETS } from '../lib/service'
+import { childServiceItemOptions } from '../lib/service'
 import { classTagStyle } from '../lib/classColor'
 import { useAuthStore } from '../stores/auth'
 import {
@@ -23,7 +24,14 @@ import {
   type FamilyLink,
   type TeacherClassAssignment,
 } from '../api/roster'
-import type { Child, ChildServicePermission, ClassGroup, Profile, UserRole } from '../types'
+import type {
+  Child,
+  ChildServiceItem,
+  ChildServicePermission,
+  ClassGroup,
+  Profile,
+  UserRole,
+} from '../types'
 
 const auth = useAuthStore()
 const members = ref<Profile[]>([])
@@ -92,15 +100,23 @@ function memberDetail(m: Profile): string {
 
 onMounted(async () => {
   try {
-    ;[members.value, children.value, links.value, classGroups.value, assignments.value, childPerms.value] =
-      await Promise.all([
-        listProfiles(),
-        listAllChildren(),
-        listFamilyLinks(),
-        listClassGroups(),
-        listTeacherClassAssignments(),
-        listChildPermissions(),
-      ])
+    ;[
+      members.value,
+      children.value,
+      links.value,
+      classGroups.value,
+      assignments.value,
+      childPerms.value,
+      serviceItems.value,
+    ] = await Promise.all([
+      listProfiles(),
+      listAllChildren(),
+      listFamilyLinks(),
+      listClassGroups(),
+      listTeacherClassAssignments(),
+      listChildPermissions(),
+      listChildServiceItems(),
+    ])
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -260,6 +276,8 @@ function openChildEditor(c: Child | null) {
 
 // ---- 服事項目授權（v5 #3：孩子×項目；即點即存，該班老師或同工）----
 const childPerms = ref<ChildServicePermission[]>([])
+/** 兒童服事項目字典（v11 #4）：勾選按鈕的來源 */
+const serviceItems = ref<ChildServiceItem[]>([])
 const permSaving = ref(false)
 
 function permsOf(childId: string): ChildServicePermission[] {
@@ -267,10 +285,7 @@ function permsOf(childId: string): ChildServicePermission[] {
 }
 function permItemOptions(childId: string): string[] {
   const granted = permsOf(childId).map((p) => p.item)
-  return [
-    ...CHILD_SERVICE_ITEM_PRESETS,
-    ...granted.filter((i) => !CHILD_SERVICE_ITEM_PRESETS.includes(i)),
-  ]
+  return childServiceItemOptions(serviceItems.value, granted)
 }
 function hasPerm(childId: string, item: string): boolean {
   return permsOf(childId).some((p) => p.item === item)

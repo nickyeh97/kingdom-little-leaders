@@ -12,17 +12,17 @@ import { computed, onMounted, ref } from 'vue'
 import { showFailToast } from 'vant'
 import { listClassGroups } from '../api/checkin'
 import { listParentLessonSegments } from '../api/teaching'
-import { listPlaylists, listSongs } from '../api/songs'
+import { listSongs, listWeeklySongs, type WeeklySongRow } from '../api/songs'
 import { formatGathering, recentGatherings } from '../lib/gathering'
 import { classTagStyle } from '../lib/classColor'
 import { normalizeUrl } from '../lib/url'
 import { PARENT_LESSON_COUNT, groupParentLessons, songsForDate } from '../lib/parentLesson'
-import type { ClassGroup, ParentLessonSegment, Song, SongPlaylist } from '../types'
+import type { ClassGroup, ParentLessonSegment, Song } from '../types'
 
 const dates = recentGatherings(PARENT_LESSON_COUNT)
 const segments = ref<ParentLessonSegment[]>([])
 const groups = ref<ClassGroup[]>([])
-const playlists = ref<SongPlaylist[]>([])
+const weekly = ref<WeeklySongRow[]>([])
 const songs = ref<Song[]>([])
 const loading = ref(true)
 
@@ -34,16 +34,20 @@ function className(id: string): string {
 
 onMounted(async () => {
   try {
-    const [segs, gs, pls, ss] = await Promise.all([
+    const [segs, gs, ss] = await Promise.all([
       listParentLessonSegments(dates[0], dates[dates.length - 1]),
       listClassGroups(),
-      listPlaylists(),
       listSongs(),
     ])
     segments.value = segs
     groups.value = gs
-    playlists.value = pls
     songs.value = ss
+    // 那天唱的歌：逐班取近 4 次聚會的排定歌曲（家長通常只有 1–2 個班別）
+    const classIds = [...new Set(segs.map((x) => x.class_group_id))]
+    const rows = await Promise.all(
+      classIds.map((id) => listWeeklySongs(id, dates[0], dates[dates.length - 1])),
+    )
+    weekly.value = rows.flat()
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -75,12 +79,12 @@ onMounted(async () => {
         </div>
 
         <div
-          v-if="songsForDate(playlists, songs, day.class_group_id, day.gathering_date).length"
+          v-if="songsForDate(weekly, songs, day.class_group_id, day.gathering_date).length"
           class="songs"
         >
-          <div class="songs-title">🎵 這段期間的詩歌</div>
+          <div class="songs-title">🎵 這次唱的詩歌</div>
           <p
-            v-for="song in songsForDate(playlists, songs, day.class_group_id, day.gathering_date)"
+            v-for="song in songsForDate(weekly, songs, day.class_group_id, day.gathering_date)"
             :key="song.id"
             class="song"
           >

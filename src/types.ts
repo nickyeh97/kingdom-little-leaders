@@ -89,6 +89,10 @@ export interface SessionLog {
   content: string
   song_progress: string
   feedback: string
+  /** 流程順暢度 1–5（v11 #5；未填＝null） */
+  flow_score: number | null
+  /** 學生配合度 1–5（v11 #5；評的是班級整體運作，不是個別孩子） */
+  cooperation_score: number | null
   updated_at: string
 }
 
@@ -208,6 +212,19 @@ export interface ChildServiceAssignment {
 }
 
 /** 教案段落（每班每聚會日；欄位依現行共編 Excel；分區塊共編） */
+/**
+ * 兒童服事項目字典（v11 #4）：名稱＋說明由同工維護。
+ * `name` 同時是 child_service_permissions / signups / assignments 的 `item` 值，
+ * 所以改名等於改所有勾選按鈕的標籤——既有紀錄以文字比對，改名前要想清楚。
+ */
+export interface ChildServiceItem {
+  id: string
+  name: string
+  description: string
+  sort_order: number
+  active: boolean
+}
+
 /** 班別老師名單（家長只拿得到自己孩子的班別；只有稱呼，沒有聯絡方式——見 class_teachers()） */
 export interface ClassTeacher {
   class_group_id: string

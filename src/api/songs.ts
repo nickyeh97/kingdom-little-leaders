@@ -137,3 +137,57 @@ export async function upsertFamiliarity(
     .upsert(row, { onConflict: 'song_id,class_group_id' })
   if (error) throw error
 }
+
+// ---- 本週歌單（v11 #1：把歌曲排到具體聚會日）----
+// 取代 playlist_songs.is_weekly（只有「現在這一次」、沒有日期，家長端查不到歷史）。
+// 教案頁取「該聚會日」、詩歌頁取「下次聚會日」，兩邊都精準。
+
+export interface WeeklySongRow {
+  class_group_id: string
+  gathering_date: string
+  song_id: string
+  sort_order: number
+}
+
+/** 區間內某班排定的歌（教案頁一次抓近 4 次、詩歌頁抓下次） */
+export async function listWeeklySongs(
+  classGroupId: string,
+  from: string,
+  to: string,
+): Promise<WeeklySongRow[]> {
+  const { data, error } = await db()
+    .from('weekly_songs')
+    .select('*')
+    .eq('class_group_id', classGroupId)
+    .gte('gathering_date', from)
+    .lte('gathering_date', to)
+    .order('gathering_date')
+    .order('sort_order')
+  if (error) throw error
+  return (data ?? []) as WeeklySongRow[]
+}
+
+/** 整組覆寫某班某聚會日的歌（先刪後插，順序即傳入順序） */
+export async function setWeeklySongs(
+  classGroupId: string,
+  gatheringDate: string,
+  songIds: string[],
+): Promise<void> {
+  const client = db()
+  const { error: delError } = await client
+    .from('weekly_songs')
+    .delete()
+    .eq('class_group_id', classGroupId)
+    .eq('gathering_date', gatheringDate)
+  if (delError) throw delError
+  if (songIds.length === 0) return
+  const { error } = await client.from('weekly_songs').insert(
+    songIds.map((song_id, i) => ({
+      class_group_id: classGroupId,
+      gathering_date: gatheringDate,
+      song_id,
+      sort_order: i,
+    })),
+  )
+  if (error) throw error
+}

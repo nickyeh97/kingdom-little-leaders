@@ -6,7 +6,8 @@ import {
   songsForDate,
   teachersOfClass,
 } from '../parentLesson'
-import type { ClassTeacher, ParentLessonSegment, Song, SongPlaylist } from '../../types'
+import type { WeeklySongRow } from '../../api/songs'
+import type { ClassTeacher, ParentLessonSegment, Song } from '../../types'
 
 function seg(p: Partial<ParentLessonSegment> = {}): ParentLessonSegment {
   return {
@@ -70,41 +71,41 @@ describe('家長版簡易教案（v10 #2）', () => {
   })
 })
 
-describe('songsForDate：那天所屬的期間歌單', () => {
+describe('songsForDate：那次聚會排定的歌（v11 #1）', () => {
   const songs: Song[] = [
     { id: 's1', title: '這是天父世界' } as Song,
     { id: 's2', title: '主是我力量' } as Song,
   ]
-  const playlists: SongPlaylist[] = [
-    {
-      id: 'p1',
-      class_group_id: 'kid',
-      title: '2026年7-8月',
-      start_date: '2026-07-01',
-      end_date: '2026-08-31',
-      playlist_songs: [
-        { song_id: 's2', sort_order: 2 },
-        { song_id: 's1', sort_order: 1 },
-      ],
-    },
+  const weekly: WeeklySongRow[] = [
+    { class_group_id: 'kid', gathering_date: '2026-08-29', song_id: 's2', sort_order: 2 },
+    { class_group_id: 'kid', gathering_date: '2026-08-29', song_id: 's1', sort_order: 1 },
+    { class_group_id: 'kid', gathering_date: '2026-09-05', song_id: 's2', sort_order: 1 },
+    { class_group_id: 'toddler', gathering_date: '2026-08-29', song_id: 's1', sort_order: 1 },
   ]
 
-  it('取涵蓋該日期的歌單，依 sort_order 排序', () => {
-    expect(songsForDate(playlists, songs, 'kid', '2026-08-29').map((s) => s.title)).toEqual([
+  it('只取該班該日排定的歌，依 sort_order 排序', () => {
+    expect(songsForDate(weekly, songs, 'kid', '2026-08-29').map((s) => s.title)).toEqual([
       '這是天父世界',
       '主是我力量',
     ])
   })
 
-  it('邊際：期間端點視為涵蓋', () => {
-    expect(songsForDate(playlists, songs, 'kid', '2026-07-01')).toHaveLength(2)
-    expect(songsForDate(playlists, songs, 'kid', '2026-08-31')).toHaveLength(2)
+  it('不同聚會日各自獨立——換一週就換一組歌', () => {
+    expect(songsForDate(weekly, songs, 'kid', '2026-09-05').map((s) => s.title)).toEqual([
+      '主是我力量',
+    ])
   })
 
-  it('邊際：日期落在期間外、班別不符、曲目已刪除都不會壞掉', () => {
-    expect(songsForDate(playlists, songs, 'kid', '2026-09-01')).toEqual([])
-    expect(songsForDate(playlists, songs, 'toddler', '2026-08-29')).toEqual([])
-    expect(songsForDate(playlists, [], 'kid', '2026-08-29')).toEqual([])
+  it('同一天不同班別互不干擾', () => {
+    expect(songsForDate(weekly, songs, 'toddler', '2026-08-29').map((s) => s.title)).toEqual([
+      '這是天父世界',
+    ])
+  })
+
+  it('邊際：沒排歌的日期、未知班別、曲庫查無此曲都回空陣列', () => {
+    expect(songsForDate(weekly, songs, 'kid', '2026-09-12')).toEqual([])
+    expect(songsForDate(weekly, songs, 'baby', '2026-08-29')).toEqual([])
+    expect(songsForDate(weekly, [], 'kid', '2026-08-29')).toEqual([])
   })
 })
 

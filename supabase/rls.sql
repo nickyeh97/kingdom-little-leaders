@@ -224,6 +224,14 @@ create policy "playlist_songs_write" on playlist_songs
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
+-- weekly_songs（v11 #1）：全員可讀（家長要預習下次的歌）；同工維護
+alter table weekly_songs enable row level security;
+create policy "weekly_songs_read" on weekly_songs
+  for select to authenticated using (public.is_approved());
+create policy "weekly_songs_write" on weekly_songs
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
 alter table song_familiarity enable row level security;
 create policy "song_familiarity_read" on song_familiarity
   for select to authenticated using (public.is_approved());
@@ -351,6 +359,14 @@ as $$
     and (public.is_admin() or public.child_in_my_class(cid));
 $$;
 grant execute on function public.set_child_service_eligible(uuid, boolean) to authenticated;
+
+-- child_service_items（v11 #4）：老師與家長可檢視項目與說明；同工可維護
+alter table child_service_items enable row level security;
+create policy "child_service_items_read" on child_service_items
+  for select to authenticated using (public.is_approved());
+create policy "child_service_items_write" on child_service_items
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 alter table child_service_signups enable row level security;
 create policy "child_signups_read" on child_service_signups

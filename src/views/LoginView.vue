@@ -75,7 +75,7 @@ async function sendReset() {
     const msg = (e as Error).message
     showFailToast(
       /rate limit/i.test(msg)
-        ? '寄信額度暫時已滿，請約一小時後再試，或聯繫兒主同工協助重設'
+        ? '寄信額度暫時已滿，請約一小時後再試，或聯繫兒童部同工協助重設'
         : `寄送失敗：${msg}`,
     )
   } finally {

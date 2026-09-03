@@ -83,6 +83,13 @@ const router = createRouter({
           meta: { requiresApproval: true },
         },
         {
+          // 兒童服事項目（v11 #4）：同工維護名稱與說明，老師與兒童班家長檢視
+          path: 'child-service-items',
+          name: 'child-service-items',
+          component: () => import('../views/ChildServiceItemsView.vue'),
+          meta: { requiresApproval: true },
+        },
+        {
           // 孩子上過的課程（家長版簡易教案，v10 #2）
           path: 'my-lessons',
           name: 'my-lessons',

@@ -14,7 +14,11 @@ export const SERVICE_ITEM_PRESETS = [
 /** 服事報名開放範圍：未來 N 次聚會（v9 #9：8 → 12） */
 export const SIGNUP_WEEKS_AHEAD = 12
 
-/** 兒童服事固定項目（v6 反饋 #6，2026-08-27 定案；自訂新增暫時隱藏） */
+/**
+ * 兒童服事項目（v6 反饋 #6，2026-08-27 定案的六項）。
+ * v11 #4 起改由 `child_service_items` 資料表維護，這裡只留作**後備**：
+ * 資料表讀不到（migration 尚未執行）時，畫面仍有可用的項目而不是空白。
+ */
 export const CHILD_SERVICE_ITEM_PRESETS = [
   '收奉獻',
   '敬拜-司琴',
@@ -23,3 +27,17 @@ export const CHILD_SERVICE_ITEM_PRESETS = [
   '領讀天使-宣言/讀經/禱告',
   '環境稽核',
 ]
+
+/**
+ * 勾選按鈕要顯示的項目（v11 #4）。
+ * 啟用中的字典項目排前面，後面接「已授權但不在字典裡」的舊項目——
+ * 那些項目仍要看得到，同工才取消得掉（停用或改名不會讓既有授權變成孤兒）。
+ */
+export function childServiceItemOptions(
+  items: { name: string; active: boolean }[],
+  granted: string[],
+): string[] {
+  const base = items.length > 0 ? items.filter((i) => i.active).map((i) => i.name) : CHILD_SERVICE_ITEM_PRESETS
+  const seen = new Set(base)
+  return [...base, ...granted.filter((g) => !seen.has(g))]
+}

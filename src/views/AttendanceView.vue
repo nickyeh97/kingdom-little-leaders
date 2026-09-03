@@ -295,16 +295,16 @@ async function submit() {
           rows="1"
           autosize
           maxlength="200"
-          placeholder="給老師的話（選填），例：這週會帶奉獻、會晚 15 分鐘到"
+          placeholder="給老師的話（選填），例如：這週會帶奉獻、感冒剛好請提醒戴好口罩"
           :disabled="!openSel"
         />
       </div>
 
       <div v-if="children.length === 0" class="card hint">
-        尚未綁定孩子，請聯繫兒主窗口協助綁定。
+        尚未綁定孩子，請聯繫兒童部窗口協助綁定。
       </div>
 
-      <div class="card hint">勾選結果僅供同工預備課程與材料，臨時變動也沒關係 😊</div>
+      <div class="card hint">勾選結果供同工預備課程與材料，臨時變動請記得取消</div>
 
       <van-button
         v-if="children.length > 0"
@@ -324,7 +324,7 @@ async function submit() {
     <template v-else-if="mode === 'past'">
       <h3 class="section-title">{{ formatGathering(selected) }} · 當週勾選紀錄</h3>
       <div v-if="children.length === 0" class="card hint">
-        尚未綁定孩子，請聯繫兒主窗口協助綁定。
+        尚未綁定孩子，請聯繫兒童部窗口協助綁定。
       </div>
       <div v-for="c in children" :key="c.id" class="card">
         <div class="kid">

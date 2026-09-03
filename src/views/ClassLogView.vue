@@ -7,6 +7,7 @@ import { listSessionLogsRange, upsertSessionLog } from '../api/records'
 import { listCurrentPlaylistSongs, upsertFamiliarity } from '../api/songs'
 import { downloadCsv } from '../lib/csv'
 import { FAMILIARITY_VALUES } from '../lib/familiarity'
+import { LOG_SCORE_LABELS, LOG_SCORE_VALUES, type LogScoreDim } from '../lib/classLog'
 import { classHasIndex } from '../lib/performance'
 import {
   feedbackDeadline,
@@ -72,7 +73,18 @@ onMounted(async () => {
 
 // ---- 填寫/編輯 ----
 const editing = ref<SessionLog | null | 'new'>(null)
-const draft = ref({ content: '', song_progress: '', feedback: '' })
+const draft = ref<{
+  content: string
+  song_progress: string
+  feedback: string
+  flow_score: number | null
+  cooperation_score: number | null
+}>({ content: '', song_progress: '', feedback: '', flow_score: null, cooperation_score: null })
+
+/** 點同一格＝取消（未填＝null，不預設帶值） */
+function setLogScore(dim: LogScoreDim, value: number) {
+  draft.value[dim] = draft.value[dim] === value ? null : value
+}
 const editDate = ref(today)
 const saving = ref(false)
 
@@ -113,11 +125,17 @@ function openEditor(log: SessionLog | null) {
   if (log) {
     editing.value = log
     editDate.value = log.gathering_date
-    draft.value = { content: log.content, song_progress: log.song_progress, feedback: log.feedback }
+    draft.value = {
+      content: log.content,
+      song_progress: log.song_progress,
+      feedback: log.feedback,
+      flow_score: log.flow_score,
+      cooperation_score: log.cooperation_score,
+    }
   } else {
     editing.value = 'new'
     editDate.value = today
-    draft.value = { content: '', song_progress: '', feedback: '' }
+    draft.value = { content: '', song_progress: '', feedback: '', flow_score: null, cooperation_score: null }
   }
   loadFamSongs()
 }
@@ -133,20 +151,29 @@ function pickDate(d: string) {
       content: existing.content,
       song_progress: existing.song_progress,
       feedback: existing.feedback,
+      flow_score: existing.flow_score,
+      cooperation_score: existing.cooperation_score,
     }
   } else {
     editing.value = 'new'
-    draft.value = { content: '', song_progress: '', feedback: '' }
+    draft.value = { content: '', song_progress: '', feedback: '', flow_score: null, cooperation_score: null }
   }
   loadFamSongs()
 }
 
 /** 匯出本年課堂紀錄（自出席紀錄頁移入——v5 #6 動線調整） */
 function exportLogs() {
-  const rows: string[][] = [['日期', '班別', '老師', '課後反饋']]
+  const rows: string[][] = [['日期', '班別', '老師', '流程順暢度', '學生配合度', '課後反饋']]
   const groupName = (id: string) => groups.value.find((g) => g.id === id)?.name ?? ''
   for (const l of [...logs.value].sort((a, b) => a.gathering_date.localeCompare(b.gathering_date))) {
-    rows.push([l.gathering_date, groupName(l.class_group_id), l.teacher_name, l.feedback])
+    rows.push([
+      l.gathering_date,
+      groupName(l.class_group_id),
+      l.teacher_name,
+      l.flow_score != null ? String(l.flow_score) : '',
+      l.cooperation_score != null ? String(l.cooperation_score) : '',
+      l.feedback,
+    ])
   }
   downloadCsv(`課堂紀錄_${yearStart}_${today}.csv`, rows)
   showSuccessToast('已匯出，可存至教會 NAS 或匯入 Google Sheet')
@@ -188,7 +215,7 @@ async function save() {
 <template>
   <div class="page">
     <h2>課堂紀錄</h2>
-    <p class="hint">課後反饋與交接（給下一堂的老師）＋詩歌熟悉度，全年連貫呈現</p>
+    <p class="hint">課後反饋與交接（給下一堂的老師）＋流程/配合度＋詩歌熟悉度，全年連貫呈現</p>
 
     <van-tabs v-model:active="activeGroup" type="card" class="tabs" :color="activeClassColor">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
@@ -234,6 +261,11 @@ async function save() {
           <strong>{{ l.gathering_date }}</strong>
           <span class="hint">{{ l.teacher_name }}</span>
         </div>
+        <p v-if="l.flow_score != null || l.cooperation_score != null" class="hint">
+          <span v-if="l.flow_score != null">流程順暢度 {{ l.flow_score }}</span>
+          <span v-if="l.flow_score != null && l.cooperation_score != null">・</span>
+          <span v-if="l.cooperation_score != null">學生配合度 {{ l.cooperation_score }}</span>
+        </p>
         <p v-if="l.feedback" class="fb"><span class="label">課後反饋</span>{{ l.feedback }}</p>
         <p v-if="!l.feedback" class="hint">（尚未填寫課後反饋）</p>
       </div>
@@ -265,6 +297,23 @@ async function save() {
           </van-tag>
         </div>
         <!-- v6 #3：教學內容/詩歌進度欄位停用（教學內容看教案、詩歌進度看熟悉度）；舊資料保留不動 -->
+        <!-- v11 #5：兩維評的是這堂課的運作（流程/班級整體），不是個別孩子 -->
+        <p class="hint score-title">這堂課（1＝不順、5＝順暢；未填則留空）</p>
+        <div v-for="dim in (['flow_score', 'cooperation_score'] as LogScoreDim[])" :key="dim" class="score-dim">
+          <span class="score-label">{{ LOG_SCORE_LABELS[dim] }}</span>
+          <van-tag
+            v-for="v in LOG_SCORE_VALUES"
+            :key="v"
+            round
+            size="large"
+            :type="draft[dim] === v ? 'primary' : 'default'"
+            :plain="draft[dim] !== v"
+            @click="setLogScore(dim, v)"
+          >
+            {{ v }}
+          </van-tag>
+        </div>
+
         <van-field v-model="draft.feedback" label="課後反饋" type="textarea" rows="3" autosize
           maxlength="500" placeholder="給下一堂老師的提醒與交接" />
 
@@ -358,6 +407,20 @@ h2 {
 }
 .save-btn {
   margin-top: 14px;
+}
+.score-title {
+  margin: 14px 0 6px;
+}
+.score-dim {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.score-label {
+  min-width: 92px;
+  font-size: 16px;
 }
 .fam-title {
   margin: 14px 16px 6px;
