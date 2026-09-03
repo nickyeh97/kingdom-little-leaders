@@ -285,3 +285,95 @@
 ## 外部依賴
 
 - **需組長於 Supabase SQL Editor 執行 `supabase/migrations/2026-09-03_parent_view.sql`**，否則家長端兩頁會取不到資料。
+
+---
+
+# 追加需求（v11，2026-09-03）
+
+## 一覽
+
+| # | 需求 | 狀態 |
+| --- | --- | --- |
+| v11-1 | 本週歌單排到聚會日：教案頁看那次唱的歌、詩歌頁預習下次的歌 | ✅ 已實作 |
+| v11-2 | 確保家長不能編輯教案 | ✅ 已查證＋補測試 |
+| v11-3 | 出席頁兩則文案改為組長指定用字 | ✅ 已實作 |
+| v11-4 | 兒童服事項目字典（同工維護名稱與說明） | ✅ 已實作 |
+| v11-5 | 點名移除專心/配合，課堂紀錄新增流程順暢度、學生配合度 | ✅ 已實作（課堂紀錄後續還會再改） |
+| v11-6 | 「兒主」統一改為「兒童部」 | ✅ 已實作 |
+| v11-7 | 平台配色改為暖色系（參考 nypreschoolandkidsclub.com） | ✅ 已實作 |
+
+## v11-1｜本週歌單排到聚會日
+
+**問題**：`playlist_songs.is_weekly` 只是歌單上的一個勾選，**沒有日期**，只能代表「現在這一次」。
+家長端因此分不出「這週上過的」與「下次要上的」，教案頁也查不到某個過去的主日到底唱了什麼。
+
+**決議（組長 2026-09-03 選定）**：歌曲排到聚會日。
+
+- 新表 `weekly_songs(class_group_id, gathering_date, song_id, sort_order)`。
+- 詩歌頁：置頂區塊改為「**下次聚會要上的歌**」（`upcomingGathering()`），家長可先預習；同工按「排定歌曲」→ 選聚會日 → 勾選曲目。
+- 家長版教案：每張卡顯示「**這次唱的詩歌**」，取該聚會日排定的曲目，往前幾週都正確。
+- `is_weekly` 欄位**保留不刪**（不做不可逆的資料變更），但已不再讀寫；歌單編輯彈窗移除該勾選。
+
+## v11-2｜家長不能編輯教案
+
+查證結果：**本來就擋住了**，三層都擋——
+
+1. RLS `lesson_segments_write` 的 `using`/`with check` 都是 `is_admin() or has_class_role(class_group_id)`，家長兩者皆非。
+2. 路由 `lesson-plans` 的 `meta.roles` 是 `['teacher','admin']`。
+3. 家長端 `ParentLessonView.vue` 只呼叫唯讀 RPC，沒有任何寫入 API。
+
+補上守衛測試「家長不可進老師端教案頁」，避免日後改動不小心放行。
+
+## v11-4｜兒童服事項目字典
+
+- 新表 `child_service_items`；帶入 2026-08-27 定案的六項（名稱與既有紀錄的 `item` 文字一致，不需搬移資料）。
+- 新頁 `/child-service-items`（`requiresApproval`），「我的」入口：老師/同工恆顯示，家長僅在**有兒童班孩子**時顯示。
+- 寫入權由 RLS 限制為同工（`is_admin()`），前端 `canEdit` 只是 UX。
+- `childServiceItemOptions()`：啟用中的字典項目 ∪ 已授權但不在字典的舊項目——停用或改名不會讓既有授權變成取消不掉的孤兒；字典讀不到（migration 未執行）時退回內建六項，畫面不會空白。
+- 改名會跳確認：既有授權/報名紀錄以文字比對，**不會**跟著改；要下架請用「停用」而非刪除。
+
+## v11-5｜指數搬家
+
+- 點名頁移除專心度/配合度的評分格、近三個月走勢的指數欄與相關文案；`performance_scores` 的**資料與 API 全部保留**，之後組長給完整需求再決定去留。
+- 課堂紀錄新增 `flow_score`（流程順暢度）、`cooperation_score`（學生配合度），1–5、**未填留空**（不預設帶 5，避免「沒想過」被記成滿分）；列表卡片與 CSV 匯出同步。
+- 守則檢核：兩維評的是**這堂課的運作**，不是任何一個孩子，也不得用於比較班級（紅燈 #1／#7）。
+
+## v11-7｜暖色系配色
+
+參考站 <https://nypreschoolandkidsclub.com/> 取得的用色：暖橘 `#db662a`、金黃 `#f7a722`、暖底 `#feece0`／`#f9eef3`、輔助綠 `#598f78`、紫 `#7462a2`。
+
+依「暖色系為主」落成色票（`src/style.css`），並為了長輩可讀性調整深度：
+
+| Token | 值 | 說明 |
+| --- | --- | --- |
+| `--kll-primary` | `#c4551e` | 主色。參考站 `#db662a` 白字對比僅 **3.53:1**，本平台字級刻意放大就是因為長輩看不清，按鈕白字不能再吃力；加深後 **4.50:1**（WCAG AA），色相不變 |
+| `--kll-primary-bright` | `#db662a` | 參考站原色，只用於不承載文字的裝飾底 |
+| `--kll-primary-soft` / `--kll-primary-text` | `#feece0` / `#8a3d12` | 淺橘底＋深字（6.63:1） |
+| `--kll-bg` | `#fdf7f1` | 全站暖白底（原冷灰 `#f6f8f7`） |
+| `--kll-text` / `--kll-sub` | `#2b2018` / `#6e5d52` | 暖黑 14.93:1／暖灰 5.89:1 |
+| `--kll-accent` | `#4e7f69` | 語意綠（已簽到）：參考站 `#598f78` 加深，白字 4.60:1 |
+| `--van-warning-color` | `#a86a12` | 亮金 `#f7a722` 白字只有 2.0:1，只留給不承載文字的小圓點 |
+
+各頁硬寫的冷色（`#2aa876`、`#c3c9c6`、`#1f6f54` 等）一併換成 token。班別顏色（v9 #1）維持不變，三色標籤在新底色上的對比為 5.46／6.16／5.63。
+
+**待組長/師母確認**：兒童班的太陽色 `#E8930C` 與新主色 `#c4551e` 同屬暖色，若實機看覺得兩者不夠好分，可把兒童班換成別的色相。
+
+## 技術異動
+
+| 檔案 | 內容 |
+| --- | --- |
+| `supabase/migrations/2026-09-03b_v11.sql` | `weekly_songs`、`child_service_items` 兩張新表＋`session_logs` 兩個指數欄（同步寫回 `schema.sql` / `rls.sql`） |
+| `src/api/songs.ts` | `listWeeklySongs` / `setWeeklySongs` |
+| `src/api/childService.ts` | 項目字典 CRUD |
+| `src/lib/classLog.ts` | 課堂紀錄兩維指數（新檔） |
+| `src/lib/service.ts` | `childServiceItemOptions` |
+| `src/lib/parentLesson.ts` | `songsForDate` 改讀 `weekly_songs` |
+| `src/views/ChildServiceItemsView.vue` | 新頁 |
+| `src/views/SongsView.vue` / `ParentLessonView.vue` / `CheckInView.vue` / `ClassLogView.vue` / `MembersView.vue` / `ServiceView.vue` / `ProfileView.vue` | 對應改動 |
+| `src/style.css` | 暖色系色票 |
+| 測試 | `classLog.test.ts`（4）、`service.test.ts` 新增 4、`parentLesson.test.ts` 改寫 songsForDate 4、`guard.test.ts` 新增 3 |
+
+## 外部依賴
+
+- **需組長於 Supabase SQL Editor 執行 `supabase/migrations/2026-09-03b_v11.sql`**（在 `2026-09-03_parent_view.sql` 之後）。
+  未執行則：詩歌頁排定歌曲、家長版教案的詩歌、課堂紀錄兩維指數、兒童服事項目頁都會取不到資料。

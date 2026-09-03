@@ -135,12 +135,12 @@ h2 {
 .teachers {
   margin: 6px 0 0;
   font-size: 14px;
-  color: #6b7570;
+  color: var(--kll-sub);
 }
 .seg {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #eef1ef;
+  border-top: 1px solid var(--kll-line);
 }
 .seg-item {
   font-weight: 600;
@@ -155,11 +155,11 @@ h2 {
 .songs {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px dashed #dfe4e1;
+  border-top: 1px dashed var(--kll-line);
 }
 .songs-title {
   font-size: 14px;
-  color: #6b7570;
+  color: var(--kll-sub);
 }
 .song {
   display: flex;
@@ -170,6 +170,6 @@ h2 {
 }
 .song a {
   font-size: 13px;
-  color: #2f8fd0;
+  color: var(--kll-primary);
 }
 </style>

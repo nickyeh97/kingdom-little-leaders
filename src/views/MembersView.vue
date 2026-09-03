@@ -634,7 +634,7 @@ async function removeChild() {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #e8eaed;
+  background: var(--kll-line);
   flex-shrink: 0;
 }
 .child-avatar {

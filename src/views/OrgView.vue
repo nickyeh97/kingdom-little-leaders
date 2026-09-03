@@ -91,6 +91,6 @@ h3 {
 .foot-hint {
   margin: 10px 2px 0;
   font-size: 13px;
-  color: #8a9490;
+  color: var(--kll-sub);
 }
 </style>

@@ -253,7 +253,7 @@ async function removeAnn() {
       left-icon="edit"
       mode="link"
       color="#7a5300"
-      background="#fef1d9"
+      background="var(--kll-amber-soft)"
       :text="`上堂課（${lastG}）${missingLogClasses.map((c) => c.name).join('、')}的課堂紀錄還沒填——${feedbackDue.toLocaleDateString('zh-TW')}（${weekdayName(feedbackDue)}）23:59 前完成`"
       @click="$router.push({ name: 'class-log', query: { class: missingLogClasses[0].id } })"
     />
@@ -288,8 +288,8 @@ async function removeAnn() {
       v-if="kidServiceDates.length > 0"
       left-icon="smile-o"
       mode="link"
-      color="#1f6f54"
-      background="#e2f0e8"
+      color="#8a3d12"
+      background="#feece0"
       :text="`您的孩子有服事安排（${kidServiceDates.map((d) => d.slice(5).replace('-', '/')).join('、')}）——點日期到出席頁查看服事表`"
       @click="$router.push({ name: 'attendance' })"
     />
@@ -298,8 +298,8 @@ async function removeAnn() {
       v-if="myServiceDates.length > 0"
       left-icon="calendar-o"
       mode="link"
-      color="#1f6f54"
-      background="#e2f0e8"
+      color="#8a3d12"
+      background="#feece0"
       :text="`您有已發布的服事安排（${myServiceDates.map((d) => d.slice(5).replace('-', '/')).join('、')}）——點我查看服事表`"
       @click="$router.push({ name: 'service' })"
     />

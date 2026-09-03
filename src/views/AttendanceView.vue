@@ -449,7 +449,7 @@ h2 {
   line-height: 1.2;
 }
 .cal-cell.out .num {
-  color: #c3c9c6;
+  color: var(--kll-muted);
 }
 .cal-cell.gday {
   background: var(--kll-primary-soft);
@@ -480,16 +480,16 @@ h2 {
   display: inline-block;
 }
 .dot-attend {
-  background: #2aa876;
+  background: var(--kll-accent);
 }
 .sel .dot-attend {
-  background: #bdeedd;
+  background: var(--kll-accent-soft);
 }
 .dot-leave {
   background: var(--kll-amber);
 }
 .dot-none {
-  background: #c3c9c6;
+  background: var(--kll-muted);
 }
 .sel .dot-none {
   background: #ffffff88;
@@ -499,7 +499,7 @@ h2 {
   font-size: 14px;
 }
 .lg-attend {
-  color: #2aa876;
+  color: var(--kll-accent);
   margin: 0 8px 0 2px;
 }
 .lg-leave {

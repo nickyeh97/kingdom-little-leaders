@@ -1,13 +1,25 @@
 :root {
-  /* 對齊 Figma 初稿的色票 */
-  --kll-primary: #1f8a70;
-  --kll-primary-dark: #176b57;
-  --kll-primary-soft: #e0f1ec;
-  --kll-bg: #f6f8f7;
-  --kll-text: #1f2933;
-  --kll-sub: #6b7280;
-  --kll-amber: #f5a623;
-  --kll-amber-soft: #fef1d9;
+  /* ---- 暖色系色票（v11 #7，2026-09-03）----
+     來源：師母指定參考 nypreschoolandkidsclub.com 的用色
+     （暖橘 #db662a、金黃 #f7a722、暖底 #feece0、輔助綠 #598f78）。
+     主色改用略深的 #c4551e：參考站原色 #db662a 配白字對比只有 3.53:1，
+     本平台字級刻意放大就是因為長輩看不清，按鈕上的白字不能再吃力——
+     #c4551e 對白字 4.50:1（WCAG AA），色相與原色一致，看起來仍是同一個橘。 */
+  --kll-primary: #c4551e; /* 主色：按鈕、選取、強調（白字 4.50:1） */
+  --kll-primary-bright: #db662a; /* 參考站原色：只用於裝飾底色，不承載文字 */
+  --kll-primary-dark: #9e4317;
+  --kll-primary-soft: #feece0; /* 暖橘淺底 */
+  --kll-primary-text: #8a3d12; /* 淺橘底上的深字（6.63:1） */
+  --kll-accent: #4e7f69; /* 語意綠（已簽到、成功）：參考站 #598f78 加深，白字 4.60:1 */
+  --kll-accent-soft: #e7f0ea;
+  --kll-bg: #fdf7f1; /* 全站暖白底 */
+  --kll-text: #2b2018; /* 暖黑（14.93:1） */
+  --kll-sub: #6e5d52; /* 暖灰次要文字（5.89:1） */
+  --kll-line: #eadfd4; /* 分隔線 */
+  --kll-border: #dccec0; /* 邊框 */
+  --kll-muted: #b8a99c; /* 停用/未定 */
+  --kll-amber: #f7a722;
+  --kll-amber-soft: #fef3dc;
 
   /* 覆寫 Vant 主題色 */
   --van-primary-color: var(--kll-primary);
@@ -38,6 +50,15 @@
   --van-notice-bar-height: 48px;
   --van-collapse-item-content-font-size: 18px;
   --van-checkbox-size: 24px;
+
+  /* Vant 語意色也跟著暖化，避免元件內建的藍綠跳出整體色調。
+     兩色都取「白字仍讀得清」的深度：success 4.60:1、warning 4.43:1；
+     參考站的亮金 #f7a722 白字只有 2.0:1，只留給不承載文字的小圓點。 */
+  --van-success-color: var(--kll-accent);
+  --van-warning-color: #a86a12;
+  --van-background-2: #fffdfb;
+  --van-cell-background: #fffdfb;
+  --van-border-color: var(--kll-line);
 }
 
 html,
@@ -61,7 +82,7 @@ body {
 }
 
 .card {
-  background: #fff;
+  background: #fffdfb;
   border-radius: 14px;
   padding: 14px 16px;
   margin-bottom: 12px;

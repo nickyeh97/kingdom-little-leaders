@@ -726,7 +726,7 @@ h2 {
 .mv {
   width: 36px;
   height: 34px;
-  border: 1px solid var(--kll-border, #dde4df);
+  border: 1px solid var(--kll-line);
   border-radius: 8px;
   background: var(--kll-bg);
   font-size: 17px;
@@ -791,9 +791,9 @@ h2 {
 .time-block {
   flex: 1;
   min-width: 0;
-  border: 1px solid #dde4df;
+  border: 1px solid var(--kll-line);
   border-radius: 12px;
-  background: #fff;
+  background: #fffdfb;
   padding: 10px 8px 12px;
   display: flex;
   flex-direction: column;

@@ -648,7 +648,7 @@ async function removePl() {
   padding: 0 12px;
   border: 1px solid currentColor;
   border-radius: 4px;
-  background: #fff;
+  background: #fffdfb;
   font-size: 14px;
   line-height: 1;
   text-decoration: none;

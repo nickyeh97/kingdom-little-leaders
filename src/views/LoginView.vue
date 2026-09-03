@@ -251,13 +251,13 @@ async function sendReset() {
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--kll-border, #e0e5e3);
+  background: var(--kll-line);
 }
 .google-btn {
   margin: 0 auto;
   width: calc(100% - 32px);
   display: block;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--kll-border);
 }
 .g-icon {
   display: inline-block;
