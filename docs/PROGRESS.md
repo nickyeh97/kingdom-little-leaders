@@ -109,6 +109,8 @@
 | --- | --- | --- |
 | 教會 Google 雲端授權（Service Account） | 組長 | Google Sheet 自動同步 |
 | 執行 migration `2026-09-03c_announcement_updated_at.sql` | 組長（Supabase SQL Editor） | 未執行則公告不會顯示「X 編輯」 |
+| 執行 migration `2026-09-03d_meeting_links.sql` | 組長（Supabase SQL Editor） | 未執行則開會決議沒有「相關連結」區（頁面其餘功能正常） |
+| 教會 Google **Service Account JSON 金鑰** | 組長（需 Workspace 管理者建立） | 平台直接上傳/下載雲端檔案；帳號密碼無法使用亦不應提供 |
 | 課堂紀錄的完整需求 | 組長 | v11 #5 先加兩維指數，整頁改版待需求 |
 
 （`2026-09-03_parent_view.sql` 與 `2026-09-03b_v11.sql` 已於 2026-09-03 執行完畢。）

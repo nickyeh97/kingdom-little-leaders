@@ -464,6 +464,25 @@ create policy "meeting_items_write" on meeting_items
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
+-- meeting_links（v11 #11）：讀寫完全跟著母會議走，不重複實作 scope/班別判斷
+alter table meeting_links enable row level security;
+create policy "meeting_links_read" on meeting_links
+  for select to authenticated
+  using (
+    exists (
+      select 1 from meetings m
+      where m.id = meeting_id
+        and (
+          public.is_admin()
+          or (public.is_staff() and m.scope = 'all')
+          or (m.scope = 'class' and public.has_class_role(m.class_group_id))
+        )
+    )
+  );
+create policy "meeting_links_write" on meeting_links
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
 alter table org_units enable row level security;
 create policy "org_units_read" on org_units
   for select to authenticated using (public.is_staff());

@@ -245,7 +245,9 @@ h2 {
 }
 .cls-head strong {
   font-size: 18px;
-  color: var(--kll-primary-dark);
+  /* 班別名用黑色粗體：底色與外框已足以辨識班別，文字再上色反而不好讀（v11 #9） */
+  color: var(--kll-text);
+  font-weight: 700;
 }
 .rec-row {
   padding: 8px 0;

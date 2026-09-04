@@ -412,3 +412,44 @@
 - `2026-09-03_parent_view.sql`、`2026-09-03b_v11.sql`：**組長已於 2026-09-03 執行完畢**。
 - **尚待執行：`supabase/migrations/2026-09-03c_announcement_updated_at.sql`**（v11 #8），
   未執行則公告不會顯示「X 編輯」。
+
+---
+
+# 追加需求（v12，2026-09-03 下午）
+
+| # | 需求 | 狀態 |
+| --- | --- | --- |
+| v12-9 | 出席紀錄的班別名改黑色粗體 | ✅ 已實作 |
+| v12-10 | 老師服事總覽改成四類為欄、聚會日為列的表格 | ✅ 已實作 |
+| v12-11 | 開會決議可掛多個連結 | ✅ 已實作 |
+| v12-12 | 平台直接上傳/下載教會 Google 雲端 | ⛔ 暫不實作（需 Service Account 金鑰，不是帳密；見規格書 v12 說明） |
+
+## v12-10｜老師服事總覽表
+
+`serviceGrid()`（`src/lib/service.ts`）把報名攤成「日期 × 四欄」：
+
+- 欄：全主責／助教／助理／彈性時間。
+- **助教（敬拜）與助教（真理）併入「助教」欄**，顯示成「小美（敬拜）」，保留分工才看得出差別。
+- **v7 之前的舊資料存的是「主責」而非「全主責」**——實機資料驗證時發現全被丟進「其他」，
+  因此比對改用 `includes` 而不是 `startsWith`。
+- 不屬於四類的自訂項目不硬塞欄位，列在表格下方「其他」。
+- 手機放不下四欄＋日期，表格自身 `overflow-x: auto` 橫捲，頁面本身不橫捲（`.ov-scroll`）。
+
+順手清掉 `ServiceView.vue` 裡重複兩份且已無對應標籤的 `.ov-row/.ov-date/.ov-list` dead CSS。
+
+## v12-11｜開會決議的多個連結
+
+- 新表 `meeting_links(meeting_id, title, url, sort_order)`；RLS 的讀寫**完全跟著母會議走**
+  （`exists (select 1 from meetings m where ...)`），scope／班別判斷不重複實作，避免兩處走鐘。
+- 卡片內「相關連結」區塊，同工可＋連結／編輯／刪除；網址存檔前過 `normalizeUrl`。
+- 彈窗文案提醒：檔案放教會 NAS／Google 雲端，**記得把雲端檔案的分享權限開給需要看的同工**。
+
+**部署順序的坑（已處理）**：`listMeetings` 原本直接 `select('*, meeting_items(*), meeting_links(*)')`，
+在 migration 尚未執行的環境裡 PostgREST 會回 `PGRST200`（找不到關聯），**整個開會決議頁一筆會議都讀不到**。
+已加上退回不帶連結的查詢：頁面照常可用，只是暫時沒有連結區。實機驗證過（未建表時仍讀得到會議）。
+
+## 外部依賴（更新）
+
+- **尚待執行**：`2026-09-03c_announcement_updated_at.sql`、`2026-09-03d_meeting_links.sql`。
+- v12 #12 若要做，需教會 Google Workspace 管理者提供 **Service Account JSON 金鑰**（不是帳密），
+  並把兒童部資料夾單獨分享給該 Service Account；金鑰只能存在 Edge Function secret。

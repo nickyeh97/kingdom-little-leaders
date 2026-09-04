@@ -466,6 +466,17 @@ create table meeting_items (
 );
 create index idx_meeting_items on meeting_items (meeting_id);
 
+-- 會議附件連結（v11 #11）：講義/簡報/錄影放教會 NAS 或 Google 雲端，平台只存外連
+create table meeting_links (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid not null references meetings (id) on delete cascade,
+  title text not null,
+  url text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index idx_meeting_links on meeting_links (meeting_id, sort_order);
+
 -- 組織架構／分工（C-06）
 create table org_units (
   id uuid primary key default gen_random_uuid(),

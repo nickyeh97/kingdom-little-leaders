@@ -298,6 +298,16 @@ export interface Meeting {
   minutes: string
   created_by_name: string
   meeting_items?: MeetingItem[]
+  meeting_links?: MeetingLink[]
+}
+
+/** 會議附件連結（v11 #11）：講義/簡報/錄影放教會雲端，平台只存外連 */
+export interface MeetingLink {
+  id: string
+  meeting_id: string
+  title: string
+  url: string
+  sort_order: number
 }
 
 /** 會議事項（決議/待討論：內容、分工、預計完成日、狀態） */
