@@ -5,7 +5,7 @@
 >
 > 最後更新：2026-09-04（**平台升版 v0.3.0**：Sprint 07 追加 v10／v11／v12 全數上線；
 > 操作手冊 v5、更新說明 `docs/RELEASE_NOTES_v0.3.0.md`、
-> 實機圖文說明書 `docs/圖文說明書_v0.3.0.pdf`（取代 Figma 導覽））
+> 實機圖文說明書 `docs/圖文說明書_v0.3.1.pdf`（取代 Figma 導覽））
 
 ## 目前狀態一句話
 
@@ -110,7 +110,7 @@
 | --- | --- | --- |
 | 教會 Google 雲端授權（Service Account） | 組長 | Google Sheet 自動同步 |
 | 教會 Google **Service Account JSON 金鑰** | 組長（需 Workspace 管理者建立） | 平台直接上傳/下載雲端檔案；帳號密碼無法使用亦不應提供 |
-（Figma 實機導覽已停止維護，改以 `docs/圖文說明書_v0.3.0.pdf`（iPhone 14 尺寸截圖＋逐頁說明）取代。）
+（Figma 實機導覽已停止維護，改以 `docs/圖文說明書_v0.3.1.pdf`（iPhone 14 尺寸截圖＋逐頁說明）取代。）
 | 課堂紀錄的完整需求 | 組長 | v11 #5 先加兩維指數，整頁改版待需求 |
 
 （四支 migration `2026-09-03_parent_view`／`b_v11`／`c_announcement_updated_at`／`d_meeting_links`
