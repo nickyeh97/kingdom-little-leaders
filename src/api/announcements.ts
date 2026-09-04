@@ -1,4 +1,5 @@
 import { db } from '../lib/supabase'
+import { normalizeCategory } from '../lib/announcement'
 import type { Announcement } from '../types'
 
 export async function listAnnouncements(): Promise<Announcement[]> {
@@ -8,7 +9,8 @@ export async function listAnnouncements(): Promise<Announcement[]> {
     .order('pinned', { ascending: false })
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data as Announcement[]
+  // 舊值（公告／重要）在 migration 執行前仍可能存在，讀取時就轉成分類
+  return (data as Announcement[]).map((a) => ({ ...a, tag: normalizeCategory(a.tag) }))
 }
 
 export interface AnnouncementInput {

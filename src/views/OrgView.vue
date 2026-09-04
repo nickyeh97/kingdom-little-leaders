@@ -42,43 +42,37 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <div class="page">
     <ImageBoard
       title="組織架構與分工"
       hint="兒童部的督導、主責同工與各班負責同工（點圖可放大）"
       src="/兒童部組織架構.png"
       alt="兒童部組織架構與分工"
+      max-height="40vh"
     />
 
-    <div class="page teachers">
-      <h3>{{ isStaff ? '各班老師' : '孩子班上的老師' }}</h3>
-      <van-loading v-if="loading" class="loading" />
-      <template v-else>
-        <div v-for="g in visibleGroups" :key="g.id" class="card">
-          <van-tag :style="classTagStyle(g.name)">{{ g.name }}</van-tag>
-          <p class="names">{{ teachersOfClass(teachers, g.id).join('、') }}</p>
-        </div>
-        <p v-if="visibleGroups.length === 0" class="card hint">
-          {{
-            isStaff
-              ? '尚未指派班別老師，可於「名單與權限」設定。'
-              : '目前沒有可顯示的班級老師。若孩子尚未綁定，請聯絡同工協助。'
-          }}
-        </p>
-        <p class="foot-hint">名單僅顯示稱呼；聯絡方式請透過同工或班級群組取得。</p>
-      </template>
-    </div>
+    <h3 class="section-title" style="--sec: var(--kll-green)">
+      {{ isStaff ? '各班老師' : '孩子班上的老師' }}
+    </h3>
+    <van-loading v-if="loading" class="loading" />
+    <template v-else>
+      <div v-for="g in visibleGroups" :key="g.id" class="card">
+        <van-tag :style="classTagStyle(g.name)">{{ g.name }}</van-tag>
+        <p class="names">{{ teachersOfClass(teachers, g.id).join('、') }}</p>
+      </div>
+      <p v-if="visibleGroups.length === 0" class="card hint">
+        {{
+          isStaff
+            ? '尚未指派班別老師，可於「名單與權限」設定。'
+            : '目前沒有可顯示的班級老師。若孩子尚未綁定，請聯絡同工協助。'
+        }}
+      </p>
+      <p class="foot-hint">名單僅顯示稱呼；聯絡方式請透過同工或班級群組取得。</p>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.teachers {
-  padding-top: 0;
-}
-h3 {
-  margin: 4px 0 8px;
-  font-size: 18px;
-}
 .loading {
   text-align: center;
   padding: 16px 0;

@@ -23,3 +23,40 @@ export function normalizeUrl(input: string | null | undefined): string {
   // 協定相對網址（//host/path）與漏打 scheme 的網址都補上 https://
   return `https://${url.replace(/^\/+/, '')}`
 }
+
+// ---- 內文網址轉連結（v0.3.2）----
+// 公告內文常直接貼網址（手冊、報名表、影片）。純文字渲染的話點不動，
+// 家長只能自己複製貼到瀏覽器。這裡把內文切成「文字段」與「連結段」，
+// 由呼叫端各自渲染——**不使用 v-html**，避免使用者輸入的內容變成可執行的標記。
+
+/** 只認 http/https 開頭的完整網址；不猜 www. 開頭，避免把一般文字誤判成連結 */
+const URL_IN_TEXT = /https?:\/\/[^\s<>"'\u3000]+/g
+
+/** 網址結尾常黏到的標點（中英文都算），不應算進連結 */
+const TRAILING = /[.,;:!?、。，；：！？)\]}）］｝」』>]+$/
+
+export interface TextSegment {
+  text: string
+  /** 有值代表這段是連結；已過 normalizeUrl，只會是 http/https */
+  href?: string
+}
+
+export function linkifyText(input: string | null | undefined): TextSegment[] {
+  const text = input ?? ''
+  if (!text) return []
+  const segments: TextSegment[] = []
+  let last = 0
+  for (const m of text.matchAll(URL_IN_TEXT)) {
+    const start = m.index ?? 0
+    let raw = m[0]
+    // 把黏在網址後面的標點還給文字段（「請看 https://a.b/c。」的句號）
+    const trimmed = raw.replace(TRAILING, '')
+    const href = normalizeUrl(trimmed)
+    if (!href) continue
+    if (start > last) segments.push({ text: text.slice(last, start) })
+    segments.push({ text: trimmed, href })
+    last = start + trimmed.length
+  }
+  if (last < text.length) segments.push({ text: text.slice(last) })
+  return segments.length > 0 ? segments : [{ text }]
+}

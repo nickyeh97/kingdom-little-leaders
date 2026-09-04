@@ -229,7 +229,7 @@ create table announcements (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   body text not null,
-  tag text not null default '公告',
+  tag text not null default '行政' check (tag in ('行政', '課程')), -- 分類（v0.3.2；醒目度由 pinned 承擔）
   class_group_id uuid references class_groups (id),
   pinned boolean not null default false,
   created_by uuid not null default auth.uid() references profiles (id),

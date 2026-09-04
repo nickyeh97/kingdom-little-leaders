@@ -8,10 +8,12 @@ import ImageBoard from '../components/ImageBoard.vue'
 </script>
 
 <template>
-  <ImageBoard
-    title="國度領袖兒童異象"
-    hint="培育神國小領袖，活出天父美好的計畫（點圖可放大）"
-    src="/國度領袖兒童部異象.jpg"
-    alt="國度領袖兒童異象：核心三要點"
-  />
+  <div class="page">
+    <ImageBoard
+      title="國度領袖兒童異象"
+      hint="培育神國小領袖，活出天父美好的計畫（點圖可放大）"
+      src="/國度領袖兒童部異象.jpg"
+      alt="國度領袖兒童異象：核心三要點"
+    />
+  </div>
 </template>

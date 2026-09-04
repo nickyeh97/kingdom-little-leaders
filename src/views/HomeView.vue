@@ -15,8 +15,19 @@ import { listServiceWeeks } from '../api/service'
 import { listMeetings } from '../api/meetings'
 import { listLessonSegmentsByDate } from '../api/teaching'
 import { classHasIndex } from '../lib/performance'
+import { classTagStyle } from '../lib/classColor'
+import { linkifyText } from '../lib/url'
 import { classesMissingLog } from '../lib/teaching'
-import { announcementDateText } from '../lib/announcement'
+import {
+  ANNOUNCEMENT_CATEGORIES,
+  CATEGORY_ALL,
+  CATEGORY_DEFAULT,
+  announcementDateText,
+  categoryIcon,
+  categoryStyle,
+  filterByCategory,
+  showCategoryFilter,
+} from '../lib/announcement'
 import { roleLabel, roleTagStyle } from '../lib/roleColor'
 import {
   feedbackDeadline,
@@ -33,6 +44,10 @@ import type { Announcement, ClassGroup } from '../types'
 
 const auth = useAuthStore()
 const announcements = ref<Announcement[]>([])
+/** 公告分類篩選（v0.3.2）：預設「全部」，不預先藏起任何一則 */
+const annCategory = ref<string>(CATEGORY_ALL)
+const shownAnns = computed(() => filterByCategory(announcements.value, annCategory.value))
+const annFilterVisible = computed(() => showCategoryFilter(announcements.value))
 const classGroups = ref<ClassGroup[]>([])
 const loading = ref(true)
 
@@ -169,7 +184,7 @@ const annDraft = ref<{
   tag: string
   class_group_id: string | null
   pinned: boolean
-}>({ title: '', body: '', tag: '公告', class_group_id: null, pinned: false })
+}>({ title: '', body: '', tag: CATEGORY_DEFAULT, class_group_id: null, pinned: false })
 const annSaving = ref(false)
 
 function openAnnEditor(a: Announcement | null) {
@@ -180,7 +195,7 @@ function openAnnEditor(a: Announcement | null) {
     : {
         title: '',
         body: '',
-        tag: '公告',
+        tag: CATEGORY_DEFAULT,
         // 老師沒有「全體」選項：預設帶入自己的第一個班別
         class_group_id: annClassOptions.value[0]?.id ?? null,
         pinned: false,
@@ -323,23 +338,64 @@ async function removeAnn() {
     </div>
     <van-skeleton v-if="loading" title :row="3" />
     <template v-else>
-      <div v-if="announcements.length === 0" class="card hint">目前沒有公告</div>
+      <!-- 分類篩選（v0.3.2）：只有一種分類時不出現，比照教材資料庫 -->
+      <div v-if="annFilterVisible" class="ann-filter">
+        <van-tag
+          round
+          size="large"
+          :type="annCategory === CATEGORY_ALL ? 'primary' : 'default'"
+          :plain="annCategory !== CATEGORY_ALL"
+          @click="annCategory = CATEGORY_ALL"
+        >
+          全部
+        </van-tag>
+        <van-tag
+          v-for="c in ANNOUNCEMENT_CATEGORIES"
+          :key="c"
+          round
+          size="large"
+          :type="annCategory === c ? 'primary' : 'default'"
+          :plain="annCategory !== c"
+          @click="annCategory = annCategory === c ? CATEGORY_ALL : c"
+        >
+          {{ categoryIcon(c) }} {{ c }}
+        </van-tag>
+      </div>
+
+      <div v-if="shownAnns.length === 0" class="card hint">
+        {{ announcements.length === 0 ? '目前沒有公告' : `目前沒有${annCategory}公告` }}
+      </div>
       <div
-        v-for="a in announcements"
+        v-for="a in shownAnns"
         :key="a.id"
         class="card"
         :class="{ clickable: canEditAnn(a) }"
         @click="openAnnEditor(a)"
       >
+        <!-- 標籤自成一列：手機上標題與標籤同列時，標題會被擠到換行且與標籤錯位 -->
         <div class="ann-head">
-          <van-tag :type="a.tag === '重要' ? 'warning' : 'primary'" plain>{{ a.tag }}</van-tag>
-          <van-tag v-if="a.class_group_id" type="success" plain>
+          <van-tag :style="categoryStyle(a.tag)">{{ categoryIcon(a.tag) }} {{ a.tag }}</van-tag>
+          <van-tag v-if="a.class_group_id" :style="classTagStyle(a.class_groups?.name)">
             {{ a.class_groups?.name ?? '班別' }}
           </van-tag>
-          <strong class="ann-title">{{ a.title }}</strong>
-          <span v-if="a.pinned">📌</span>
+          <span v-if="a.pinned" class="ann-pin">📌</span>
         </div>
-        <p class="ann-body">{{ a.body }}</p>
+        <strong class="ann-title">{{ a.title }}</strong>
+        <!-- 內文網址轉成可點連結；不用 v-html，避免使用者輸入變成可執行標記。
+             @click.stop：卡片本身是編輯入口，點連結不該同時開啟編輯 -->
+        <p class="ann-body">
+          <template v-for="(seg, i) in linkifyText(a.body)" :key="i">
+            <a
+              v-if="seg.href"
+              :href="seg.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="ann-link"
+              @click.stop
+            >{{ seg.text }}</a>
+            <template v-else>{{ seg.text }}</template>
+          </template>
+        </p>
         <p class="hint">{{ announcementDateText(a.created_at, a.updated_at) }}</p>
       </div>
     </template>
@@ -374,19 +430,19 @@ async function removeAnn() {
             </van-tag>
           </template>
         </van-cell>
-        <van-cell title="標籤" center class="tag-cell">
+        <van-cell title="分類" center class="tag-cell">
           <template #value>
             <van-tag
-              v-for="t in ['公告', '重要']"
+              v-for="t in ANNOUNCEMENT_CATEGORIES"
               :key="t"
               round
               size="large"
               class="tag-opt"
-              :type="annDraft.tag === t ? (t === '重要' ? 'warning' : 'primary') : 'default'"
+              :type="annDraft.tag === t ? 'primary' : 'default'"
               :plain="annDraft.tag !== t"
               @click="annDraft.tag = t"
             >
-              {{ t }}
+              {{ categoryIcon(t) }} {{ t }}
             </van-tag>
           </template>
         </van-cell>
@@ -441,6 +497,12 @@ async function removeAnn() {
   align-items: center;
   justify-content: space-between;
 }
+.ann-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 2px 10px;
+}
 .clickable {
   cursor: pointer;
 }
@@ -476,10 +538,20 @@ async function removeAnn() {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 6px;
+}
+.ann-pin {
+  margin-left: auto;
 }
 .ann-title {
-  flex: 1;
+  display: block;
   font-size: 21px;
+  line-height: 1.4;
+}
+.ann-link {
+  color: var(--kll-primary);
+  text-decoration: underline;
+  word-break: break-all;
 }
 .ann-body {
   font-size: 18px;
