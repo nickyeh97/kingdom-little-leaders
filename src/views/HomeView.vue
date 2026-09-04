@@ -16,6 +16,7 @@ import { listMeetings } from '../api/meetings'
 import { listLessonSegmentsByDate } from '../api/teaching'
 import { classHasIndex } from '../lib/performance'
 import { classTagStyle } from '../lib/classColor'
+import { linkifyText } from '../lib/url'
 import { classesMissingLog } from '../lib/teaching'
 import {
   ANNOUNCEMENT_CATEGORIES,
@@ -380,7 +381,21 @@ async function removeAnn() {
           <span v-if="a.pinned" class="ann-pin">📌</span>
         </div>
         <strong class="ann-title">{{ a.title }}</strong>
-        <p class="ann-body">{{ a.body }}</p>
+        <!-- 內文網址轉成可點連結；不用 v-html，避免使用者輸入變成可執行標記。
+             @click.stop：卡片本身是編輯入口，點連結不該同時開啟編輯 -->
+        <p class="ann-body">
+          <template v-for="(seg, i) in linkifyText(a.body)" :key="i">
+            <a
+              v-if="seg.href"
+              :href="seg.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="ann-link"
+              @click.stop
+            >{{ seg.text }}</a>
+            <template v-else>{{ seg.text }}</template>
+          </template>
+        </p>
         <p class="hint">{{ announcementDateText(a.created_at, a.updated_at) }}</p>
       </div>
     </template>
@@ -532,6 +547,11 @@ async function removeAnn() {
   display: block;
   font-size: 21px;
   line-height: 1.4;
+}
+.ann-link {
+  color: var(--kll-primary);
+  text-decoration: underline;
+  word-break: break-all;
 }
 .ann-body {
   font-size: 18px;
