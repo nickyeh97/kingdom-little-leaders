@@ -360,7 +360,7 @@ as $$
 $$;
 grant execute on function public.set_child_service_eligible(uuid, boolean) to authenticated;
 
--- child_service_items（v11 #4）：老師與家長可檢視項目與說明；同工可維護
+-- child_service_items（v11 #4）：**所有已審核成員**皆可檢視項目與說明；僅同工可維護
 alter table child_service_items enable row level security;
 create policy "child_service_items_read" on child_service_items
   for select to authenticated using (public.is_approved());
