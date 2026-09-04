@@ -133,6 +133,7 @@ export interface Announcement {
   id: string
   title: string
   body: string
+  /** 分類：行政 / 課程（v0.3.2；原為重要度「公告/重要」，醒目度改由 pinned 承擔） */
   tag: string
   /** 班別歸屬：null＝全體公告（v3 決議 4） */
   class_group_id: string | null
