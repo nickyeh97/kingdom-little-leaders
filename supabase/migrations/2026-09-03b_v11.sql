@@ -66,7 +66,7 @@ create table if not exists child_service_items (
 alter table child_service_items enable row level security;
 drop policy if exists "child_service_items_read" on child_service_items;
 create policy "child_service_items_read" on child_service_items
-  for select to authenticated using (public.is_approved()); -- 老師與家長皆可檢視項目說明
+  for select to authenticated using (public.is_approved()); -- 所有已審核成員皆可檢視項目說明
 drop policy if exists "child_service_items_write" on child_service_items;
 create policy "child_service_items_write" on child_service_items
   for all to authenticated
