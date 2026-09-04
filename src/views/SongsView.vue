@@ -9,14 +9,18 @@ import {
   deleteSong,
   listPlaylists,
   listSongs,
+  listWeeklySongs,
   setPlaylistSongs,
+  setWeeklySongs,
   updatePlaylist,
   updateSong,
   upsertFamiliarity,
+  type WeeklySongRow,
 } from '../api/songs'
 import { FAMILIARITY_VALUES, familiarityText } from '../lib/familiarity'
 import { classHasIndex } from '../lib/performance'
-import { upcomingGathering } from '../lib/gathering'
+import { formatGathering, recentGatherings, upcomingGathering, upcomingGatherings } from '../lib/gathering'
+import { songsForDate } from '../lib/parentLesson'
 import { normalizeUrl } from '../lib/url'
 import { useAuthStore } from '../stores/auth'
 import type { ClassGroup, Song, SongFamiliarity, SongPlaylist } from '../types'
@@ -30,6 +34,9 @@ const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
 const loading = ref(true)
 const openLyrics = ref<string[]>([])
+/** 本週歌單（v11 #1）：歌曲排到具體聚會日；近 2 次＋未來 4 次的範圍夠用 */
+const weeklyRows = ref<WeeklySongRow[]>([])
+const weeklyDates = [...new Set([...recentGatherings(2), ...upcomingGatherings(4)])].sort()
 
 const songById = computed(() => new Map(songs.value.map((s) => [s.id, s])))
 
@@ -46,6 +53,13 @@ async function load() {
     // 幼幼班無詩歌模組（只有點名＋老師課後紀錄）——不顯示頁籤
     groups.value = allGroups.filter((g) => classHasIndex(g.name))
     if (!activeGroup.value) activeGroup.value = groups.value[0]?.id ?? ''
+    if (activeGroup.value) {
+      weeklyRows.value = await listWeeklySongs(
+        activeGroup.value,
+        weeklyDates[0],
+        weeklyDates[weeklyDates.length - 1],
+      )
+    }
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -71,16 +85,14 @@ const currentSongs = computed<Song[]>(() =>
     .map((ps) => songById.value.get(ps.song_id))
     .filter((s): s is Song => Boolean(s)),
 )
-/** 本週歌曲（v6 #1：歌單內勾選多首，置頂顯示） */
-const weeklyIds = computed(
-  () =>
-    new Set(
-      (currentPlaylist.value?.playlist_songs ?? [])
-        .filter((ps) => ps.is_weekly)
-        .map((ps) => ps.song_id),
-    ),
+/**
+ * 下次上課要唱的歌（v11 #1）：取「排到下次聚會日」的曲目，置頂讓家長預習。
+ * 不再用 playlist_songs.is_weekly（那個沒有日期，分不出這次與下次）。
+ */
+const weeklySongs = computed(() =>
+  songsForDate(weeklyRows.value, songs.value, activeGroup.value, today),
 )
-const weeklySongs = computed(() => currentSongs.value.filter((s) => weeklyIds.value.has(s.id)))
+const weeklyIds = computed(() => new Set(weeklySongs.value.map((s) => s.id)))
 const restSongs = computed(() => currentSongs.value.filter((s) => !weeklyIds.value.has(s.id)))
 /** 曲庫其餘歌曲（敬拜過的歌單；新→舊） */
 const otherSongs = computed(() => {
@@ -238,15 +250,7 @@ const plEditing = ref<SongPlaylist | 'new' | null>(null)
 const plDraft = ref({ title: '', start_date: '', end_date: '' })
 /** 勾選順序即歌單順序 */
 const plSongIds = ref<string[]>([])
-/** 本週歌曲（可複選；v6 #1） */
-const plWeeklyIds = ref<string[]>([])
 const plSaving = ref(false)
-
-function togglePlWeekly(id: string) {
-  plWeeklyIds.value = plWeeklyIds.value.includes(id)
-    ? plWeeklyIds.value.filter((x) => x !== id)
-    : [...plWeeklyIds.value, id]
-}
 
 function openPlEditor() {
   if (!auth.can('admin')) return
@@ -261,15 +265,11 @@ function openPlEditor() {
         .sort((a, b) => a.sort_order - b.sort_order)
         .map((ps) => ps.song_id)
     : []
-  plWeeklyIds.value = pl
-    ? (pl.playlist_songs ?? []).filter((ps) => ps.is_weekly).map((ps) => ps.song_id)
-    : []
 }
 
 function togglePlSong(id: string) {
   if (plSongIds.value.includes(id)) {
     plSongIds.value = plSongIds.value.filter((x) => x !== id)
-    plWeeklyIds.value = plWeeklyIds.value.filter((x) => x !== id)
   } else {
     plSongIds.value = [...plSongIds.value, id]
   }
@@ -296,10 +296,7 @@ async function savePl() {
     }
     await setPlaylistSongs(
       id,
-      plSongIds.value.map((song_id) => ({
-        song_id,
-        is_weekly: plWeeklyIds.value.includes(song_id),
-      })),
+      plSongIds.value.map((song_id) => ({ song_id, is_weekly: false })),
     )
     await load()
     showSuccessToast('歌單已儲存')
@@ -308,6 +305,53 @@ async function savePl() {
     showFailToast((e as Error).message)
   } finally {
     plSaving.value = false
+  }
+}
+
+// ---- 同工端：把歌排到聚會日（v11 #1）----
+const wkEditing = ref(false)
+const wkDate = ref(today)
+const wkIds = ref<string[]>([])
+const wkSaving = ref(false)
+
+function openWkEditor() {
+  if (!auth.can('admin')) return
+  wkDate.value = today
+  syncWkIds()
+  wkEditing.value = true
+}
+
+/** 切換聚會日時帶入該日已排定的歌 */
+function syncWkIds() {
+  wkIds.value = weeklyRows.value
+    .filter((w) => w.class_group_id === activeGroup.value && w.gathering_date === wkDate.value)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((w) => w.song_id)
+}
+
+function pickWkDate(d: string) {
+  if (d === wkDate.value) return
+  wkDate.value = d
+  syncWkIds()
+}
+
+function toggleWkSong(id: string) {
+  wkIds.value = wkIds.value.includes(id)
+    ? wkIds.value.filter((x) => x !== id)
+    : [...wkIds.value, id]
+}
+
+async function saveWk() {
+  wkSaving.value = true
+  try {
+    await setWeeklySongs(activeGroup.value, wkDate.value, wkIds.value)
+    await load()
+    showSuccessToast('已排定')
+    wkEditing.value = false
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    wkSaving.value = false
   }
 }
 
@@ -349,7 +393,7 @@ async function removePl() {
     <van-skeleton v-if="loading" title :row="4" />
     <template v-else>
       <div class="section-row">
-        <h3 class="section-title">
+        <h3 class="section-title" style="--sec: var(--kll-orange)">
           {{ currentPlaylist ? `${currentPlaylist.title}歌單` : '當期歌單' }}
         </h3>
         <van-button v-if="auth.can('admin')" size="small" plain @click="openPlEditor">
@@ -360,11 +404,18 @@ async function removePl() {
         {{ activeGroupName }}目前沒有發布中的歌單
       </div>
 
-      <!-- 本週歌曲（v6 #1：歌單內勾選、置頂顯示） -->
+      <!-- 下次上課要唱的歌（v11 #1：歌曲排到聚會日，家長可先預習） -->
+      <div class="section-row wk-row">
+        <p class="hint">{{ formatGathering(today) }} 要上的歌，可先預習</p>
+        <van-button v-if="auth.can('admin')" size="small" plain @click="openWkEditor">
+          排定歌曲
+        </van-button>
+      </div>
+      <div v-if="weeklySongs.length === 0" class="card hint">尚未排定下次上課的歌</div>
       <template v-if="weeklySongs.length > 0">
         <div v-for="s in weeklySongs" :key="'w' + s.id" class="card weekly-card">
           <div class="song-head">
-            <van-tag type="warning" class="weekly-tag">本週歌曲</van-tag>
+            <van-tag type="warning" class="weekly-tag">下次上課</van-tag>
             <strong class="title">{{ s.title }}</strong>
             <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
           </div>
@@ -415,7 +466,7 @@ async function removePl() {
         <p v-if="openLyrics.includes(s.id)" class="lyrics">{{ s.lyrics }}</p>
       </div>
 
-      <h3 class="section-title">所有歌曲（敬拜過的歌單）</h3>
+      <h3 class="section-title" style="--sec: var(--kll-green)">所有歌曲（敬拜過的歌單）</h3>
       <div v-if="otherSongs.length === 0" class="card hint">曲庫沒有其他歌曲</div>
       <div v-for="s in otherSongs" :key="s.id" class="card">
         <div class="song-head">
@@ -501,27 +552,55 @@ async function removePl() {
             {{ plSongIds.includes(s.id) ? `${plSongIds.indexOf(s.id) + 1}. ` : '' }}{{ s.title }}
           </van-tag>
         </div>
-        <template v-if="plSongIds.length > 0">
-          <p class="hint pl-hint">本週歌曲（可複選，會置頂顯示）：</p>
-          <div class="pl-songs">
-            <van-tag
-              v-for="sid in plSongIds"
-              :key="'wk' + sid"
-              round
-              size="large"
-              :type="plWeeklyIds.includes(sid) ? 'warning' : 'default'"
-              :plain="!plWeeklyIds.includes(sid)"
-              @click="togglePlWeekly(sid)"
-            >
-              {{ plWeeklyIds.includes(sid) ? '★ ' : '' }}{{ songById.get(sid)?.title ?? '' }}
-            </van-tag>
-          </div>
-        </template>
         <van-button round block type="primary" :loading="plSaving" class="save-btn" @click="savePl">
           儲存歌單
         </van-button>
         <van-button v-if="plEditing !== 'new'" round block plain type="danger" class="del-btn" @click="removePl">
           刪除歌單
+        </van-button>
+      </div>
+    </van-popup>
+
+    <!-- 排定某聚會日要上的歌（v11 #1） -->
+    <van-popup
+      :show="wkEditing"
+      round
+      closeable
+      position="bottom"
+      @update:show="(v: boolean) => !v && (wkEditing = false)"
+    >
+      <div class="editor">
+        <h3>排定{{ activeGroupName }}的歌</h3>
+        <p class="hint">選聚會日，再勾選那天要上的歌（點選順序＝顯示順序）</p>
+        <div class="date-row">
+          <van-tag
+            v-for="d in weeklyDates"
+            :key="d"
+            round
+            size="large"
+            :type="wkDate === d ? 'primary' : 'default'"
+            :plain="wkDate !== d"
+            @click="pickWkDate(d)"
+          >
+            {{ d.slice(5).replace('-', '/') }}
+          </van-tag>
+        </div>
+        <p class="hint pl-hint">{{ currentPlaylist ? `${currentPlaylist.title}歌單` : '曲庫' }}：</p>
+        <div class="pl-songs">
+          <van-tag
+            v-for="s in (currentSongs.length > 0 ? currentSongs : songs)"
+            :key="'wks' + s.id"
+            round
+            size="large"
+            :type="wkIds.includes(s.id) ? 'warning' : 'default'"
+            :plain="!wkIds.includes(s.id)"
+            @click="toggleWkSong(s.id)"
+          >
+            {{ wkIds.includes(s.id) ? `${wkIds.indexOf(s.id) + 1}. ` : '' }}{{ s.title }}
+          </van-tag>
+        </div>
+        <van-button round block type="primary" :loading="wkSaving" class="save-btn" @click="saveWk">
+          儲存排定
         </van-button>
       </div>
     </van-popup>
@@ -569,17 +648,18 @@ async function removePl() {
   padding: 0 12px;
   border: 1px solid currentColor;
   border-radius: 4px;
-  background: #fff;
+  background: var(--kll-card);
   font-size: 14px;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
 }
 .link-btn.dance {
-  color: var(--van-warning-color, #ff976a);
+  color: var(--kll-orange-text);
 }
 .link-btn.lyric {
-  color: var(--van-danger-color, #ee0a24);
+  /* 原為 YouTube 紅；紅不在師母指定的色盤內（白粉橘綠紫），改用綠 */
+  color: var(--kll-green-text);
 }
 .link-btn:active {
   opacity: 0.7;
@@ -635,6 +715,15 @@ h2 {
 }
 .fam-line {
   margin: 10px 0 0;
+}
+.wk-row {
+  align-items: center;
+}
+.date-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 4px;
 }
 .weekly-card {
   border: 2px solid var(--kll-amber);

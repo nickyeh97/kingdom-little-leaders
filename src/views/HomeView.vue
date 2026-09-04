@@ -16,6 +16,8 @@ import { listMeetings } from '../api/meetings'
 import { listLessonSegmentsByDate } from '../api/teaching'
 import { classHasIndex } from '../lib/performance'
 import { classesMissingLog } from '../lib/teaching'
+import { announcementDateText } from '../lib/announcement'
+import { roleLabel, roleTagStyle } from '../lib/roleColor'
 import {
   feedbackDeadline,
   isFeedbackOpen,
@@ -159,10 +161,6 @@ onMounted(async () => {
   }
 })
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('zh-TW')
-}
-
 // ---- 管理端：公告發布/編輯/刪除 ----
 const editingAnn = ref<Announcement | 'new' | null>(null)
 const annDraft = ref<{
@@ -235,8 +233,14 @@ async function removeAnn() {
         <p class="hint">{{ new Date().toLocaleDateString('zh-TW') }}・點這裡可修改稱呼</p>
       </div>
       <div class="role-tags">
-        <van-tag v-for="r in auth.roles" :key="r" round type="primary" size="medium">
-          {{ r === 'admin' ? '管理者' : r === 'teacher' ? '老師' : '家長' }}
+        <van-tag
+          v-for="r in auth.roles"
+          :key="r"
+          round
+          size="medium"
+          :style="roleTagStyle(r)"
+        >
+          {{ roleLabel(r) }}
         </van-tag>
       </div>
     </header>
@@ -244,7 +248,9 @@ async function removeAnn() {
     <van-notice-bar
       v-if="auth.profile && !auth.isApproved"
       left-icon="clock-o"
-      text="帳號審核中——請通知兒主同工核准，通過後即可使用完整功能"
+      color="var(--kll-primary-text)"
+      background="var(--kll-primary-soft)"
+      text="帳號審核中——請通知兒童部同工核准，通過後即可使用完整功能"
     />
 
     <!-- 指名是哪一班還沒填，並直接跳到該班（v9 驗收回饋：同班已有人填就不該再提醒） -->
@@ -252,8 +258,8 @@ async function removeAnn() {
       v-if="missingLogClasses.length > 0"
       left-icon="edit"
       mode="link"
-      color="#7a5300"
-      background="#fef1d9"
+      color="var(--kll-orange-text)"
+      background="var(--kll-orange-soft)"
       :text="`上堂課（${lastG}）${missingLogClasses.map((c) => c.name).join('、')}的課堂紀錄還沒填——${feedbackDue.toLocaleDateString('zh-TW')}（${weekdayName(feedbackDue)}）23:59 前完成`"
       @click="$router.push({ name: 'class-log', query: { class: missingLogClasses[0].id } })"
     />
@@ -262,6 +268,8 @@ async function removeAnn() {
       v-if="needPlan"
       left-icon="todo-list-o"
       mode="link"
+      color="var(--kll-green-text)"
+      background="var(--kll-green-soft)"
       :text="`本週出席還沒填喔——${weekdayName(deadline)} 23:59 前完成勾選`"
       @click="$router.push({ name: 'attendance' })"
     />
@@ -270,8 +278,8 @@ async function removeAnn() {
       v-if="overdueItems > 0"
       left-icon="warning-o"
       mode="link"
-      color="#8a2a24"
-      background="#f9e0dd"
+      color="var(--kll-pink-text)"
+      background="var(--kll-pink-soft)"
       :text="`會議待辦有 ${overdueItems} 項已逾期——點我查看`"
       @click="$router.push({ name: 'meetings' })"
     />
@@ -280,6 +288,8 @@ async function removeAnn() {
       v-if="lessonStatus && lessonStatus.filled > 0"
       left-icon="notes-o"
       mode="link"
+      color="var(--kll-primary-text)"
+      background="var(--kll-primary-soft)"
       :text="`本週教案：${lessonStatus.filled}/${lessonStatus.total} 班已填寫——點我查看`"
       @click="$router.push({ name: 'lesson-plans' })"
     />
@@ -288,8 +298,8 @@ async function removeAnn() {
       v-if="kidServiceDates.length > 0"
       left-icon="smile-o"
       mode="link"
-      color="#1f6f54"
-      background="#e2f0e8"
+      color="var(--kll-orange-text)"
+      background="var(--kll-orange-soft)"
       :text="`您的孩子有服事安排（${kidServiceDates.map((d) => d.slice(5).replace('-', '/')).join('、')}）——點日期到出席頁查看服事表`"
       @click="$router.push({ name: 'attendance' })"
     />
@@ -298,15 +308,15 @@ async function removeAnn() {
       v-if="myServiceDates.length > 0"
       left-icon="calendar-o"
       mode="link"
-      color="#1f6f54"
-      background="#e2f0e8"
+      color="var(--kll-green-text)"
+      background="var(--kll-green-soft)"
       :text="`您有已發布的服事安排（${myServiceDates.map((d) => d.slice(5).replace('-', '/')).join('、')}）——點我查看服事表`"
       @click="$router.push({ name: 'service' })"
     />
 
 
     <div class="section-row">
-      <h3 class="section-title">兒主公告</h3>
+      <h3 class="section-title" style="--sec: var(--kll-pink)">兒童部公告</h3>
       <van-button v-if="canPostAnn" size="small" type="primary" plain @click="openAnnEditor(null)">
         ＋發布
       </van-button>
@@ -330,7 +340,7 @@ async function removeAnn() {
           <span v-if="a.pinned">📌</span>
         </div>
         <p class="ann-body">{{ a.body }}</p>
-        <p class="hint">{{ fmtDate(a.created_at) }}</p>
+        <p class="hint">{{ announcementDateText(a.created_at, a.updated_at) }}</p>
       </div>
     </template>
 

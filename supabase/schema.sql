@@ -130,6 +130,8 @@ create table session_logs (
   content text not null default '',        -- 教學內容
   song_progress text not null default '',  -- 詩歌進度
   feedback text not null default '',       -- 課後反饋（給下一堂的老師）
+  flow_score smallint check (flow_score is null or flow_score between 1 and 5),        -- 流程順暢度（v11 #5）
+  cooperation_score smallint check (cooperation_score is null or cooperation_score between 1 and 5), -- 學生配合度（v11 #5）
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (class_group_id, gathering_date)
@@ -186,6 +188,17 @@ create table playlist_songs (
   primary key (playlist_id, song_id)
 );
 
+-- 本週歌單（v11 #1）：把歌曲排到具體聚會日，教案頁取該日、詩歌頁取下次聚會日。
+-- 取代 playlist_songs.is_weekly（該欄保留但不再使用）。
+create table weekly_songs (
+  class_group_id uuid not null references class_groups (id) on delete cascade,
+  gathering_date date not null,
+  song_id uuid not null references songs (id) on delete cascade,
+  sort_order int not null default 0,
+  primary key (class_group_id, gathering_date, song_id)
+);
+create index idx_weekly_songs_date on weekly_songs (gathering_date, class_group_id);
+
 -- 兩維熟悉度（班別 × 歌曲；歌唱/動作各 1–5：1＝不熟、5＝熟悉——v4 決議 3）
 -- 記錄於詩歌曲目上；老師可於詩歌頁直接編輯或於日誌流程覆寫；幼幼班不需填寫。
 -- 欄位依 Excel「敬拜過的歌單」：熟悉指數、填寫人（快照）、填寫日期、上課日期
@@ -220,8 +233,19 @@ create table announcements (
   class_group_id uuid references class_groups (id),
   pinned boolean not null default false,
   created_by uuid not null default auth.uid() references profiles (id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()  -- 最後編輯時間（v11 #8）
 );
+
+-- 編輯公告時自動更新 updated_at（created_at 維持「發布日」不動）
+create or replace function public.touch_announcement()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+create trigger trg_touch_announcement before update on announcements
+  for each row execute function public.touch_announcement();
 
 create index idx_plans_gathering on attendance_plans (gathering_date);
 create index idx_checkins_gathering on check_ins (gathering_date);
@@ -325,6 +349,16 @@ create table child_service_signups (
   unique (child_id, gathering_date, item)
 );
 create index idx_child_signups_date on child_service_signups (gathering_date);
+
+-- 兒童服事項目字典（v11 #4）：名稱＋說明由同工維護，授權與報名的勾選按鈕同步讀這張表
+create table child_service_items (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,            -- 也是 child_service_* 各表 item 欄位的值
+  description text not null default '',
+  sort_order int not null default 0,
+  active boolean not null default true, -- 停用＝不再出現在新的勾選，既有紀錄不動
+  created_at timestamptz not null default now()
+);
 
 -- 兒童服事表（C-02：同工依報名排班；發布後家長/老師可見）
 create table child_service_rosters (
@@ -431,6 +465,17 @@ create table meeting_items (
   sort_order int not null default 0
 );
 create index idx_meeting_items on meeting_items (meeting_id);
+
+-- 會議附件連結（v11 #11）：講義/簡報/錄影放教會 NAS 或 Google 雲端，平台只存外連
+create table meeting_links (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid not null references meetings (id) on delete cascade,
+  title text not null,
+  url text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index idx_meeting_links on meeting_links (meeting_id, sort_order);
 
 -- 組織架構／分工（C-06）
 create table org_units (

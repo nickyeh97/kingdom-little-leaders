@@ -5,15 +5,19 @@ import { listClassGroups } from '../api/checkin'
 import {
   createMeeting,
   createMeetingItem,
+  createMeetingLink,
   deleteMeeting,
   deleteMeetingItem,
+  deleteMeetingLink,
   listMeetings,
   updateMeeting,
   updateMeetingItem,
+  updateMeetingLink,
 } from '../api/meetings'
+import { normalizeUrl } from '../lib/url'
 import { MEETING_STATUS, nextStatus, statusMeta } from '../lib/meeting'
 import { useAuthStore } from '../stores/auth'
-import type { ClassGroup, Meeting, MeetingItem } from '../types'
+import type { ClassGroup, Meeting, MeetingItem, MeetingLink } from '../types'
 
 const auth = useAuthStore()
 const meetings = ref<Meeting[]>([])
@@ -90,6 +94,71 @@ function openMeetingEditor(m: Meeting | null) {
         title: '',
         minutes: '',
       }
+}
+
+// ---- 會議附件連結（v11 #11）：講義/簡報/錄影放教會雲端，平台只存外連 ----
+const lkEditing = ref<{ meeting: Meeting; link: MeetingLink | null } | null>(null)
+const lkDraft = ref({ title: '', url: '' })
+const lkSaving = ref(false)
+
+function links(m: Meeting): MeetingLink[] {
+  return [...(m.meeting_links ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+}
+
+function openLinkEditor(m: Meeting, link: MeetingLink | null) {
+  if (!auth.can('admin')) return
+  lkEditing.value = { meeting: m, link }
+  lkDraft.value = link ? { title: link.title, url: link.url } : { title: '', url: '' }
+}
+
+async function saveLink() {
+  const target = lkEditing.value
+  if (!target) return
+  const title = lkDraft.value.title.trim()
+  const url = normalizeUrl(lkDraft.value.url)
+  if (!title || !url) {
+    showFailToast(url ? '請填寫連結名稱' : '請填寫有效的網址（http:// 或 https://）')
+    return
+  }
+  lkSaving.value = true
+  try {
+    if (target.link) await updateMeetingLink(target.link.id, { title, url })
+    else
+      await createMeetingLink({
+        meeting_id: target.meeting.id,
+        title,
+        url,
+        sort_order: links(target.meeting).length,
+      })
+    await load()
+    showSuccessToast('已儲存')
+    lkEditing.value = null
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    lkSaving.value = false
+  }
+}
+
+async function removeLink() {
+  const target = lkEditing.value
+  if (!target?.link) return
+  try {
+    await showConfirmDialog({
+      title: '刪除連結',
+      message: `確定刪除「${target.link.title}」？（雲端上的檔案不受影響）`,
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteMeetingLink(target.link.id)
+    await load()
+    showSuccessToast('已刪除')
+    lkEditing.value = null
+  } catch (e) {
+    showFailToast((e as Error).message)
+  }
 }
 
 async function saveMeeting() {
@@ -261,6 +330,28 @@ async function cycleStatus(item: MeetingItem) {
 
           <p v-if="m.minutes" class="minutes">{{ m.minutes }}</p>
 
+          <!-- 附件連結（v11 #11）：檔案放教會 NAS / 雲端，這裡只外連 -->
+          <p v-if="links(m).length > 0 || auth.can('admin')" class="blk-title">
+            相關連結
+            <van-button
+              v-if="auth.can('admin')"
+              size="mini"
+              plain
+              class="blk-btn"
+              @click="openLinkEditor(m, null)"
+            >
+              ＋連結
+            </van-button>
+          </p>
+          <div v-for="lk in links(m)" :key="lk.id" class="link-row">
+            <a class="mt-link" :href="lk.url" target="_blank" rel="noopener noreferrer">
+              🔗 {{ lk.title }}
+            </a>
+            <van-button v-if="auth.can('admin')" size="mini" plain @click="openLinkEditor(m, lk)">
+              編輯
+            </van-button>
+          </div>
+
           <p class="blk-title">
             事項追蹤
             <van-button
@@ -367,6 +458,51 @@ async function cycleStatus(item: MeetingItem) {
       </div>
     </van-popup>
 
+    <!-- 附件連結編輯（v11 #11） -->
+    <van-popup
+      :show="lkEditing !== null"
+      round
+      closeable
+      position="bottom"
+      @update:show="(v: boolean) => !v && (lkEditing = null)"
+    >
+      <div class="editor">
+        <h3>{{ lkEditing?.link ? '編輯連結' : '新增連結' }}</h3>
+        <p class="hint">
+          檔案請放教會 NAS 或 Google 雲端，這裡貼分享連結即可（平台不保存檔案本身）。
+          記得把雲端檔案的分享權限開給需要看的同工。
+        </p>
+        <van-field
+          v-model="lkDraft.title"
+          label="名稱"
+          label-align="top"
+          maxlength="60"
+          placeholder="例：兒童部研習會講義"
+        />
+        <van-field
+          v-model="lkDraft.url"
+          label="網址"
+          label-align="top"
+          type="url"
+          placeholder="貼上 Google 雲端／NAS 的分享連結"
+        />
+        <van-button round block type="primary" :loading="lkSaving" class="save-btn" @click="saveLink">
+          儲存
+        </van-button>
+        <van-button
+          v-if="lkEditing?.link"
+          round
+          block
+          plain
+          type="danger"
+          class="del-btn"
+          @click="removeLink"
+        >
+          刪除連結
+        </van-button>
+      </div>
+    </van-popup>
+
     <!-- 事項編輯 -->
     <van-popup
       :show="itEditing !== null"
@@ -433,6 +569,18 @@ h2 {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.mt-link {
+  flex: 1;
+  color: var(--kll-primary);
+  font-size: 16px;
+  word-break: break-all;
 }
 .minutes {
   margin: 4px 0 10px;

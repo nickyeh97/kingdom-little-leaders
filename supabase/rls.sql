@@ -224,6 +224,14 @@ create policy "playlist_songs_write" on playlist_songs
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
+-- weekly_songs（v11 #1）：全員可讀（家長要預習下次的歌）；同工維護
+alter table weekly_songs enable row level security;
+create policy "weekly_songs_read" on weekly_songs
+  for select to authenticated using (public.is_approved());
+create policy "weekly_songs_write" on weekly_songs
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
 alter table song_familiarity enable row level security;
 create policy "song_familiarity_read" on song_familiarity
   for select to authenticated using (public.is_approved());
@@ -246,6 +254,63 @@ as $$
 $$;
 
 grant execute on function public.parent_checkin_marks(date, date) to authenticated;
+
+-- ---- 家長端「組織架構的班別老師名單」與「孩子上過的課程」（v10 #1/#2）----
+-- 個資紅線：兩個函式**只回傳稱呼（display_name）**，不回傳 email/phone；
+-- profiles 的 RLS（本人或 admin 可讀）維持不動，家長拿不到老師的聯絡方式。
+
+-- 我綁定的孩子所屬班別（家長端授權範圍的單一來源）
+create or replace function public.my_child_class_ids()
+returns setof uuid
+language sql stable security definer set search_path = public
+as $$
+  select distinct c.class_group_id
+  from children c
+  where c.id in (select public.my_child_ids())
+$$;
+
+-- 班別老師名單：同工看全部班別，家長只看自己孩子的班別
+create or replace function public.class_teachers()
+returns table (class_group_id uuid, teacher_name text)
+language sql stable security definer set search_path = public
+as $$
+  select tca.class_group_id, p.display_name
+  from teacher_class_assignments tca
+  join profiles p on p.id = tca.teacher_id
+  where public.is_approved()
+    and p.approved                              -- 未審核的老師不列入名單
+    and (
+      public.is_staff()
+      or tca.class_group_id in (select public.my_child_class_ids())
+    )
+  order by tca.class_group_id, p.display_name
+$$;
+grant execute on function public.class_teachers() to authenticated;
+
+-- 家長版簡易教案：只回「已經上過的課」＋孩子所屬班別；幼幼班無教案模組（v4 決議 8）。
+-- 欄位只給「項目 / 內容 / 帶班老師」——時間、教材預備、課後執行屬同工內部欄位，不外流。
+create or replace function public.parent_lesson_segments(from_date date, to_date date)
+returns table (
+  class_group_id uuid,
+  gathering_date date,
+  sort_order int,
+  item text,
+  content text,
+  teacher_name text
+)
+language sql stable security definer set search_path = public
+as $$
+  select s.class_group_id, s.gathering_date, s.sort_order, s.item, s.content, s.teacher_text
+  from lesson_segments s
+  join class_groups g on g.id = s.class_group_id
+  where public.is_approved()
+    and s.class_group_id in (select public.my_child_class_ids())
+    and g.name not like '%幼幼%'
+    and s.gathering_date >= from_date
+    and s.gathering_date <= least(to_date, current_date) -- 未來的課不預告，避免變成進度壓力
+  order by s.gathering_date desc, s.sort_order
+$$;
+grant execute on function public.parent_lesson_segments(date, date) to authenticated;
 
 -- ---- 服事排班（Sprint 04 Wave 1a）----
 alter table service_weeks enable row level security;
@@ -294,6 +359,14 @@ as $$
     and (public.is_admin() or public.child_in_my_class(cid));
 $$;
 grant execute on function public.set_child_service_eligible(uuid, boolean) to authenticated;
+
+-- child_service_items（v11 #4）：老師與家長可檢視項目與說明；同工可維護
+alter table child_service_items enable row level security;
+create policy "child_service_items_read" on child_service_items
+  for select to authenticated using (public.is_approved());
+create policy "child_service_items_write" on child_service_items
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 alter table child_service_signups enable row level security;
 create policy "child_signups_read" on child_service_signups
@@ -388,6 +461,25 @@ create policy "meeting_items_read" on meeting_items
     )
   );
 create policy "meeting_items_write" on meeting_items
+  for all to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+-- meeting_links（v11 #11）：讀寫完全跟著母會議走，不重複實作 scope/班別判斷
+alter table meeting_links enable row level security;
+create policy "meeting_links_read" on meeting_links
+  for select to authenticated
+  using (
+    exists (
+      select 1 from meetings m
+      where m.id = meeting_id
+        and (
+          public.is_admin()
+          or (public.is_staff() and m.scope = 'all')
+          or (m.scope = 'class' and public.has_class_role(m.class_group_id))
+        )
+    )
+  );
+create policy "meeting_links_write" on meeting_links
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 

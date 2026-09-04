@@ -106,9 +106,52 @@ describe('路由守衛：登入與標籤式授權', () => {
     expect(router.currentRoute.value.name).toBe('login')
   })
 
+  it('組織架構頁：家長也進得去（v10 #1）——老師名單由 RPC 依角色過濾', async () => {
+    loginAs(['parent'])
+    await router.push({ name: 'org' })
+    expect(router.currentRoute.value.name).toBe('org')
+  })
+
+  it('邊際：未審核者仍進不了組織架構頁', async () => {
+    loginAs(['parent'], false)
+    await router.push({ name: 'org' })
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('孩子上過的課程：家長可進（v10 #2）', async () => {
+    loginAs(['parent'])
+    await router.push({ name: 'my-lessons' })
+    expect(router.currentRoute.value.name).toBe('my-lessons')
+  })
+
+  it('邊際：沒有家長標籤的老師/同工進不了「孩子上過的課程」', async () => {
+    loginAs(['teacher', 'admin'])
+    await router.push({ name: 'my-lessons' })
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('家長不可進老師端教案頁（v11 #2：避免覆蓋老師的教案）', async () => {
+    // 家長只走唯讀的 my-lessons；教案的寫入權在 RLS 也只給 admin 與該班老師
+    loginAs(['parent'])
+    await router.push({ name: 'lesson-plans' })
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('兒童服事項目：老師與家長都進得去（編輯權另由 RLS 只給同工；v11 #4）', async () => {
+    loginAs(['parent'])
+    await router.push({ name: 'child-service-items' })
+    expect(router.currentRoute.value.name).toBe('child-service-items')
+  })
+
+  it('邊際：未審核者進不了兒童服事項目', async () => {
+    loginAs(['teacher'], false)
+    await router.push({ name: 'child-service-items' })
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
   it('組長情境：三標籤齊全可進所有頁面', async () => {
     loginAs(['admin', 'teacher', 'parent'])
-    for (const name of ['attendance', 'checkin', 'songs', 'members', 'me'] as const) {
+    for (const name of ['attendance', 'checkin', 'songs', 'members', 'org', 'my-lessons', 'me'] as const) {
       await router.push({ name })
       expect(router.currentRoute.value.name).toBe(name)
     }

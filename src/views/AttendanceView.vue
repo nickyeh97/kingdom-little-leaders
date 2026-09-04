@@ -254,8 +254,11 @@ async function submit() {
         </div>
       </div>
       <p class="cal-legend hint">
-        ●<span class="lg-attend">出席</span> ●<span class="lg-leave">請假</span>
-        ●<span class="lg-none">未定/未填</span> · 點聚會日查看
+        <!-- 圓點要跟文字同色，否則圖例對不上月曆上的點 -->
+        <span class="lg-attend">●出席</span>
+        <span class="lg-leave">●請假</span>
+        <span class="lg-none">●未定/未填</span>
+        · 點聚會日查看
       </p>
     </div>
 
@@ -263,7 +266,7 @@ async function submit() {
 
     <!-- 本週與未來：可填寫（v5 #0） -->
     <template v-else-if="mode === 'edit'">
-      <h3 class="section-title">
+      <h3 class="section-title" style="--sec: var(--kll-green)">
         {{ formatGathering(selected) }} · {{ selected === gathering ? '本週勾選' : '預先勾選' }}
       </h3>
       <p class="hint week-due">
@@ -295,16 +298,16 @@ async function submit() {
           rows="1"
           autosize
           maxlength="200"
-          placeholder="給老師的話（選填），例：這週會帶奉獻、會晚 15 分鐘到"
+          placeholder="給老師的話（選填），例如：這週會帶奉獻、感冒剛好請提醒戴好口罩"
           :disabled="!openSel"
         />
       </div>
 
       <div v-if="children.length === 0" class="card hint">
-        尚未綁定孩子，請聯繫兒主窗口協助綁定。
+        尚未綁定孩子，請聯繫兒童部窗口協助綁定。
       </div>
 
-      <div class="card hint">勾選結果僅供同工預備課程與材料，臨時變動也沒關係 😊</div>
+      <div class="card hint">勾選結果供同工預備課程與材料，臨時變動請記得取消</div>
 
       <van-button
         v-if="children.length > 0"
@@ -322,9 +325,9 @@ async function submit() {
 
     <!-- 過去的聚會日：唯讀 -->
     <template v-else-if="mode === 'past'">
-      <h3 class="section-title">{{ formatGathering(selected) }} · 當週勾選紀錄</h3>
+      <h3 class="section-title" style="--sec: var(--kll-primary)">{{ formatGathering(selected) }} · 當週勾選紀錄</h3>
       <div v-if="children.length === 0" class="card hint">
-        尚未綁定孩子，請聯繫兒主窗口協助綁定。
+        尚未綁定孩子，請聯繫兒童部窗口協助綁定。
       </div>
       <div v-for="c in children" :key="c.id" class="card">
         <div class="kid">
@@ -350,7 +353,7 @@ async function submit() {
 
     <!-- 兒童服事報名（P-04）：本週與未來聚會日皆可報名；僅具資格的孩子 -->
     <template v-if="!loading && mode !== 'past' && eligibleChildren.length > 0">
-      <h3 class="section-title">兒童服事報名 · {{ formatGathering(selected) }}</h3>
+      <h3 class="section-title" style="--sec: var(--kll-orange)">兒童服事報名 · {{ formatGathering(selected) }}</h3>
       <div v-for="c in eligibleChildren" :key="c.id" class="card">
         <div class="kid">
           <strong>{{ c.name }}</strong>
@@ -377,7 +380,7 @@ async function submit() {
 
     <!-- 兒童服事表（P-05）：發布後顯示自己孩子班別的安排 -->
     <template v-if="!loading && selectedRosters.length > 0">
-      <h3 class="section-title">兒童服事表 · {{ formatGathering(selected) }}</h3>
+      <h3 class="section-title" style="--sec: var(--kll-pink)">兒童服事表 · {{ formatGathering(selected) }}</h3>
       <div v-for="r in selectedRosters" :key="r.id" class="card">
         <div class="kid">
           <strong>{{ rosterClassName(r) }}</strong>
@@ -449,7 +452,7 @@ h2 {
   line-height: 1.2;
 }
 .cal-cell.out .num {
-  color: #c3c9c6;
+  color: var(--kll-muted);
 }
 .cal-cell.gday {
   background: var(--kll-primary-soft);
@@ -480,16 +483,16 @@ h2 {
   display: inline-block;
 }
 .dot-attend {
-  background: #2aa876;
+  background: var(--kll-accent);
 }
 .sel .dot-attend {
-  background: #bdeedd;
+  background: var(--kll-accent-soft);
 }
 .dot-leave {
   background: var(--kll-amber);
 }
 .dot-none {
-  background: #c3c9c6;
+  background: var(--kll-muted);
 }
 .sel .dot-none {
   background: #ffffff88;
@@ -499,11 +502,11 @@ h2 {
   font-size: 14px;
 }
 .lg-attend {
-  color: #2aa876;
+  color: var(--kll-accent);
   margin: 0 8px 0 2px;
 }
 .lg-leave {
-  color: var(--kll-amber);
+  color: #a86a12; /* 圖例是文字，需 4.43:1；月曆上的圓點才用亮一階的 --kll-amber */
   margin: 0 8px 0 2px;
 }
 .lg-none {

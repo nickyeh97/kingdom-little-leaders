@@ -1,14 +1,27 @@
 import { db } from '../lib/supabase'
-import type { Meeting, MeetingItem, OrgUnit } from '../types'
+import type { Meeting, MeetingItem, MeetingLink, OrgUnit } from '../types'
 
-/** 全部可見會議（RLS 依 scope 過濾），含事項；新會議在前 */
+/**
+ * 全部可見會議（RLS 依 scope 過濾），含事項與附件連結；新會議在前。
+ *
+ * meeting_links 是後加的（v11 #11）。migration 尚未執行的環境裡，
+ * PostgREST 找不到這層關聯會整個查詢回 400——**連會議本體都讀不到**。
+ * 所以查不到關聯時退回不帶連結的查詢：頁面照常可用，只是沒有連結區。
+ */
 export async function listMeetings(): Promise<Meeting[]> {
-  const { data, error } = await db()
+  const base = db().from('meetings')
+  const { data, error } = await base
+    .select('*, meeting_items(*), meeting_links(*)')
+    .order('meeting_date', { ascending: false })
+  if (!error) return data as Meeting[]
+  // PGRST200＝找不到關聯（meeting_links 還沒建表）；其他錯誤照常拋出
+  if (error.code !== 'PGRST200') throw error
+  const fallback = await db()
     .from('meetings')
     .select('*, meeting_items(*)')
     .order('meeting_date', { ascending: false })
-  if (error) throw error
-  return data as Meeting[]
+  if (fallback.error) throw fallback.error
+  return fallback.data as Meeting[]
 }
 
 export interface MeetingInput {
@@ -33,6 +46,36 @@ export async function updateMeeting(id: string, patch: Partial<MeetingInput>): P
 
 export async function deleteMeeting(id: string): Promise<void> {
   const { error } = await db().from('meetings').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ---- 會議附件連結（v11 #11）----
+// 檔案本體放教會 NAS / Google 雲端（CLAUDE.md 決議 11：平台不自建檔案儲存），
+// 這裡只存標題與網址；網址在寫入前先過 normalizeUrl，避免漏打 https:// 變成站內路徑。
+
+export interface MeetingLinkInput {
+  meeting_id: string
+  title: string
+  url: string
+  sort_order: number
+}
+
+export async function createMeetingLink(input: MeetingLinkInput): Promise<MeetingLink> {
+  const { data, error } = await db().from('meeting_links').insert(input).select().single()
+  if (error) throw error
+  return data as MeetingLink
+}
+
+export async function updateMeetingLink(
+  id: string,
+  patch: Partial<MeetingLinkInput>,
+): Promise<void> {
+  const { error } = await db().from('meeting_links').update(patch).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteMeetingLink(id: string): Promise<void> {
+  const { error } = await db().from('meeting_links').delete().eq('id', id)
   if (error) throw error
 }
 

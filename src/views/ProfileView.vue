@@ -1,12 +1,36 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { updateDisplayName } from '../api/members'
+import { listMyChildren } from '../api/attendance'
+import { classTone } from '../lib/classColor'
 import { useAuthStore } from '../stores/auth'
+import type { Child } from '../types'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+/**
+ * 兒童服事項目入口（v11 #4）：老師/同工恆可檢視；
+ * 家長僅在有**兒童班**孩子時顯示（兒童服事目前只開放兒童班）。
+ */
+const myChildren = ref<Child[]>([])
+const hasKidClassChild = computed(() =>
+  myChildren.value.some((c) => classTone(c.class_groups?.name) === 'kid'),
+)
+const showServiceItems = computed(
+  () => auth.can('teacher') || auth.can('admin') || hasKidClassChild.value,
+)
+
+onMounted(async () => {
+  if (!auth.can('parent')) return
+  try {
+    myChildren.value = await listMyChildren()
+  } catch {
+    // 取不到就當作沒有兒童班孩子——只影響一個選單入口，不需要打擾使用者
+  }
+})
 
 /** 版本號來自 package.json（vite define 注入），不必兩處手動同步 */
 const appVersion = __APP_VERSION__
@@ -64,6 +88,7 @@ async function logout() {
         ✎ 修改稱呼
       </van-button>
     </div>
+    <h3 class="section-title" style="--sec: var(--kll-primary)">關於兒童部</h3>
     <van-cell-group inset>
       <van-cell
         title="國度領袖兒童異象"
@@ -71,7 +96,34 @@ async function logout() {
         is-link
         @click="$router.push({ name: 'vision' })"
       />
+      <van-cell
+        v-if="auth.isApproved"
+        title="組織架構與分工"
+        label="兒童部團隊組別、職務，與孩子班上的老師"
+        is-link
+        @click="$router.push({ name: 'org' })"
+      />
     </van-cell-group>
+    <h3 v-if="auth.can('parent') || showServiceItems" class="section-title" style="--sec: var(--kll-pink)">
+      我的孩子
+    </h3>
+    <van-cell-group inset v-if="auth.can('parent') || showServiceItems">
+      <van-cell
+        v-if="auth.can('parent')"
+        title="孩子上過的課程"
+        label="最近 4 次主日，孩子班上教了什麼"
+        is-link
+        @click="$router.push({ name: 'my-lessons' })"
+      />
+      <van-cell
+        v-if="showServiceItems"
+        title="兒童服事項目"
+        label="孩子可以參與的服事與說明"
+        is-link
+        @click="$router.push({ name: 'child-service-items' })"
+      />
+    </van-cell-group>
+    <h3 v-if="auth.can('admin')" class="section-title" style="--sec: var(--kll-orange)">管理</h3>
     <van-cell-group inset v-if="auth.can('admin')">
       <van-cell
         title="名單與權限"
@@ -80,6 +132,9 @@ async function logout() {
         @click="$router.push({ name: 'members' })"
       />
     </van-cell-group>
+    <h3 v-if="auth.can('teacher') || auth.can('admin')" class="section-title" style="--sec: var(--kll-green)">
+      老師與同工
+    </h3>
     <van-cell-group inset v-if="auth.can('teacher') || auth.can('admin')">
       <van-cell
         title="教案"
@@ -104,12 +159,6 @@ async function logout() {
         label="大會/同工/班別會議紀錄與待辦追蹤"
         is-link
         @click="$router.push({ name: 'meetings' })"
-      />
-      <van-cell
-        title="組織架構與分工"
-        label="兒主團隊組別、職務與名單"
-        is-link
-        @click="$router.push({ name: 'org' })"
       />
       <van-cell
         title="出席紀錄（近半年）"

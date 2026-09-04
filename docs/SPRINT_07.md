@@ -231,3 +231,225 @@
   由 `main.ts` 的 `registerSW` 接手：每小時與回到前景時檢查更新、有新版才提示使用者重載；
   另加 `router.onError` 動態載入失敗自動重載一次（sessionStorage 防迴圈）與全域錯誤提示。
   建置後確認 `sw.js` 已無自動 `skipWaiting`/`clientsClaim`（只剩使用者確認後的 SKIP_WAITING 訊息）。
+
+---
+
+# 追加需求（v10，2026-09-03）
+
+組長於 Sprint 07 上線（v0.2.0）後追加的家長端擴充。第 3 項待組長補齊。
+
+## 一覽
+
+| # | 需求 | 狀態 |
+| --- | --- | --- |
+| v10-1 | 家長可看組織架構與分工＋孩子班上的老師名單 | ✅ 已實作 |
+| v10-2 | 家長可查閱孩子上過的課程（簡易版教案） | ✅ 已實作 |
+| v10-3 | （待補） | ⏳ 等組長提供 |
+
+## v10-1｜組織架構與分工開放給家長＋班別老師名單
+
+**決議**：老師名單併進既有的「組織架構與分工」頁（不另開新頁），一個入口把整件事講完。
+
+- 路由 `org` 的授權由 `roles: ['teacher','admin']` 改為 `requiresApproval: true`——審核通過者皆可進入。
+- 架構圖維持圖片顯示（v8 #2 不變），下方新增老師名單區：家長看**自己孩子班別**、老師/同工看**全部班別**，班名以班別顏色標籤呈現（v9 #1）。
+- **個資**：`class_teachers()` RPC 只 `select display_name`，不回傳 email/phone；`profiles` 的 RLS（本人或 admin 可讀）完全不動，家長拿不到老師聯絡方式。頁尾明寫「名單僅顯示稱呼；聯絡方式請透過同工或班級群組取得」。
+- 未審核的老師不列入名單（`p.approved` 過濾）。
+
+## v10-2｜孩子上過的課程（家長版簡易教案）
+
+**決議（組長 2026-09-03 確認）**：回看**最近 4 次**聚會；每段顯示**項目＋內容＋帶班老師**，並附**當天的詩歌**。
+
+- 新頁 `/my-lessons`（`ParentLessonView.vue`），`roles: ['parent']`；「我的」新增家長專區入口。
+- 資料走 `parent_lesson_segments(from_date, to_date)` RPC，資料庫層即限定：
+  - 只有**自己綁定孩子**所屬的班別（`my_child_class_ids()`）
+  - 只到 `current_date` 為止——**未來的課不預告**，避免變成進度壓力（守則紅燈 #2）
+  - 依班名排除**幼幼班**（v4 決議 8：幼幼班無教案模組）
+  - 欄位只回 `item / content / teacher_text`；**時間、教材預備、課後執行不外流**（比照 `parent_checkin_marks` 不回傳 `note`）
+- 「注重在小孩上的課程而非流程」→ 只有項目沒有內容的流程列（報到、點心、下課）不列出（`isCourseSegment`）。
+- 詩歌採**期間歌單**對應：找該班 `start_date ≤ 該日 ≤ end_date` 的歌單列出曲目（歌單是雙月期間制，非逐週），沒有涵蓋的歌單就不顯示詩歌區塊。連結沿用 v9 #6 的 `<a target="_blank">` ＋ `normalizeUrl`。
+
+## 技術異動
+
+| 檔案 | 內容 |
+| --- | --- |
+| `supabase/migrations/2026-09-03_parent_view.sql` | 新增 `my_child_class_ids()`、`class_teachers()`、`parent_lesson_segments()` 三個 security definer 函式（同步寫回 `supabase/rls.sql`） |
+| `src/api/roster.ts` | `listClassTeachers()` |
+| `src/api/teaching.ts` | `listParentLessonSegments(from, to)` |
+| `src/lib/parentLesson.ts` | `isCourseSegment`／`groupParentLessons`／`songsForDate`／`teachersOfClass`＋`PARENT_LESSON_COUNT` |
+| `src/views/OrgView.vue` | 架構圖下方加老師名單區 |
+| `src/views/ParentLessonView.vue` | 新頁 |
+| `src/router/index.ts` | `org` 改 `requiresApproval`、新增 `my-lessons` |
+| `src/views/ProfileView.vue` | 組織架構移出同工專區、新增家長專區入口 |
+| 測試 | `parentLesson.test.ts`（12 項）、`guard.test.ts` 新增 4 項授權/邊際 |
+
+## 外部依賴
+
+- **需組長於 Supabase SQL Editor 執行 `supabase/migrations/2026-09-03_parent_view.sql`**，否則家長端兩頁會取不到資料。
+
+---
+
+# 追加需求（v11，2026-09-03）
+
+## 一覽
+
+| # | 需求 | 狀態 |
+| --- | --- | --- |
+| v11-1 | 本週歌單排到聚會日：教案頁看那次唱的歌、詩歌頁預習下次的歌 | ✅ 已實作 |
+| v11-2 | 確保家長不能編輯教案 | ✅ 已查證＋補測試 |
+| v11-3 | 出席頁兩則文案改為組長指定用字 | ✅ 已實作 |
+| v11-4 | 兒童服事項目字典（同工維護名稱與說明） | ✅ 已實作 |
+| v11-5 | 點名移除專心/配合，課堂紀錄新增流程順暢度、學生配合度 | ✅ 已實作（課堂紀錄後續還會再改） |
+| v11-6 | 「兒主」統一改為「兒童部」 | ✅ 已實作 |
+| v11-7 | 平台配色：白粉橘綠紫，不與班別色互搶、一頁不只單一色 | ✅ 已實作（二版；一版「暖色系為主」已被否決） |
+| v11-8 | 公告顯示 7/28 的原因查明＋補「最後編輯時間」 | ✅ 已查明＋已實作 |
+
+## v11-1｜本週歌單排到聚會日
+
+**問題**：`playlist_songs.is_weekly` 只是歌單上的一個勾選，**沒有日期**，只能代表「現在這一次」。
+家長端因此分不出「這週上過的」與「下次要上的」，教案頁也查不到某個過去的主日到底唱了什麼。
+
+**決議（組長 2026-09-03 選定）**：歌曲排到聚會日。
+
+- 新表 `weekly_songs(class_group_id, gathering_date, song_id, sort_order)`。
+- 詩歌頁：置頂區塊改為「**下次聚會要上的歌**」（`upcomingGathering()`），家長可先預習；同工按「排定歌曲」→ 選聚會日 → 勾選曲目。
+- 家長版教案：每張卡顯示「**這次唱的詩歌**」，取該聚會日排定的曲目，往前幾週都正確。
+- `is_weekly` 欄位**保留不刪**（不做不可逆的資料變更），但已不再讀寫；歌單編輯彈窗移除該勾選。
+
+## v11-2｜家長不能編輯教案
+
+查證結果：**本來就擋住了**，三層都擋——
+
+1. RLS `lesson_segments_write` 的 `using`/`with check` 都是 `is_admin() or has_class_role(class_group_id)`，家長兩者皆非。
+2. 路由 `lesson-plans` 的 `meta.roles` 是 `['teacher','admin']`。
+3. 家長端 `ParentLessonView.vue` 只呼叫唯讀 RPC，沒有任何寫入 API。
+
+補上守衛測試「家長不可進老師端教案頁」，避免日後改動不小心放行。
+
+## v11-4｜兒童服事項目字典
+
+- 新表 `child_service_items`；帶入 2026-08-27 定案的六項（名稱與既有紀錄的 `item` 文字一致，不需搬移資料）。
+- 新頁 `/child-service-items`（`requiresApproval`），「我的」入口：老師/同工恆顯示，家長僅在**有兒童班孩子**時顯示。
+- 寫入權由 RLS 限制為同工（`is_admin()`），前端 `canEdit` 只是 UX。
+- `childServiceItemOptions()`：啟用中的字典項目 ∪ 已授權但不在字典的舊項目——停用或改名不會讓既有授權變成取消不掉的孤兒；字典讀不到（migration 未執行）時退回內建六項，畫面不會空白。
+- 改名會跳確認：既有授權/報名紀錄以文字比對，**不會**跟著改；要下架請用「停用」而非刪除。
+
+## v11-5｜指數搬家
+
+- 點名頁移除專心度/配合度的評分格、近三個月走勢的指數欄與相關文案；`performance_scores` 的**資料與 API 全部保留**，之後組長給完整需求再決定去留。
+- 課堂紀錄新增 `flow_score`（流程順暢度）、`cooperation_score`（學生配合度），1–5、**未填留空**（不預設帶 5，避免「沒想過」被記成滿分）；列表卡片與 CSV 匯出同步。
+- 守則檢核：兩維評的是**這堂課的運作**，不是任何一個孩子，也不得用於比較班級（紅燈 #1／#7）。
+
+## v11-7｜配色（二版：白粉橘綠紫）
+
+**一版（暖色系為主）已被否決**：組長回報「色系有問題」，並補上明確條件——
+參考 <https://nypreschoolandkidsclub.com/activities/classes/>，要有**白、粉、橘、綠、紫**，
+**不要與班別色互搶風采**，**也不要一頁只有單一色**。
+
+參考頁取得的用色：白 `#ffffff`、粉 `#f9eef3`、橘 `#db662a`／`#feece0`、綠 `#598f78`／`#f1f7e5`、紫 `#7462a2`／`#dad0ec`。
+
+**主色為什麼是紫**：班別色是橘（兒童）、藍（幼童）、綠（幼幼）。平台主色若取橘或綠，
+按鈕與班別標籤會在同一畫面互搶；參考站的紫不在班別色裡，而且**原色白字就有 5.24:1**，
+不必像一版的橘那樣加深，等於直接用師母看到的顏色。
+
+| Token | 值 | 用途 |
+| --- | --- | --- |
+| `--kll-primary` / `-soft` / `-text` | `#7462a2` / `#f3eefa` / `#4a3d72` | 互動元件（按鈕、選取、連結）；淺紫底深字 8.37:1 |
+| `--kll-pink` / `-soft` / `-text` | `#e0799f` / `#f9eef3` / `#8f3a5c` | 公告區、家長相關（6.34:1） |
+| `--kll-orange` / `-soft` / `-text` | `#db662a` / `#feece0` / `#8a3d12` | 教案/流程/服事提醒（6.63:1） |
+| `--kll-green` / `-soft` / `-text` | `#598f78` / `#f1f7e5` / `#2f6b56` | 出席、老師相關（5.71:1） |
+| `--kll-bg` / `--kll-card` | `#fdf9f7` / `#ffffff` | 白中帶粉的頁底＋純白卡片（班別標籤的淺底才浮得出來） |
+| `--kll-text` / `--kll-sub` | `#2b2430` / `#6b6270` | 14.36:1 / 5.57:1 |
+
+**「不要一頁只有單一色」怎麼落實**：
+
+- `.section-title` 加左側色條，各區塊以 `--sec` 指定不同顏色（首頁公告＝粉、出席＝綠、教案/流程＝橘、我的·關於兒童部＝紫…）。
+- 首頁通知列逐條分色：會議逾期＝粉、課堂紀錄未填＝橘、出席未填＝綠、教案與帳號審核＝紫。
+- 角色標籤（`src/lib/roleColor.ts`）：管理者＝橘、老師＝綠、家長＝粉——原本三個都同色，既單調也分不出誰是誰。
+- 教材資料庫的類別標題輪替四色。
+
+順手修掉兩個既有小問題：出席月曆圖例的圓點沒跟文字同色（對不上月曆）、「請假」圖例文字對比不足；
+詩歌的「純歌詞」按鈕原為 YouTube 紅，紅不在指定色盤內，改用綠。
+
+**班別色維持不變**，三色標籤在新底色上的對比為 5.46／6.16／5.63。
+
+## v11-8｜公告日期顯示 7/28（師母回報）
+
+**查證結果：資料是對的，不是 bug。** 直接查 `announcements` 確認：
+
+- 「（測）兒童班提醒 (test)」的 `created_at` 是 **2026-07-28T03:38:46**，作者與 8/20 的「主日學平台使用手冊」同一人；
+- 9/2 建立的是另外兩則（「（測）9/5 金句」14:24、「兒童班家長說明會」13:17），作者是另一個帳號。
+
+也就是說 9/2 那次動作是**編輯 7/28 的舊公告**（在標題後加了「(test)」），不是新發布。
+畫面上的日期取自 `created_at`（發布日），編輯本來就不會改動它；而且資料表**沒有 `updated_at`**，
+所以「編輯後時間沒更新」是必然，不是寫入失敗。
+
+**修法**：`created_at` 維持「發布日」語意（公告時序仍照發布先後排），
+新增 `updated_at` 欄位＋`touch_announcement()` 觸發器，畫面改顯示「發布日 · X 編輯」（`src/lib/announcement.ts`）。
+既有資料的 `updated_at` 一律回填為 `created_at`，否則加欄位當下的 `now()` 會讓所有舊公告都變成「今天編輯過」。
+
+**未採用**：讓編輯過的公告重新排到最上面。那會讓「公告時序」變成「最後編輯時序」，
+舊公告改一個錯字就跳到最上面。若組長希望重發，建議直接發一則新公告。
+
+## 技術異動
+
+| 檔案 | 內容 |
+| --- | --- |
+| `supabase/migrations/2026-09-03b_v11.sql` | `weekly_songs`、`child_service_items` 兩張新表＋`session_logs` 兩個指數欄（同步寫回 `schema.sql` / `rls.sql`） |
+| `supabase/migrations/2026-09-03c_announcement_updated_at.sql` | `announcements.updated_at` ＋觸發器（v11 #8） |
+| `src/lib/announcement.ts` / `src/lib/roleColor.ts` | 公告日期呈現、角色標籤配色（新檔） |
+| `src/api/songs.ts` | `listWeeklySongs` / `setWeeklySongs` |
+| `src/api/childService.ts` | 項目字典 CRUD |
+| `src/lib/classLog.ts` | 課堂紀錄兩維指數（新檔） |
+| `src/lib/service.ts` | `childServiceItemOptions` |
+| `src/lib/parentLesson.ts` | `songsForDate` 改讀 `weekly_songs` |
+| `src/views/ChildServiceItemsView.vue` | 新頁 |
+| `src/views/SongsView.vue` / `ParentLessonView.vue` / `CheckInView.vue` / `ClassLogView.vue` / `MembersView.vue` / `ServiceView.vue` / `ProfileView.vue` | 對應改動 |
+| `src/style.css` | 暖色系色票 |
+| 測試 | `classLog.test.ts`（4）、`service.test.ts` 新增 4、`parentLesson.test.ts` 改寫 songsForDate 4、`guard.test.ts` 新增 3 |
+
+## 外部依賴
+
+- `2026-09-03_parent_view.sql`、`2026-09-03b_v11.sql`：**組長已於 2026-09-03 執行完畢**。
+- **尚待執行：`supabase/migrations/2026-09-03c_announcement_updated_at.sql`**（v11 #8），
+  未執行則公告不會顯示「X 編輯」。
+
+---
+
+# 追加需求（v12，2026-09-03 下午）
+
+| # | 需求 | 狀態 |
+| --- | --- | --- |
+| v12-9 | 出席紀錄的班別名改黑色粗體 | ✅ 已實作 |
+| v12-10 | 老師服事總覽改成四類為欄、聚會日為列的表格 | ✅ 已實作 |
+| v12-11 | 開會決議可掛多個連結 | ✅ 已實作 |
+| v12-12 | 平台直接上傳/下載教會 Google 雲端 | ⛔ 暫不實作（需 Service Account 金鑰，不是帳密；見規格書 v12 說明） |
+
+## v12-10｜老師服事總覽表
+
+`serviceGrid()`（`src/lib/service.ts`）把報名攤成「日期 × 四欄」：
+
+- 欄：全主責／助教／助理／彈性時間。
+- **助教（敬拜）與助教（真理）併入「助教」欄**，顯示成「小美（敬拜）」，保留分工才看得出差別。
+- **v7 之前的舊資料存的是「主責」而非「全主責」**——實機資料驗證時發現全被丟進「其他」，
+  因此比對改用 `includes` 而不是 `startsWith`。
+- 不屬於四類的自訂項目不硬塞欄位，列在表格下方「其他」。
+- 手機放不下四欄＋日期，表格自身 `overflow-x: auto` 橫捲，頁面本身不橫捲（`.ov-scroll`）。
+
+順手清掉 `ServiceView.vue` 裡重複兩份且已無對應標籤的 `.ov-row/.ov-date/.ov-list` dead CSS。
+
+## v12-11｜開會決議的多個連結
+
+- 新表 `meeting_links(meeting_id, title, url, sort_order)`；RLS 的讀寫**完全跟著母會議走**
+  （`exists (select 1 from meetings m where ...)`），scope／班別判斷不重複實作，避免兩處走鐘。
+- 卡片內「相關連結」區塊，同工可＋連結／編輯／刪除；網址存檔前過 `normalizeUrl`。
+- 彈窗文案提醒：檔案放教會 NAS／Google 雲端，**記得把雲端檔案的分享權限開給需要看的同工**。
+
+**部署順序的坑（已處理）**：`listMeetings` 原本直接 `select('*, meeting_items(*), meeting_links(*)')`，
+在 migration 尚未執行的環境裡 PostgREST 會回 `PGRST200`（找不到關聯），**整個開會決議頁一筆會議都讀不到**。
+已加上退回不帶連結的查詢：頁面照常可用，只是暫時沒有連結區。實機驗證過（未建表時仍讀得到會議）。
+
+## 外部依賴（更新）
+
+- **尚待執行**：`2026-09-03c_announcement_updated_at.sql`、`2026-09-03d_meeting_links.sql`。
+- v12 #12 若要做，需教會 Google Workspace 管理者提供 **Service Account JSON 金鑰**（不是帳密），
+  並把兒童部資料夾單獨分享給該 Service Account；金鑰只能存在 Edge Function secret。

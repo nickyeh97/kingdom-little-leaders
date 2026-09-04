@@ -76,10 +76,25 @@ const router = createRouter({
           meta: { roles: ['teacher', 'admin'] },
         },
         {
+          // 組織架構與分工：家長也看得到（v10 #1），老師名單由 class_teachers() RPC 依角色過濾
           path: 'org',
           name: 'org',
           component: () => import('../views/OrgView.vue'),
-          meta: { roles: ['teacher', 'admin'] },
+          meta: { requiresApproval: true },
+        },
+        {
+          // 兒童服事項目（v11 #4）：同工維護名稱與說明，老師與兒童班家長檢視
+          path: 'child-service-items',
+          name: 'child-service-items',
+          component: () => import('../views/ChildServiceItemsView.vue'),
+          meta: { requiresApproval: true },
+        },
+        {
+          // 孩子上過的課程（家長版簡易教案，v10 #2）
+          path: 'my-lessons',
+          name: 'my-lessons',
+          component: () => import('../views/ParentLessonView.vue'),
+          meta: { roles: ['parent'] },
         },
         {
           path: 'records',

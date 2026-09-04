@@ -5,6 +5,7 @@ import { listClassGroups } from '../api/checkin'
 import {
   addChildPermission,
   listChildPermissions,
+  listChildServiceItems,
   listChildRosters,
   listChildSignups,
   removeChildPermission,
@@ -23,13 +24,16 @@ import {
 import { downloadCsv } from '../lib/csv'
 import { formatGathering, recentGatherings, upcomingGatherings } from '../lib/gathering'
 import {
-  CHILD_SERVICE_ITEM_PRESETS,
+  SERVICE_COLUMNS,
   SERVICE_ITEM_PRESETS,
   SIGNUP_WEEKS_AHEAD,
+  childServiceItemOptions,
+  serviceGrid,
 } from '../lib/service'
 import { useAuthStore } from '../stores/auth'
 import type {
   Child,
+  ChildServiceItem,
   ChildServicePermission,
   ChildServiceRoster,
   ChildServiceSignup,
@@ -165,21 +169,47 @@ function signupsShown(date: string): TeacherServiceSignup[] {
   )
 }
 
+/**
+ * 報名總覽表（v11 #10）：四類為欄、聚會日為列。
+ * 同工排班時要一眼看出「上週誰排過、這週該換誰」，逐列文字看不出來。
+ */
+const overviewRows = computed(() =>
+  serviceGrid(
+    dates,
+    dates.flatMap((d) =>
+      signupsShown(d).map((sg) => ({
+        gathering_date: d,
+        teacher_name: sg.teacher_name,
+        item: sg.item,
+      })),
+    ),
+  ),
+)
+
 async function load() {
   loading.value = true
   try {
     const from = dates[0]
     const to = dates[dates.length - 1]
-    ;[groups.value, weeks.value, signups.value, allChildren.value, childSignups.value, childRosters.value, childPerms.value] =
-      await Promise.all([
-        listClassGroups(),
-        listServiceWeeks(from, to),
-        listSignups(from, to),
-        listAllChildren(),
-        listChildSignups(from, to),
-        listChildRosters(from, to),
-        listChildPermissions(),
-      ])
+    ;[
+      groups.value,
+      weeks.value,
+      signups.value,
+      allChildren.value,
+      childSignups.value,
+      childRosters.value,
+      childPerms.value,
+      serviceItems.value,
+    ] = await Promise.all([
+      listClassGroups(),
+      listServiceWeeks(from, to),
+      listSignups(from, to),
+      listAllChildren(),
+      listChildSignups(from, to),
+      listChildRosters(from, to),
+      listChildPermissions(),
+      listChildServiceItems(),
+    ])
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
@@ -408,6 +438,8 @@ function canEditPerm(c: Child): boolean {
   return auth.can('admin') || auth.canClass(String(c.class_group_id))
 }
 
+/** 兒童服事項目字典（v11 #4）：勾選按鈕的來源 */
+const serviceItems = ref<ChildServiceItem[]>([])
 const permChild = ref<Child | null>(null)
 const permSaving = ref(false)
 
@@ -415,10 +447,10 @@ function openPermEditor(c: Child) {
   if (!canEditPerm(c)) return
   permChild.value = c
 }
-/** 此孩子在編輯器顯示的項目：建議五項 ∪ 已授權的自訂項目 */
+/** 此孩子在編輯器顯示的項目：字典啟用項目 ∪ 已授權的舊項目（v11 #4） */
 function permItemOptions(c: Child): string[] {
   const granted = (permsByChild.value.get(c.id) ?? []).map((p) => p.item)
-  return [...CHILD_SERVICE_ITEM_PRESETS, ...granted.filter((i) => !CHILD_SERVICE_ITEM_PRESETS.includes(i))]
+  return childServiceItemOptions(serviceItems.value, granted)
 }
 function hasPerm(c: Child, item: string): boolean {
   return (permsByChild.value.get(c.id) ?? []).some((p) => p.item === item)
@@ -558,16 +590,33 @@ function assignmentLines(w: ServiceWeek): string[] {
         @click="exportTeacherService">
         匯出近一季（12 週）排班與報名
       </van-button>
-      <!-- 兩個月報名總覽（v6 #7a）：不用逐張點開就看得到誰報了什麼 -->
+      <!-- 報名總覽表（v6 #7a → v11 #10 改為表格）：直欄看同一類誰排過，橫列看某週的完整分工 -->
       <div class="card">
         <p class="blk-title ov-title">未來 {{ dates.length }} 週報名總覽</p>
-        <div v-for="d in dates" :key="'ov' + d" class="ov-row">
-          <span class="ov-date">{{ d.slice(5).replace('-', '/') }}</span>
-          <span v-if="signupsShown(d).length" class="ov-list">
-            {{ signupsShown(d).map((sg) => `${sg.teacher_name}·${sg.item}`).join('、') }}
-          </span>
-          <span v-else class="hint">尚無報名</span>
+        <p class="hint ov-tip">直欄看同一類誰排過、橫列看某週的完整分工；表格可左右滑動</p>
+        <div class="ov-scroll">
+          <table class="ov-table">
+            <thead>
+              <tr>
+                <th class="ov-th-date">主日</th>
+                <th v-for="c in SERVICE_COLUMNS" :key="c">{{ c }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in overviewRows" :key="'ov' + row.date">
+                <th class="ov-th-date">{{ row.date.slice(5).replace('-', '/') }}</th>
+                <td v-for="c in SERVICE_COLUMNS" :key="c">
+                  <span v-if="row.cells[c].length === 0" class="ov-empty">—</span>
+                  <span v-for="n in row.cells[c]" :key="n" class="ov-name">{{ n }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+        <p v-for="row in overviewRows.filter((r) => r.others.length > 0)" :key="'oth' + row.date"
+          class="hint ov-others">
+          {{ row.date.slice(5).replace('-', '/') }} 其他：{{ row.others.join('、') }}
+        </p>
       </div>
 
     <van-collapse v-model="openDates">
@@ -1014,25 +1063,49 @@ h2 {
 .ov-title {
   margin-top: 0;
 }
-.ov-row {
-  display: flex;
-  gap: 10px;
-  padding: 5px 0;
-  border-bottom: 1px dashed var(--kll-primary-soft);
+/* 總覽表：手機放不下四欄＋日期，讓表自己橫向捲動，頁面本身不橫捲 */
+.ov-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+}
+.ov-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 460px;
   font-size: 15px;
 }
-.ov-row:last-child {
-  border-bottom: none;
+.ov-table th,
+.ov-table td {
+  border: 1px solid var(--kll-line);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
 }
-.ov-date {
-  flex-shrink: 0;
+.ov-table thead th {
+  background: var(--kll-primary-soft);
+  color: var(--kll-primary-text);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.ov-th-date {
+  white-space: nowrap;
   font-weight: 700;
-  color: var(--kll-primary-dark);
   font-variant-numeric: tabular-nums;
-  width: 44px;
+  background: var(--kll-bg);
 }
-.ov-list {
-  color: var(--kll-text);
+.ov-name {
+  display: block;
+  line-height: 1.5;
+}
+.ov-empty {
+  color: var(--kll-muted);
+}
+.ov-others {
+  margin: 8px 2px 0;
+}
+.ov-tip {
+  margin: 0 0 8px;
 }
 .blk-title {
   margin: 14px 0 6px;
@@ -1049,26 +1122,6 @@ h2 {
 }
 .blk-row .ov-title {
   margin-top: 0;
-}
-.ov-row {
-  display: flex;
-  gap: 10px;
-  padding: 5px 0;
-  border-bottom: 1px dashed var(--kll-primary-soft);
-  font-size: 15px;
-}
-.ov-row:last-child {
-  border-bottom: none;
-}
-.ov-date {
-  flex-shrink: 0;
-  font-weight: 700;
-  color: var(--kll-primary-dark);
-  font-variant-numeric: tabular-nums;
-  width: 44px;
-}
-.ov-list {
-  color: var(--kll-text);
 }
 .blk-title {
   margin: 14px 0 6px;

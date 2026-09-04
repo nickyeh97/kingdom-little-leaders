@@ -1,5 +1,5 @@
 import { db } from '../lib/supabase'
-import type { ChildServicePermission, ChildServiceRoster, ChildServiceSignup } from '../types'
+import type { ChildServiceItem, ChildServicePermission, ChildServiceRoster, ChildServiceSignup } from '../types'
 
 // ---- 服事項目授權（v5 #3：逐項開通，取代整體開關）----
 
@@ -97,5 +97,43 @@ export async function setChildAssignments(
   const { error } = await client
     .from('child_service_assignments')
     .insert(entries.map((e, i) => ({ ...e, roster_id: rosterId, sort_order: i })))
+  if (error) throw error
+}
+
+// ---- 兒童服事項目字典（v11 #4）----
+// 名稱與說明由同工維護；授權（名單頁）與報名（服事頁）的勾選按鈕都讀這張表。
+
+export async function listChildServiceItems(): Promise<ChildServiceItem[]> {
+  const { data, error } = await db()
+    .from('child_service_items')
+    .select('*')
+    .order('sort_order')
+    .order('name')
+  if (error) throw error
+  return (data ?? []) as ChildServiceItem[]
+}
+
+export interface ChildServiceItemInput {
+  name: string
+  description: string
+  sort_order: number
+  active: boolean
+}
+
+export async function createChildServiceItem(input: ChildServiceItemInput): Promise<void> {
+  const { error } = await db().from('child_service_items').insert(input)
+  if (error) throw error
+}
+
+export async function updateChildServiceItem(
+  id: string,
+  patch: Partial<ChildServiceItemInput>,
+): Promise<void> {
+  const { error } = await db().from('child_service_items').update(patch).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteChildServiceItem(id: string): Promise<void> {
+  const { error } = await db().from('child_service_items').delete().eq('id', id)
   if (error) throw error
 }

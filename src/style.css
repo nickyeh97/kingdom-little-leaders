@@ -1,13 +1,46 @@
 :root {
-  /* 對齊 Figma 初稿的色票 */
-  --kll-primary: #1f8a70;
-  --kll-primary-dark: #176b57;
-  --kll-primary-soft: #e0f1ec;
-  --kll-bg: #f6f8f7;
-  --kll-text: #1f2933;
-  --kll-sub: #6b7280;
-  --kll-amber: #f5a623;
-  --kll-amber-soft: #fef1d9;
+  /* ---- 多色暖調色票（v11 #7 二版，2026-09-03）----
+     來源：師母指定的 nypreschoolandkidsclub.com/activities/classes/
+     ——白底＋淺粉/淺橘/淺綠色塊分區，橘 #db662a、綠 #598f78、紫 #7462a2 當主題色。
+
+     兩個限制決定了主色：
+     (1) 班別色是橘（兒童）、藍（幼童）、綠（幼幼），平台主色若用橘或綠會跟班別標籤互搶；
+         參考站的**紫**不在班別色裡，且原色白字就有 5.24:1，直接用不必加深。
+     (2) 「不要一頁只有單一色」：粉/橘/綠/紫各自成套（底色＋深字），
+         分別掛在不同區塊與通知列上，同一頁至少會出現兩三種色。 */
+
+  /* 主色：互動元件（按鈕、選取、連結） */
+  --kll-primary: #7462a2; /* 參考站原色，白字 5.24:1 */
+  --kll-primary-dark: #5d4c8d;
+  --kll-primary-soft: #f3eefa;
+  --kll-primary-mid: #dad0ec; /* 參考站的淺紫塊 */
+  --kll-primary-text: #4a3d72; /* 淺紫底上的深字 8.37:1 */
+
+  /* 分區點綴：粉／橘／綠（底色不承載白字，深字版本才拿來寫字） */
+  --kll-pink: #e0799f;
+  --kll-pink-soft: #f9eef3;
+  --kll-pink-text: #8f3a5c; /* 6.34:1 */
+  --kll-orange: #db662a;
+  --kll-orange-soft: #feece0;
+  --kll-orange-text: #8a3d12; /* 6.63:1 */
+  --kll-green: #598f78;
+  --kll-green-soft: #f1f7e5;
+  --kll-green-text: #2f6b56; /* 5.71:1 */
+
+  /* 底色與文字 */
+  --kll-bg: #fdf9f7; /* 白中帶一點粉的頁底 */
+  --kll-card: #ffffff; /* 卡片維持純白，班別標籤的淺底才浮得出來 */
+  --kll-text: #2b2430; /* 14.36:1 */
+  --kll-sub: #6b6270; /* 5.57:1 */
+  --kll-line: #efe6ec;
+  --kll-border: #ded2da;
+  --kll-muted: #b7aebb;
+
+  /* 語意色（白字仍讀得清的深度） */
+  --kll-accent: #4e7f69; /* 成功／已簽到，白字 4.60:1 */
+  --kll-accent-soft: var(--kll-green-soft);
+  --kll-amber: #db8a1e; /* 小圓點等不承載文字處 */
+  --kll-amber-soft: #fdf0dc;
 
   /* 覆寫 Vant 主題色 */
   --van-primary-color: var(--kll-primary);
@@ -38,6 +71,14 @@
   --van-notice-bar-height: 48px;
   --van-collapse-item-content-font-size: 18px;
   --van-checkbox-size: 24px;
+
+  /* Vant 語意色：都取「白字仍讀得清」的深度（success 4.60:1、warning 4.43:1）；
+     參考站的亮橘/亮金白字都不到 3:1，只留給不承載文字的小圓點。 */
+  --van-success-color: var(--kll-accent);
+  --van-warning-color: #a86a12;
+  --van-background-2: var(--kll-card);
+  --van-cell-background: var(--kll-card);
+  --van-border-color: var(--kll-line);
 }
 
 html,
@@ -61,7 +102,7 @@ body {
 }
 
 .card {
-  background: #fff;
+  background: var(--kll-card);
   border-radius: 14px;
   padding: 14px 16px;
   margin-bottom: 12px;
@@ -71,6 +112,10 @@ body {
   font-size: 23px;
   font-weight: 700;
   margin: 16px 0 10px;
+  padding-left: 10px;
+  /* 左側色條：各區塊以 --sec 指定不同顏色，同一頁不會只有單一色 */
+  border-left: 5px solid var(--sec, var(--kll-primary));
+  line-height: 1.3;
 }
 
 .hint {
