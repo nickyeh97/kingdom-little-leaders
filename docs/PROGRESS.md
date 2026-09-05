@@ -110,7 +110,7 @@
 | --- | --- | --- |
 | 教會 Google 雲端授權（Service Account） | 組長 | Google Sheet 自動同步 |
 | 執行 migration `2026-09-04_announcement_category.sql` | 組長（Supabase SQL Editor） | 未執行則公告分類仍以前端換算呈現，資料庫值尚未對齊 |
-| 教會 Google **Service Account JSON 金鑰** | 組長（需 Workspace 管理者建立） | 平台直接上傳/下載雲端檔案；帳號密碼無法使用亦不應提供 |
+| 教會 Google **Service Account JSON 金鑰** | 組長 | 平台直接上傳/下載雲端檔案；帳號密碼無法使用亦不應提供。**取得步驟已寫成教學**：`docs/DEVELOPMENT.md` →「教會 Google 雲端串接」。開工前需先確認教會用的是 Google Workspace 還是一般 Gmail 帳號 |
 （Figma 實機導覽已停止維護，改以 `docs/圖文說明書_v0.3.2.pdf`（iPhone 14 尺寸截圖＋逐頁說明）取代。）
 | 課堂紀錄的完整需求 | 組長 | v11 #5 先加兩維指數，整頁改版待需求 |
 
