@@ -477,7 +477,7 @@ async function cycleStatus(item: MeetingItem) {
           label="名稱"
           label-align="top"
           maxlength="60"
-          placeholder="例：兒童部研習會講義"
+          placeholder="例：兒童牧區研習會講義"
         />
         <van-field
           v-model="lkDraft.url"

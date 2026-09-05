@@ -8,7 +8,7 @@
 create table if not exists meeting_links (
   id uuid primary key default gen_random_uuid(),
   meeting_id uuid not null references meetings (id) on delete cascade,
-  title text not null,                  -- 例：兒童部研習會講義
+  title text not null,                  -- 例：兒童牧區研習會講義
   url text not null,
   sort_order int not null default 0,
   created_at timestamptz not null default now()

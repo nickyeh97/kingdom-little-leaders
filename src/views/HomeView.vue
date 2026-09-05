@@ -265,7 +265,7 @@ async function removeAnn() {
       left-icon="clock-o"
       color="var(--kll-primary-text)"
       background="var(--kll-primary-soft)"
-      text="帳號審核中——請通知兒童部同工核准，通過後即可使用完整功能"
+      text="帳號審核中——請通知兒童牧區同工核准，通過後即可使用完整功能"
     />
 
     <!-- 指名是哪一班還沒填，並直接跳到該班（v9 驗收回饋：同班已有人填就不該再提醒） -->
@@ -331,7 +331,7 @@ async function removeAnn() {
 
 
     <div class="section-row">
-      <h3 class="section-title" style="--sec: var(--kll-pink)">兒童部公告</h3>
+      <h3 class="section-title" style="--sec: var(--kll-pink)">兒童牧區公告</h3>
       <van-button v-if="canPostAnn" size="small" type="primary" plain @click="openAnnEditor(null)">
         ＋發布
       </van-button>

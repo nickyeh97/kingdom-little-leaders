@@ -64,7 +64,7 @@ async function logout() {
         ✎ 修改稱呼
       </van-button>
     </div>
-    <h3 class="section-title" style="--sec: var(--kll-primary)">關於兒童部</h3>
+    <h3 class="section-title" style="--sec: var(--kll-primary)">關於兒童牧區</h3>
     <van-cell-group inset>
       <van-cell
         title="國度領袖兒童異象"
@@ -75,7 +75,7 @@ async function logout() {
       <van-cell
         v-if="auth.isApproved"
         title="組織架構與分工"
-        label="兒童部團隊組別、職務，與孩子班上的老師"
+        label="兒童牧區團隊組別、職務，與孩子班上的老師"
         is-link
         @click="$router.push({ name: 'org' })"
       />

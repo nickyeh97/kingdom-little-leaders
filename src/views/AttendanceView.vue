@@ -304,7 +304,7 @@ async function submit() {
       </div>
 
       <div v-if="children.length === 0" class="card hint">
-        尚未綁定孩子，請聯繫兒童部窗口協助綁定。
+        尚未綁定孩子，請聯繫兒童牧區窗口協助綁定。
       </div>
 
       <div class="card hint">勾選結果供同工預備課程與材料，臨時變動請記得取消</div>
@@ -327,7 +327,7 @@ async function submit() {
     <template v-else-if="mode === 'past'">
       <h3 class="section-title" style="--sec: var(--kll-primary)">{{ formatGathering(selected) }} · 當週勾選紀錄</h3>
       <div v-if="children.length === 0" class="card hint">
-        尚未綁定孩子，請聯繫兒童部窗口協助綁定。
+        尚未綁定孩子，請聯繫兒童牧區窗口協助綁定。
       </div>
       <div v-for="c in children" :key="c.id" class="card">
         <div class="kid">

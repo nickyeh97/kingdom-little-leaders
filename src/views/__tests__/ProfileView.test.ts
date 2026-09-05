@@ -64,11 +64,11 @@ describe('「我的」選單入口（權限修正）', () => {
     }
   })
 
-  it('兒童服事項目在「關於兒童部」區，不在「我的孩子」區', async () => {
+  it('兒童服事項目在「關於兒童牧區」區，不在「我的孩子」區', async () => {
     loginAs(['teacher'])
     const w = await mountMe()
     // 純老師沒有家長標籤，「我的孩子」整區不出現，但兒童服事項目仍在
-    expect(w.text()).toContain('關於兒童部')
+    expect(w.text()).toContain('關於兒童牧區')
     expect(w.text()).not.toContain('我的孩子')
     expect(w.text()).toContain('兒童服事項目')
   })
