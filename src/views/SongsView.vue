@@ -420,18 +420,16 @@ async function removePl() {
             <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
           </div>
           <div class="song-actions">
-            <a v-if="linkOf(s.dance_url)" class="link-btn dance" :href="linkOf(s.dance_url)"
-              target="_blank" rel="noopener noreferrer">
-              <van-icon name="play-circle-o" />有動作
-            </a>
-            <a v-if="linkOf(s.youtube_url)" class="link-btn lyric" :href="linkOf(s.youtube_url)"
-              target="_blank" rel="noopener noreferrer">
-              <van-icon name="play-circle-o" />純歌詞
-            </a>
-            <van-button v-if="s.lyrics" size="small" plain @click="toggleLyrics(s.id)">
+            <van-button v-if="linkOf(s.dance_url)" class="link-btn dance" size="small"
+              tag="a" :href="linkOf(s.dance_url)" target="_blank" rel="noopener noreferrer"
+              icon="play-circle-o">有動作</van-button>
+            <van-button v-if="linkOf(s.youtube_url)" class="link-btn lyric" size="small"
+              tag="a" :href="linkOf(s.youtube_url)" target="_blank" rel="noopener noreferrer"
+              icon="play-circle-o">純歌詞</van-button>
+            <van-button v-if="s.lyrics" size="small" plain class="secondary-btn" @click="toggleLyrics(s.id)">
               {{ openLyrics.includes(s.id) ? '收合歌詞' : '看歌詞' }}
             </van-button>
-            <van-button v-if="canEditFam" size="small" plain type="primary" @click="openFamEditor(s)">
+            <van-button v-if="canEditFam" size="small" plain class="secondary-btn" @click="openFamEditor(s)">
               熟悉度
             </van-button>
           </div>
@@ -447,18 +445,16 @@ async function removePl() {
           <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
         </div>
         <div class="song-actions">
-          <a v-if="linkOf(s.dance_url)" class="link-btn dance" :href="linkOf(s.dance_url)"
-            target="_blank" rel="noopener noreferrer">
-            <van-icon name="play-circle-o" />有動作
-          </a>
-          <a v-if="linkOf(s.youtube_url)" class="link-btn lyric" :href="linkOf(s.youtube_url)"
-            target="_blank" rel="noopener noreferrer">
-            <van-icon name="play-circle-o" />純歌詞
-          </a>
-          <van-button v-if="s.lyrics" size="small" plain @click="toggleLyrics(s.id)">
+          <van-button v-if="linkOf(s.dance_url)" class="link-btn dance" size="small"
+            tag="a" :href="linkOf(s.dance_url)" target="_blank" rel="noopener noreferrer"
+            icon="play-circle-o">有動作</van-button>
+          <van-button v-if="linkOf(s.youtube_url)" class="link-btn lyric" size="small"
+            tag="a" :href="linkOf(s.youtube_url)" target="_blank" rel="noopener noreferrer"
+            icon="play-circle-o">純歌詞</van-button>
+          <van-button v-if="s.lyrics" size="small" plain class="secondary-btn" @click="toggleLyrics(s.id)">
             {{ openLyrics.includes(s.id) ? '收合歌詞' : '看歌詞' }}
           </van-button>
-          <van-button v-if="canEditFam" size="small" plain type="primary" @click="openFamEditor(s)">
+          <van-button v-if="canEditFam" size="small" plain class="secondary-btn" @click="openFamEditor(s)">
             熟悉度
           </van-button>
         </div>
@@ -474,18 +470,16 @@ async function removePl() {
           <van-button v-if="auth.can('admin')" size="mini" plain @click="openEditor(s)">編輯</van-button>
         </div>
         <div class="song-actions">
-          <a v-if="linkOf(s.dance_url)" class="link-btn dance" :href="linkOf(s.dance_url)"
-            target="_blank" rel="noopener noreferrer">
-            <van-icon name="play-circle-o" />有動作
-          </a>
-          <a v-if="linkOf(s.youtube_url)" class="link-btn lyric" :href="linkOf(s.youtube_url)"
-            target="_blank" rel="noopener noreferrer">
-            <van-icon name="play-circle-o" />純歌詞
-          </a>
-          <van-button v-if="s.lyrics" size="small" plain @click="toggleLyrics(s.id)">
+          <van-button v-if="linkOf(s.dance_url)" class="link-btn dance" size="small"
+            tag="a" :href="linkOf(s.dance_url)" target="_blank" rel="noopener noreferrer"
+            icon="play-circle-o">有動作</van-button>
+          <van-button v-if="linkOf(s.youtube_url)" class="link-btn lyric" size="small"
+            tag="a" :href="linkOf(s.youtube_url)" target="_blank" rel="noopener noreferrer"
+            icon="play-circle-o">純歌詞</van-button>
+          <van-button v-if="s.lyrics" size="small" plain class="secondary-btn" @click="toggleLyrics(s.id)">
             {{ openLyrics.includes(s.id) ? '收合歌詞' : '看歌詞' }}
           </van-button>
-          <van-button v-if="canEditFam" size="small" plain type="primary" @click="openFamEditor(s)">
+          <van-button v-if="canEditFam" size="small" plain class="secondary-btn" @click="openFamEditor(s)">
             熟悉度
           </van-button>
         </div>
@@ -639,30 +633,38 @@ async function removePl() {
 </template>
 
 <style scoped>
-/* 外觀比照 Vant small plain button，但實體是連結（v9 #6） */
+/*
+ * 預習連結（v9 #6，v14 #4 改版）。
+ *
+ * 原本是手寫的 `<a>`（32px/14px），註解說「比照 Vant small」，但那個尺寸其實對到的是
+ * Vant **mini**——本站在 style.css 把 small 放大成 44px/17px 給長輩看，所以整整差一階，
+ * 跟旁邊的「熟悉度」對不齊。改用 van-button 本體（tag="a" 保留連結語意：
+ * 可長按複製網址、可另開分頁），尺寸交給 Vant 變數，日後調字級不會再有一顆跑掉。
+ *
+ * 視覺階層：有動作／純歌詞是**家長與孩子預習用**的主要動作，給淺底色；
+ * 看歌詞、熟悉度（只有老師看得到）是次要動作，維持灰階 plain。
+ * 淺底＋深字比照公告分類標籤的既有語彙，也避開實心橘白字對比不足的問題。
+ */
 .link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  background: var(--kll-card);
-  font-size: 14px;
-  line-height: 1;
   text-decoration: none;
-  white-space: nowrap;
 }
 .link-btn.dance {
+  background: var(--kll-orange-soft);
+  border-color: var(--kll-orange-soft);
   color: var(--kll-orange-text);
 }
 .link-btn.lyric {
   /* 原為 YouTube 紅；紅不在師母指定的色盤內（白粉橘綠紫），改用綠 */
+  background: var(--kll-green-soft);
+  border-color: var(--kll-green-soft);
   color: var(--kll-green-text);
 }
 .link-btn:active {
   opacity: 0.7;
+}
+.secondary-btn {
+  color: var(--kll-sub);
+  border-color: var(--van-border-color, #ebedf0);
 }
 h2 {
   margin: 0 0 4px;

@@ -28,6 +28,15 @@ import {
 import { downloadCsv } from '../lib/csv'
 import { classHasIndex } from '../lib/performance'
 import { LESSON_ITEM_PRESETS } from '../lib/teaching'
+import { isParentVisibleItem } from '../lib/parentLesson'
+import {
+  canPasteInto,
+  clearClip,
+  clipLabel,
+  readClip,
+  writeClip,
+  type SegmentClip,
+} from '../lib/lessonClipboard'
 import { useAuthStore } from '../stores/auth'
 import type { ClassDoc, ClassGroup, LessonSegment } from '../types'
 import { classColor } from '../lib/classColor'
@@ -84,6 +93,7 @@ async function load() {
 }
 
 onMounted(async () => {
+  refreshClip() // 剪貼簿存在 localStorage，重新進頁面時要把提示列帶回來
   try {
     // 教案不含幼幼班（權限矩陣）
     groups.value = (await listClassGroups()).filter((g) => classHasIndex(g.name))
@@ -311,41 +321,71 @@ async function save() {
 }
 
 /**
- * 複製此段落（v9 #5）：老師常要寫內容/老師/時間/教材相近的段落。
- * 插在原段落之後並把後面的順序往後挪；課後執行（review_text）屬當堂實況，不複製。
- * 複製完直接開啟新段落，接著改就好。
+ * 複製段落（v9 #5 起，v14 #7 改為可跨日期）。
+ *
+ * 原本只能原地複製（`gathering_date` 寫死成當下日期）；現在改成「複製→剪貼簿→貼上」
+ * 兩段式，切到任一天都能貼。同一天要複製也走同一條路（複製完貼上即可），
+ * 只留一種機制比兩顆長得很像的按鈕好懂。
+ *
+ * 課後執行（review_text）屬當堂實況，不複製——沿用 v9 #5 的決定。
  */
-const duplicating = ref(false)
-async function duplicate() {
+const clip = ref<SegmentClip | null>(null)
+function refreshClip() {
+  clip.value = readClip()
+}
+const canPaste = computed(() => canPasteInto(clip.value, activeGroup.value))
+
+function copySegment() {
   const target = editing.value
-  if (!target || target === 'new' || duplicating.value) return
-  duplicating.value = true
+  if (!target || target === 'new') return
+  writeClip({
+    class_group_id: activeGroup.value,
+    class_name: groups.value.find((g) => g.id === activeGroup.value)?.name ?? '',
+    source_date: selectedDate.value,
+    time_text: target.time_text,
+    item: target.item,
+    content: target.content,
+    teacher_text: target.teacher_text,
+    materials_text: target.materials_text,
+  })
+  refreshClip()
+  editing.value = null
+  showSuccessToast('已複製，切到要貼的日期後按「貼上」')
+}
+
+/** 貼上：一律新增在該天最後面，不覆蓋任何既有段落（組長定案） */
+const pasting = ref(false)
+async function paste() {
+  const c = clip.value
+  if (!c || pasting.value || !canPaste.value) return
+  pasting.value = true
   try {
-    const idx = segments.value.findIndex((s) => s.id === target.id)
-    for (const seg of segments.value.slice(idx + 1).reverse()) {
-      await updateLessonSegment(seg.id, { sort_order: seg.sort_order + 1 })
-    }
     const created = await createLessonSegment({
       class_group_id: activeGroup.value,
       gathering_date: selectedDate.value,
-      time_text: target.time_text,
-      item: target.item,
-      content: target.content,
-      teacher_text: target.teacher_text,
-      materials_text: target.materials_text,
+      time_text: c.time_text,
+      item: c.item,
+      content: c.content,
+      teacher_text: c.teacher_text,
+      materials_text: c.materials_text,
       review_text: '',
-      sort_order: target.sort_order + 1,
+      sort_order: (segments.value[segments.value.length - 1]?.sort_order ?? -1) + 1,
       updated_by_name: auth.profile?.display_name ?? '',
     })
     await reflowTimes()
     await load()
     openEditor(segments.value.find((s) => s.id === created.id) ?? created)
-    showSuccessToast('已複製，可直接修改')
+    showSuccessToast('已貼上，可直接修改')
   } catch (e) {
     showFailToast((e as Error).message)
   } finally {
-    duplicating.value = false
+    pasting.value = false
   }
+}
+
+function discardClip() {
+  clearClip()
+  refreshClip()
 }
 
 async function remove() {
@@ -453,6 +493,21 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
       </div>
       <div v-else-if="segments.length === 0" class="card hint">本日尚無教案內容</div>
 
+      <!-- 剪貼簿：複製起來的段落可貼到任一天（v14 #7），不跨班別、只新增不覆蓋 -->
+      <div v-if="canEdit && clip" class="card clip-bar">
+        <span class="clip-icon">📋</span>
+        <div class="clip-text">
+          <strong>{{ clipLabel(clip) }}</strong>
+          <span v-if="!canPaste" class="clip-warn">
+            這段是{{ clip.class_name || '其他班' }}的，只能貼回同一個班別
+          </span>
+        </div>
+        <van-button v-if="canPaste" size="small" type="primary" :loading="pasting" @click="paste">
+          貼到這天
+        </van-button>
+        <van-button size="small" plain @click="discardClip">清除</van-button>
+      </div>
+
       <!-- 時間軸 run sheet -->
       <div class="timeline">
         <div
@@ -473,6 +528,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
           <div class="tl-card card">
             <div class="tl-head">
               <strong class="tl-item">{{ seg.item || '未命名段落' }}</strong>
+              <van-tag v-if="isParentVisibleItem(seg.item)" class="parent-tag">家長看得到</van-tag>
               <van-tag v-if="seg.teacher_text" plain type="primary">{{ seg.teacher_text }}</van-tag>
               <span class="spacer" />
               <template v-if="canEdit">
@@ -487,6 +543,9 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
               </template>
             </div>
             <p v-if="seg.content" class="tl-content">{{ seg.content }}</p>
+            <p v-else-if="isParentVisibleItem(seg.item)" class="tl-content unfilled warn">
+              （內容未填寫——這項會顯示給家長，沒填就整段不會出現）
+            </p>
             <p v-else class="tl-content unfilled">（內容未填寫）</p>
             <p class="tl-field">
               <span class="f-label">🧰 教材預備</span>
@@ -539,6 +598,10 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         </div>
         <van-field v-model="draft.item" label="自訂項目" maxlength="40"
           placeholder="或自行輸入（如：防災演習）" />
+        <p v-if="isParentVisibleItem(draft.item)" class="hint parent-note">
+          👨‍👩‍👧 這個項目會顯示在家長的「孩子上過的課程」，請記得填寫下面的「內容」——
+          沒填內容家長就看不到這一段。老師欄位與課後執行不會給家長看。
+        </p>
 
         <p class="hint pop-label">
           時間{{ timePreview ? `：${timePreview}` : '（設定長度與開始時間自動計算）' }}
@@ -577,8 +640,8 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
           儲存此段落
         </van-button>
         <van-button v-if="editing !== 'new'" round block plain type="primary" class="dup-btn"
-          :loading="duplicating" @click="duplicate">
-          複製此段落
+          @click="copySegment">
+          複製此段落（可貼到其他日期）
         </van-button>
         <van-button v-if="editing !== 'new'" round block plain type="danger" class="del-btn" @click="remove">
           刪除段落
@@ -610,6 +673,49 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
 </template>
 
 <style scoped>
+.clip-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  border-left: 5px solid var(--kll-primary);
+}
+.clip-icon {
+  font-size: 22px;
+}
+.clip-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.clip-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clip-warn {
+  font-size: 14px;
+  color: var(--kll-pink-text);
+}
+/* v14 #6：讓老師一眼看出哪些段落會被家長看到，避免忘記填內容 */
+.parent-tag {
+  background: var(--kll-pink-soft);
+  color: var(--kll-pink-text);
+}
+.tl-content.warn {
+  color: var(--kll-pink-text);
+}
+.parent-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 4px solid var(--kll-pink);
+  border-radius: 0 6px 6px 0;
+  background: var(--kll-pink-soft);
+  color: var(--kll-pink-text);
+  line-height: 1.7;
+}
 .export-btn {
   margin: 4px 0 10px;
 }

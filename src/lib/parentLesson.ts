@@ -2,8 +2,8 @@
  * 家長版簡易教案的呈現邏輯（v10 #2）。
  *
  * 需求：「僅查閱、注重在小孩上的課程而非流程」——
- * 所以純流程段落（報到、點心、下課這類只有項目沒有內容的列）不列出，
- * 家長看到的是「那天上了什麼」，不是同工的時間表。
+ * 家長看到的是「那天上了什麼」，不是同工的時間表，
+ * 所以只列出白名單項目（v14 #6：敬拜／信息或主題／背金句／彈性時間）且有填內容的段落。
  *
  * 守則檢核（`docs/DESIGN_PRINCIPLES.md`）：這頁是回顧孩子上過什麼課，
  * 不呈現孩子的表現、不做班級之間的比較，也不預告未來進度（避免變成進度壓力）。
@@ -22,9 +22,32 @@ export interface ParentLessonDay {
   teachers: string[]
 }
 
-/** 有內容才算「課程」；只有項目沒內容的是流程列，不給家長看 */
+/**
+ * 家長看得到的教案項目（v14 #6）。
+ *
+ * 用「包含」而不是完全相等比對——`item` 是老師手打的自由文字，
+ * 正式資料同時存在「信息」「信息 但以理在獅子坑」「信息／主題」三種寫法。
+ * 「信息」與「主題」是同一件事的兩種叫法，任一符合就算。
+ *
+ * ⚠️ 這份清單同時存在於 `supabase/migrations/2026-09-05_parent_lesson_whitelist.sql`
+ *    的 RPC 裡，**真正的邊界在那邊**（前端只是 UX，家長拿不到清單外的資料）。
+ *    要新增項目請兩邊一起改；`__tests__/parentLesson.test.ts` 有對照測試。
+ */
+export const PARENT_VISIBLE_ITEMS = ['敬拜', '信息', '主題', '背金句', '彈性時間'] as const
+
+/** 這個項目名稱會顯示給家長嗎？（教案頁用它提醒老師填內容） */
+export function isParentVisibleItem(item: string): boolean {
+  return PARENT_VISIBLE_ITEMS.some((w) => item.includes(w))
+}
+
+/**
+ * 家長看得到的段落：白名單項目**且**有填內容。
+ *
+ * 沒填內容幾乎等於老師忘了寫（實測「背金句」7 筆全部空白），
+ * 顯示一列空白的項目對家長沒有意義，所以不列出；改由教案頁提醒老師填寫。
+ */
 export function isCourseSegment(seg: ParentLessonSegment): boolean {
-  return seg.content.trim() !== ''
+  return seg.content.trim() !== '' && isParentVisibleItem(seg.item)
 }
 
 /**
