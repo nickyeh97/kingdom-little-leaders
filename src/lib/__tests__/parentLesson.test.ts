@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   PARENT_LESSON_COUNT,
+  PARENT_VISIBLE_ITEMS,
   groupParentLessons,
   isCourseSegment,
+  isParentVisibleItem,
   songsForDate,
   teachersOfClass,
 } from '../parentLesson'
@@ -14,7 +16,7 @@ function seg(p: Partial<ParentLessonSegment> = {}): ParentLessonSegment {
     class_group_id: 'kid',
     gathering_date: '2026-08-29',
     sort_order: 0,
-    item: '主題信息',
+    item: '信息',
     content: '大衛與歌利亞',
     teacher_name: '小美老師',
     ...p,
@@ -32,14 +34,42 @@ describe('家長版簡易教案（v10 #2）', () => {
     expect(isCourseSegment(seg())).toBe(true)
   })
 
+  it('白名單外的項目不給家長看，就算有填內容也一樣（v14 #6）', () => {
+    expect(isCourseSegment(seg({ item: '環境整理', content: '收拾桌椅' }))).toBe(false)
+    expect(isCourseSegment(seg({ item: '服事分工', content: '小恩負責奉獻' }))).toBe(false)
+    expect(isCourseSegment(seg({ item: '破冰', content: '大風吹' }))).toBe(false)
+  })
+
+  it('白名單項目沒填內容也不顯示——空白列對家長沒意義，改由教案頁提醒老師（v14 #6）', () => {
+    expect(isCourseSegment(seg({ item: '背金句', content: '' }))).toBe(false)
+    expect(isCourseSegment(seg({ item: '敬拜', content: '  ' }))).toBe(false)
+    expect(isCourseSegment(seg({ item: '背金句', content: '約翰一書 4:7' }))).toBe(true)
+  })
+
+  it('項目用「包含」比對——item 是老師手打的自由文字（v14 #6）', () => {
+    // 正式資料裡同時存在這三種寫法
+    expect(isParentVisibleItem('信息')).toBe(true)
+    expect(isParentVisibleItem('信息 但以理在獅子坑')).toBe(true)
+    expect(isParentVisibleItem('信息／主題')).toBe(true)
+    // 「信息」與「主題」是同一件事的兩種叫法，任一符合就算
+    expect(isParentVisibleItem('今日主題')).toBe(true)
+    expect(isParentVisibleItem('結束禱告')).toBe(false)
+  })
+
+  it('白名單內容必須與 RPC 的 SQL 陣列一致（v14 #6）', () => {
+    // supabase/migrations/2026-09-05_parent_lesson_whitelist.sql 的
+    // unnest(array[...]) 是真正的邊界；這裡照抄一份，改一邊沒改另一邊就會紅
+    expect([...PARENT_VISIBLE_ITEMS]).toEqual(['敬拜', '信息', '主題', '背金句', '彈性時間'])
+  })
+
   it('依聚會日分組，日期新到舊、同一天照 sort_order', () => {
     const days = groupParentLessons([
-      seg({ gathering_date: '2026-08-22', sort_order: 1, item: '複習' }),
-      seg({ gathering_date: '2026-08-29', sort_order: 2, item: '延伸活動' }),
-      seg({ gathering_date: '2026-08-29', sort_order: 1, item: '主題信息' }),
+      seg({ gathering_date: '2026-08-22', sort_order: 1, item: '敬拜' }),
+      seg({ gathering_date: '2026-08-29', sort_order: 2, item: '彈性時間' }),
+      seg({ gathering_date: '2026-08-29', sort_order: 1, item: '信息' }),
     ])
     expect(days.map((d) => d.gathering_date)).toEqual(['2026-08-29', '2026-08-22'])
-    expect(days[0].segments.map((s) => s.item)).toEqual(['主題信息', '延伸活動'])
+    expect(days[0].segments.map((s) => s.item)).toEqual(['信息', '彈性時間'])
   })
 
   it('同一天多位老師去重後保留出現順序', () => {
@@ -54,7 +84,7 @@ describe('家長版簡易教案（v10 #2）', () => {
   it('邊際：同一天跨班別（家長有多個孩子）分成兩組，不會混在一起', () => {
     const days = groupParentLessons([
       seg({ class_group_id: 'kid', item: '兒童班主題' }),
-      seg({ class_group_id: 'toddler', item: '幼童班主題' }),
+      seg({ class_group_id: 'toddler', item: '幼童班主題' }),  // 含「主題」，在白名單內
     ])
     expect(days).toHaveLength(2)
     expect(new Set(days.map((d) => d.class_group_id))).toEqual(new Set(['kid', 'toddler']))

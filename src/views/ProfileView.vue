@@ -164,9 +164,9 @@ async function logout() {
       <div class="editor">
         <h3>修改稱呼</h3>
         <p class="hint name-hint">
-          這是平台上顯示給其他人看的名字（例：家榛媽媽、王老師）
+          這是平台上顯示給其他人看的名字，請直接填您的名字
         </p>
-        <van-field v-model="nameDraft" label="稱呼" maxlength="20" placeholder="例：王老師" />
+        <van-field v-model="nameDraft" label="稱呼" maxlength="20" placeholder="請填您的名字" />
         <van-button round block type="primary" :loading="savingName" class="save-btn" @click="saveName">
           儲存
         </van-button>

@@ -100,7 +100,7 @@ async function sendReset() {
             v-model="displayName"
             name="displayName"
             label="稱呼"
-            placeholder="例：家榛媽媽、王老師"
+            placeholder="請填您的名字"
             :rules="[{ required: true, message: '請填寫稱呼' }]"
           />
           <van-field
