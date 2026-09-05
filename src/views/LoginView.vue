@@ -75,7 +75,7 @@ async function sendReset() {
     const msg = (e as Error).message
     showFailToast(
       /rate limit/i.test(msg)
-        ? '寄信額度暫時已滿，請約一小時後再試，或聯繫兒童部同工協助重設'
+        ? '寄信額度暫時已滿，請約一小時後再試，或聯繫兒童牧區同工協助重設'
         : `寄送失敗：${msg}`,
     )
   } finally {
@@ -88,7 +88,7 @@ async function sendReset() {
   <div class="login-page">
     <div class="brand">
       <div class="logo" />
-      <h1>國度領袖兒童部整合平台</h1>
+      <h1>國度領袖兒童牧區整合平台</h1>
       <p class="hint">神國小領袖 · Kingdom Little Leaders</p>
     </div>
 

@@ -15,7 +15,7 @@ const props = withDefaults(
   defineProps<{
     title: string
     hint: string
-    /** 圖檔路徑（public/ 底下，如 `/兒童部組織架構.png`） */
+    /** 圖檔路徑（public/ 底下，如 `/兒童牧區組織架構.png`） */
     src: string
     alt: string
     /**

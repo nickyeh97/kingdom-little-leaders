@@ -6,8 +6,8 @@ import ImageBoard from '../ImageBoard.vue'
 const base = {
   title: '組織架構與分工',
   hint: '點圖可放大',
-  src: '/兒童部組織架構.png',
-  alt: '兒童部組織架構',
+  src: '/兒童牧區組織架構.png',
+  alt: '兒童牧區組織架構',
 }
 
 describe('ImageBoard 圖片限高（v0.3.1）', () => {
