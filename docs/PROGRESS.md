@@ -92,7 +92,9 @@
 
 - [ ] 站內邀請建帳號＋徹底刪除 Auth 帳號（需 Supabase Edge Function／service role）
 - [ ] Google Sheet 自動同步（🔒 **等組長通知取得教會 Google 雲端授權**）
-- [ ] LINE 登入（Edge Function 自訂 OIDC）、Apple 登入
+- [x] **LINE 登入（綁定式）**：走 Supabase Custom OIDC（`custom:line`），**不需要 Edge Function**——
+      這推翻了原本「Edge Function 自訂 OIDC」的規劃。程式已完成，🔒 等組長建 LINE 頻道與 Supabase 設定
+- [ ] Apple 登入
 - [ ] LINE 機器人推播（出席提醒、歌單通知）
 - [ ] E2E 流程測試（Playwright＋獨立測試資料庫）＋RLS 滲透測試
 - [ ] 正式 App icon／Logo（目前為佔位色塊，`scripts/gen-icons.mjs` 產生）
@@ -113,6 +115,8 @@
 | 教會 Google **Service Account JSON 金鑰** | 組長（需 Workspace 管理者建立） | 平台直接上傳/下載雲端檔案；帳號密碼無法使用亦不應提供 |
 （Figma 實機導覽已停止維護，改以 `docs/圖文說明書_v0.3.3.pdf`（iPhone 14 尺寸截圖＋逐頁說明）取代。）
 | 課堂紀錄的完整需求 | 組長 | v11 #5 先加兩維指數，整頁改版待需求 |
+| LINE Provider＋Login channel＋Supabase Custom OIDC 設定 | 組長 | LINE 登入綁定；步驟見 `docs/DEVELOPMENT.md`。**Login 與未來的 Messaging channel 必須同一個 Provider**，否則推播接不上 |
+| 執行 migration `2026-09-08_line_login.sql` | 組長（Supabase SQL Editor） | 補 `handle_new_user` 在 email 與 name 皆空時會讓註冊整個失敗的破口 |
 
 （四支 migration `2026-09-03_parent_view`／`b_v11`／`c_announcement_updated_at`／`d_meeting_links`
 已於 2026-09-03～04 全數執行完畢並驗證。）
