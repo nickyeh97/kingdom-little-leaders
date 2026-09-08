@@ -112,9 +112,13 @@ export function shortDate(date: string): string {
   return `${Number(m)}/${Number(d)}`
 }
 
+/**
+ * 日期後綴用「聚會日」而不是「主日」（v15）：本教會聚會在**週六下午**，
+ * 寫「主日」會被讀成星期日，實際造成過誤會。
+ */
 export function formatGathering(gatheringDate: string): string {
   const [y, m, d] = gatheringDate.split('-')
-  return `${y}/${m}/${d}（主日）`
+  return `${y}/${m}/${d}（聚會日）`
 }
 
 /** 「週X」中文字，供截止提示等文案使用 */

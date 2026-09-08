@@ -262,7 +262,7 @@ async function pickChild(child: Child) {
 <template>
   <div class="page">
     <header class="top">
-      <h2>主日點名</h2>
+      <h2>聚會日點名</h2>
       <span class="hint">{{ formatGathering(gathering) }}</span>
     </header>
 

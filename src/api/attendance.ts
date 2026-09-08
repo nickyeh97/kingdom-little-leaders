@@ -19,7 +19,7 @@ export async function listMyChildren(): Promise<Child[]> {
   return kids.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'))
 }
 
-/** 取得某主日的預先出席（RLS：家長只拿得到自己孩子的） */
+/** 取得某聚會日的預先出席（RLS：家長只拿得到自己孩子的） */
 export async function listPlans(gatheringDate: string): Promise<AttendancePlan[]> {
   const { data, error } = await db()
     .from('attendance_plans')
@@ -52,7 +52,7 @@ export async function upsertPlans(
   if (error) throw error
 }
 
-/** 統計某主日預計出席人數（老師/管理端） */
+/** 統計某聚會日預計出席人數（老師/管理端） */
 export async function countAttending(gatheringDate: string): Promise<number> {
   const { count, error } = await db()
     .from('attendance_plans')

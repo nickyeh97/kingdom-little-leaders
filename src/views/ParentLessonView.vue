@@ -59,7 +59,7 @@ onMounted(async () => {
 <template>
   <div class="page">
     <h2>孩子上過的課程</h2>
-    <p class="hint">最近 {{ PARENT_LESSON_COUNT }} 次主日，孩子班上教了什麼</p>
+    <p class="hint">最近 {{ PARENT_LESSON_COUNT }} 次聚會，孩子班上教了什麼</p>
 
     <van-loading v-if="loading" class="loading" />
 
@@ -110,7 +110,7 @@ onMounted(async () => {
       </div>
 
       <p v-if="days.length === 0" class="card hint">
-        最近 {{ PARENT_LESSON_COUNT }} 次主日還沒有可查閱的課程內容。<br />
+        最近 {{ PARENT_LESSON_COUNT }} 次聚會還沒有可查閱的課程內容。<br />
         幼幼班以點名與老師課後紀錄為主，沒有教案；其他班別的教案由老師課後整理，稍後再回來看看。
       </p>
     </template>

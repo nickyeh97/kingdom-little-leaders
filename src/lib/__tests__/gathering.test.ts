@@ -164,8 +164,8 @@ describe('recordsRangeStart（出席紀錄查詢起點：近半年）', () => {
 })
 
 describe('顯示文字', () => {
-  it('formatGathering 格式化為 YYYY/MM/DD（主日）', () => {
-    expect(formatGathering('2026-07-25')).toBe('2026/07/25（主日）')
+  it('formatGathering 格式化為 YYYY/MM/DD（聚會日）——聚會在週六，寫「主日」會被讀成星期日', () => {
+    expect(formatGathering('2026-07-25')).toBe('2026/07/25（聚會日）')
   })
 
   it('weekdayName 回傳中文週名', () => {
