@@ -598,7 +598,7 @@ function assignmentLines(w: ServiceWeek): string[] {
           <table class="ov-table">
             <thead>
               <tr>
-                <th class="ov-th-date">主日</th>
+                <th class="ov-th-date">聚會日</th>
                 <th v-for="c in SERVICE_COLUMNS" :key="c">{{ c }}</th>
               </tr>
             </thead>

@@ -93,7 +93,7 @@ async function logout() {
     <van-cell-group inset v-if="auth.can('parent')">
       <van-cell
         title="孩子上過的課程"
-        label="最近 4 次主日，孩子班上教了什麼"
+        label="最近 4 次聚會，孩子班上教了什麼"
         is-link
         @click="$router.push({ name: 'my-lessons' })"
       />
