@@ -124,11 +124,16 @@ body {
 }
 
 /* ---- 行動版底部彈窗 ----
-   手機鍵盤彈出或內容過長時，彈窗會撐滿畫面導致遮罩點不到而無法取消；
-   統一限制高度、內容改為內部捲動，並保留右上關閉鈕的空間。 */
+   內容過長時彈窗會撐滿畫面導致遮罩點不到而無法取消；
+   統一限制高度、內容改為內部捲動，並保留右上關閉鈕的空間。
+
+   `--kll-keyboard` 是軟體鍵盤高度，由 `lib/keyboardViewport.ts` 依 visualViewport 寫入。
+   軟體鍵盤**不會**縮小版面視窗，`dvh` 也不反應鍵盤——沒有這兩行的話，
+   彈窗會維持原高度貼在版面視窗底部，下半截整個躲到鍵盤後面（v15 #2）。 */
 .van-popup--bottom {
   max-height: 85vh;
-  max-height: 85dvh;
+  max-height: calc(85dvh - var(--kll-keyboard, 0px));
+  bottom: var(--kll-keyboard, 0px);
   display: flex;
   flex-direction: column;
 }
