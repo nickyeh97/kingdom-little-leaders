@@ -30,14 +30,19 @@ import {
   childServiceItemOptions,
   serviceGrid,
 } from '../lib/service'
+import { listClassTopics, upsertClassTopic } from '../api/topics'
+import { listPlansRange } from '../api/attendance'
+import { attendingByClass, attendingSummary, topicAt, topicIndex } from '../lib/serviceTopic'
 import { useAuthStore } from '../stores/auth'
 import type {
+  AttendancePlan,
   Child,
   ChildServiceItem,
   ChildServicePermission,
   ChildServiceRoster,
   ChildServiceSignup,
   ClassGroup,
+  ClassTopic,
   ServiceWeek,
   TeacherServiceSignup,
 } from '../types'
@@ -122,6 +127,9 @@ const groups = ref<ClassGroup[]>([])
 const weeks = ref<ServiceWeek[]>([])
 const signups = ref<TeacherServiceSignup[]>([])
 const allChildren = ref<Child[]>([])
+/** 預排主題（v16 #1）與家長預先出席（v16 #2）——都跟服事排班脫鉤，各自獨立載入 */
+const topics = ref<ClassTopic[]>([])
+const plans = ref<AttendancePlan[]>([])
 const childSignups = ref<ChildServiceSignup[]>([])
 const childRosters = ref<ChildServiceRoster[]>([])
 const childPerms = ref<ChildServicePermission[]>([])
@@ -200,6 +208,8 @@ async function load() {
       childRosters.value,
       childPerms.value,
       serviceItems.value,
+      topics.value,
+      plans.value,
     ] = await Promise.all([
       listClassGroups(),
       listServiceWeeks(from, to),
@@ -209,6 +219,8 @@ async function load() {
       listChildRosters(from, to),
       listChildPermissions(),
       listChildServiceItems(),
+      listClassTopics(from, to),
+      listPlansRange(from, to),
     ])
   } catch (e) {
     showFailToast((e as Error).message)
@@ -311,7 +323,52 @@ interface DraftAssignment {
 const editOpen = ref(false)
 const editDate = ref('')
 const editClassId = ref('')
-const editDraft = ref({ songs_text: '', topic: '', flex_text: '', published: false })
+/** 預排主題索引與查詢（v16 #1） */
+const topicMap = computed(() => topicIndex(topics.value))
+function topicOf(date: string, classGroupId: string): string {
+  return topicAt(topicMap.value, date, classGroupId)
+}
+
+/** 那天各班家長已勾出席的人數（v16 #2）；沒人填就回空字串，整行不顯示 */
+function plannedText(date: string): string {
+  return attendingSummary(attendingByClass(plans.value, allChildren.value, groups.value, date))
+}
+
+// ---- 主題編輯（僅同工；與服事排班分開，不必先安排、也不必發布）----
+const topicOpen = ref(false)
+const topicDate = ref('')
+const topicClassId = ref('')
+const topicDraft = ref('')
+const topicSaving = ref(false)
+
+function openTopicEditor(date: string, classGroupId: string) {
+  topicDate.value = date
+  topicClassId.value = classGroupId
+  topicDraft.value = topicOf(date, classGroupId)
+  topicOpen.value = true
+}
+
+async function saveTopic() {
+  if (topicSaving.value) return
+  topicSaving.value = true
+  try {
+    await upsertClassTopic({
+      gathering_date: topicDate.value,
+      class_group_id: topicClassId.value,
+      topic: topicDraft.value,
+      updated_by_name: auth.profile?.display_name ?? '',
+    })
+    topics.value = await listClassTopics(dates[0], dates[dates.length - 1])
+    topicOpen.value = false
+    showSuccessToast('已儲存主題')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    topicSaving.value = false
+  }
+}
+
+const editDraft = ref({ songs_text: '', flex_text: '', published: false })
 const editAssignments = ref<DraftAssignment[]>([])
 const manualName = ref('')
 const manualItem = ref('')
@@ -323,8 +380,8 @@ function openEditor(date: string, classId: string) {
   editDate.value = date
   editClassId.value = classId
   editDraft.value = w
-    ? { songs_text: w.songs_text, topic: w.topic, flex_text: w.flex_text, published: w.published }
-    : { songs_text: '', topic: '', flex_text: '', published: false }
+    ? { songs_text: w.songs_text, flex_text: w.flex_text, published: w.published }
+    : { songs_text: '', flex_text: '', published: false }
   editAssignments.value = (w?.service_assignments ?? [])
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
@@ -371,6 +428,9 @@ async function saveWeek() {
       gathering_date: editDate.value,
       class_group_id: editClassId.value,
       ...editDraft.value,
+      // 主題已改由 class_topics 管（v16 #1）；這裡原封帶回舊值，
+      // 免得 upsert 把既有資料洗成空字串
+      topic: weekAt.value.get(`${editDate.value}|${editClassId.value}`)?.topic ?? '',
     })
     await setAssignments(weekId, editAssignments.value)
     await load()
@@ -640,6 +700,9 @@ function assignmentLines(w: ServiceWeek): string[] {
 
         <!-- A. 服事表（T-COM-03／C-01） -->
         <p class="blk-title">服事表</p>
+        <!-- 家長已勾的預先出席（v16 #2）：老師提早知道那天大概幾個孩子會來，好準備材料與分組。
+             另起一行不與標題同列——手機 390px 寬放不下，擠在一起會把標題推掉並撐出橫向捲動。 -->
+        <p v-if="plannedText(d)" class="hint planned">🙋 預計出席：{{ plannedText(d) }}</p>
         <div v-for="g in rosterClasses(d)" :key="g.id" class="svc-block">
           <div class="week-head">
             <strong>{{ g.name }}</strong>
@@ -655,11 +718,26 @@ function assignmentLines(w: ServiceWeek): string[] {
               size="mini"
               plain
               class="week-edit"
+              @click="openTopicEditor(d, g.id)"
+            >
+              主題
+            </van-button>
+            <van-button
+              v-if="auth.can('admin')"
+              size="mini"
+              plain
               @click="openEditor(d, g.id)"
             >
               {{ weekAt.get(`${d}|${g.id}`) ? '編輯' : '安排' }}
             </van-button>
           </div>
+          <!--
+            預排主題（v16 #1）：放在服事安排之外，不論有沒有安排、有沒有發布都顯示——
+            老師需要主題的時機正是「決定要不要報名這一週」，那時還沒發布。
+          -->
+          <p v-if="topicOf(d, g.id)" class="svc-line topic-line">
+            📖 主題：{{ topicOf(d, g.id) }}
+          </p>
           <template v-if="weekAt.get(`${d}|${g.id}`)">
             <p
               v-for="line in assignmentLines(weekAt.get(`${d}|${g.id}`)!)"
@@ -670,9 +748,6 @@ function assignmentLines(w: ServiceWeek): string[] {
             </p>
             <p v-if="weekAt.get(`${d}|${g.id}`)!.songs_text" class="svc-line">
               🎵 詩歌：{{ weekAt.get(`${d}|${g.id}`)!.songs_text }}
-            </p>
-            <p v-if="weekAt.get(`${d}|${g.id}`)!.topic" class="svc-line">
-              📖 主題：{{ weekAt.get(`${d}|${g.id}`)!.topic }}
             </p>
             <p v-if="weekAt.get(`${d}|${g.id}`)!.flex_text" class="svc-line">
               🎨 彈性時間：{{ weekAt.get(`${d}|${g.id}`)!.flex_text }}
@@ -855,6 +930,29 @@ function assignmentLines(w: ServiceWeek): string[] {
       </div>
     </van-popup>
 
+    <!-- 預排主題彈窗（v16 #1，僅同工） -->
+    <van-popup
+      :show="topicOpen"
+      round
+      closeable
+      position="bottom"
+      @update:show="(v: boolean) => (topicOpen = v)"
+    >
+      <div class="editor">
+        <h3>{{ formatGathering(topicDate) }}・{{ groupName.get(topicClassId) }}</h3>
+        <p class="hint pop-label">
+          這週要帶的主題。老師在報名服事時就看得到，不必等服事表發布。
+        </p>
+        <van-field v-model="topicDraft" label="主題" type="textarea" rows="2" autosize
+          maxlength="300" placeholder="例：品格週-分享／油瓶不斷 — 王下 4:1-7" />
+        <p class="hint pop-label">清空內容並儲存＝取消這一週的主題。</p>
+        <van-button round block type="primary" :loading="topicSaving" class="save-btn"
+          @click="saveTopic">
+          儲存主題
+        </van-button>
+      </div>
+    </van-popup>
+
     <!-- 同工排班彈窗 -->
     <van-popup
       :show="editOpen"
@@ -867,8 +965,6 @@ function assignmentLines(w: ServiceWeek): string[] {
         <h3>{{ formatGathering(editDate) }}・{{ groupName.get(editClassId) }}</h3>
         <van-field v-model="editDraft.songs_text" label="詩歌" type="textarea" rows="1" autosize
           maxlength="300" placeholder="本週詩歌（文字）" />
-        <van-field v-model="editDraft.topic" label="主題課程" type="textarea" rows="1" autosize
-          maxlength="300" placeholder="課程主題" />
         <van-field v-model="editDraft.flex_text" label="彈性時間" type="textarea" rows="1" autosize
           maxlength="300" placeholder="彈性時間安排" />
 
@@ -1036,6 +1132,16 @@ function assignmentLines(w: ServiceWeek): string[] {
 </template>
 
 <style scoped>
+/* v16：主題與預計出席都是「服事安排之外」的資訊，視覺上與排班列區隔 */
+.topic-line {
+  color: var(--kll-primary-text);
+  font-weight: 700;
+}
+.planned {
+  /* 不能 nowrap：三個班別的文字在手機上一行放不下，會撐出橫向溢出把班別名切掉 */
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
 .export-btn {
   margin-bottom: 10px;
 }
