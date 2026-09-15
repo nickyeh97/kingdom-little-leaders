@@ -26,12 +26,21 @@ create table if not exists class_topics (
   gathering_date date not null,
   class_group_id uuid not null references class_groups (id) on delete cascade,
   topic text not null default '',
-  updated_by uuid not null default auth.uid() references profiles (id),
+  -- 可為 null：`auth.uid()` 只在「從平台寫入」時有值。
+  -- 這支 migration 最後會把 service_weeks 的舊 topic 搬過來，那是在 SQL Editor 裡執行的，
+  -- 沒有登入的 JWT → auth.uid() 回 NULL → 若設 not null 整支 migration 會失敗。
+  -- 搬過來的資料本來就不是任何人在平台上填的，記成 null 才誠實；
+  -- 畫面顯示用的是下面的 updated_by_name 快照。
+  updated_by uuid references profiles (id),
   updated_by_name text not null default '',
   updated_at timestamptz not null default now(),
   unique (gathering_date, class_group_id)
 );
 create index if not exists idx_class_topics_date on class_topics (gathering_date);
+
+-- 保險：Supabase SQL Editor 是包在交易裡跑的，前一次失敗會整支回滾、表根本不會留下來；
+-- 但若在非交易環境下跑過並留下 not null 的舊表，這行會把它放寬，讓整支 migration 可以直接重跑
+alter table class_topics alter column updated_by drop not null;
 
 comment on table class_topics is
   '預排主題（聚會日 × 班別）。學期初一次排完，讓老師在報名服事前就知道那週要帶什麼。'
