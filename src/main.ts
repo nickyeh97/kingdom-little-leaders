@@ -6,6 +6,7 @@ import zhTW from 'vant/es/locale/lang/zh-TW'
 import 'vant/lib/index.css'
 import App from './App.vue'
 import router from './router'
+import { installKeyboardViewport } from './lib/keyboardViewport'
 import { useAuthStore } from './stores/auth'
 import './style.css'
 
@@ -87,6 +88,7 @@ async function bootstrap() {
 
   setupChunkErrorGuard()
   setupPwaUpdate()
+  installKeyboardViewport() // 軟體鍵盤不遮住底部彈窗的輸入框（v15 #2）
 }
 
 bootstrap()
