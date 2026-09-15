@@ -152,10 +152,26 @@ export interface ServiceWeek {
   gathering_date: string
   class_group_id: string
   songs_text: string
+  /** @deprecated v16 #1 起改用 ClassTopic；保留僅為舊資料與既有匯出 */
   topic: string
   flex_text: string
   published: boolean
   service_assignments?: ServiceAssignment[]
+}
+
+/**
+ * 預排主題（v16 #1）：聚會日 × 班別。
+ *
+ * 與 `ServiceWeek.topic` 不同——後者綁在服事排班上、要發布老師才看得到；
+ * 這張是學期初一次排完、老師報名前就看得到的。`ServiceWeek.topic` 已停用。
+ */
+export interface ClassTopic {
+  id: string
+  gathering_date: string
+  class_group_id: string
+  topic: string
+  updated_by_name: string
+  updated_at: string
 }
 
 /** 老師服事報名（T-COM-01；teacher_name 為快照） */
