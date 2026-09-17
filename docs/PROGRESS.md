@@ -87,6 +87,7 @@
 ### Phase 3 文化深化
 
 - [ ] 電子服事經歷卡（報名→受訓中→已核定→服事完成；家長可見自己孩子）
+  - 2026-09-17 組長定案改以**「小領袖靈獸」遊戲**（Unity 6 Web）呈現：GDD v0.1 與新 repo 種子放在 `spirit-beast-game/`（待另開 repo 後整包搬移）；平台端需配合 migration（`service_card_entries`、`beast_profiles`）＋家長服事卡頁＋鼓勵話語編輯＋開啟遊戲連結，見 `spirit-beast-game/docs/GDD.md` §5、§6
 - [ ] 公告雙向互動（家長回覆/簽到）
 
 ### 整合與技術項
