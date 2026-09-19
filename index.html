@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#1F8A70" />
+    <meta name="theme-color" content="#7462a2" />
+    <!-- vite-plugin-pwa 只注入 manifest，icon 宣告要手寫；少了它們 /favicon.ico 會被 SPA fallback 回成 HTML。
+         檔名帶 kll_logo 前綴，換 logo 時連檔名一起換可繞過瀏覽器的圖示快取。 -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/kll_logo-32.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <!-- iOS 加入主畫面優先看這個；沒有的話部分版本會退回用網頁截圖 -->
+    <link rel="apple-touch-icon" href="/kll_logo-180.png" />
     <title>國度領袖兒童牧區整合平台</title>
   </head>
   <body>
