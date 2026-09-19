@@ -1,29 +1,18 @@
 /**
  * 從一張原圖產生全套 PWA / favicon 圖示。
  *
+ *   npm i -D playwright && npx playwright install chromium   # 只在換 logo 時裝，跑完可移除
  *   node scripts/gen-icons.mjs assets/kll_logo-src.webp public
  *
- * 換 logo 時把新圖放到 assets/kll_logo-src.webp 再跑這行即可。
- *
- * ⚠️ 這支需要 playwright（用它的 Chromium 解 WebP／縮圖），但**不是專案相依**——
- *    換 logo 是很少發生的事，不值得為它讓每個人都裝一份瀏覽器。
- *    要跑的時候先 `npm i -D playwright && npx playwright install chromium`，跑完可以移除。
- *    產出的圖示本身已經進版控，平常建置不需要這支腳本。
+ * playwright 刻意不列為專案相依：換 logo 很少發生，產出的圖已進版控，平常建置用不到這支。
  *
  * favicon.ico 另外產（ICO 容器包一張 32px PNG）：
- *    python3 -c "import struct;p=open('public/kll_logo-32.png','rb').read();\
- *      open('public/favicon.ico','wb').write(struct.pack('<HHH',0,1,1)+\
- *      struct.pack('<BBBBHHII',32,32,0,0,1,32,len(p),22)+p)"
+ *   python3 -c "import struct;p=open('public/kll_logo-32.png','rb').read();\
+ *     open('public/favicon.ico','wb').write(struct.pack('<HHH',0,1,1)+\
+ *     struct.pack('<BBBBHHII',32,32,0,0,1,32,len(p),22)+p)"
  *
- * 用 Chromium 的 canvas 做解碼與縮圖——專案沒有 sharp 之類的影像套件，
- * 而環境裡本來就有 Playwright 的 Chromium，不必為了換 logo 多裝一個相依。
- *
- * 原圖是「白底 ＋ 紫色圓角方塊 logo」。直接縮放會得到「白底中間一小塊紫」，
- * 作業系統再套上自己的圓角遮罩就會露出白邊。所以：
- *   1. 以主色（出現最多的顏色）找出紫色方塊的外框，裁掉白邊
- *   2. 輸出時先鋪滿主色，再用**圓角裁切**把方塊畫上去——
- *      方塊自己的圓角外原本是白的，落在裁切範圍外就被主色蓋掉了。
- *      （不用 flood fill：原圖邊緣有一圈壓縮雜訊會把填色擋住）
+ * 做法：原圖是「白底＋紫色圓角方塊」，直接縮放會在 OS 的圓角遮罩下露出白邊。
+ * 所以先以主色找出方塊外框裁掉白邊，輸出時鋪滿主色、再用圓角裁切把方塊畫上去。
  */
 import { chromium } from 'playwright'
 import fs from 'node:fs'
@@ -33,7 +22,8 @@ const SRC = process.argv[2]
 const OUT = process.argv[3] || '.'
 if (!SRC) throw new Error('用法: node scripts/gen-icons.mjs assets/kll_logo-src.webp public')
 
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
+// 預設用 playwright install 裝的 Chromium；環境另有瀏覽器時可用 CHROMIUM_PATH 指定
+const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 const p = await b.newPage()
 const ext = path.extname(SRC).slice(1) || 'png'
 const dataUri = `data:image/${ext};base64,${fs.readFileSync(SRC).toString('base64')}`
