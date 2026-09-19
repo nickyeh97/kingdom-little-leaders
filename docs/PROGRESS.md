@@ -96,7 +96,7 @@
 - [ ] LINE 登入（Edge Function 自訂 OIDC）、Apple 登入
 - [ ] LINE 機器人推播（出席提醒、歌單通知）
 - [ ] E2E 流程測試（Playwright＋獨立測試資料庫）＋RLS 滲透測試
-- [ ] 正式 App icon／Logo（目前為佔位色塊，`scripts/gen-icons.mjs` 產生）
+- [x] 正式 App icon／Logo（師母提供，`assets/kll_logo-src.webp` → `scripts/gen-icons.mjs` 產出全套；含 maskable 與 apple-touch-icon）
 
 ### 未來預留（資料模型已留欄位，未啟用）
 
