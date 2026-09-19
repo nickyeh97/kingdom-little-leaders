@@ -95,6 +95,48 @@ body {
     sans-serif;
 }
 
+/* ---- 全域防溢出（2026-09-19）----
+   正式資料裡出現過一則 743 字元、整串沒有 `/` 的 Yahoo 搜尋網址。
+   瀏覽器在整串裡找不到任何可斷行的位置 → 整頁被撐到 6701px 寬（視窗 390px），
+   Safari 為了塞下它把整頁縮到 6%，在平板上看起來就是「整個跑版」。
+   Chromium 實測同一份內容一樣會溢出，不是 Safari 獨有的問題。
+
+   分三層處理，從「不要溢出」到「就算溢出也撐不破畫面」：
+
+   1. 文字：`overflow-wrap` 會繼承，掛在 body 上就是全站通用。
+      `break-word` 只在「這個字自己獨佔一行也放不下」時才斷，
+      一般中英文排版完全不受影響。
+      不用 `anywhere`（Safari 支援不完整，WebKit bug 195345），
+      也不用 `break-all`（連正常的英文句子都會從中間切斷）。
+   2. 圖片／影片／內嵌：一律不得寬於容器。
+   3. 最後一道保險：任何元素（含日後新增的 div）都不能把頁面撐寬。
+      真的需要橫向捲動的地方（服事總覽表 `.ov-scroll`、日期列 `.date-row`）
+      本來就各自有 `overflow-x: auto` 容器，捲動照常；
+      被夾住的只有「本來就不該溢出的東西」。 */
+html,
+body {
+  overflow-x: hidden;
+}
+
+body {
+  overflow-wrap: break-word;
+}
+
+img,
+video,
+iframe,
+canvas,
+svg,
+embed,
+object {
+  max-width: 100%;
+}
+
+img,
+video {
+  height: auto;
+}
+
 .page {
   padding: 16px 16px 76px; /* 底部留 tabbar 空間 */
   min-height: 100vh;
