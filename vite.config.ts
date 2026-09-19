@@ -23,8 +23,16 @@ export default defineConfig({
         background_color: '#F6F8F7',
         display: 'standalone',
         icons: [
-          { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'kll_logo-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'kll_logo-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          // maskable：Android 會把圖裁成圓形/方圓形，內容要留在中央安全區，
+          // 沒有這張的話系統會自己補白底圓框，看起來像沒設計過
+          {
+            src: 'kll_logo-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
       },
     }),
