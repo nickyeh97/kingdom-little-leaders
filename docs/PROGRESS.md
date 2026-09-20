@@ -3,8 +3,9 @@
 > **本文件是跨 session／跨協作者的進度單一事實來源（Single Source of Truth）。**
 > 更新規則（見 CLAUDE.md 工作流程慣例）：**每完成一次 Sprint、或有外部設定完成/需求異動時，必須更新本文件。**
 >
-> 最後更新：2026-09-04（**平台升版 v0.3.0**：Sprint 07 追加 v10／v11／v12 全數上線；
-> 操作手冊 v5、更新說明 `docs/RELEASE_NOTES_v0.3.0.md`、
+> 最後更新：2026-09-20（**平台 v0.4.1**：正式 App 圖示＋manifest 主題色、全域防溢出（平板長網址跑版）；
+> 操作手冊 v8、更新說明 `docs/RELEASE_NOTES_v0.4.1.md`；
+> v0.4.0（09-15）：聚會日文案、鍵盤遮擋修正、服事表預排主題與預計出席，migration `2026-09-15_class_topics` 已執行；
 > 實機圖文說明書 `docs/圖文說明書_v0.4.0.pdf`（取代 Figma 導覽））
 
 ## 目前狀態一句話
@@ -18,8 +19,10 @@
 - [x] 前端：Vue 3 + Vite + TypeScript + Vant（mobile-first PWA，繁中介面 zh-TW）
 - [x] 後端：Supabase（Postgres + Auth + RLS 資料庫層權限；schema 與 migrations 見 `supabase/`）
 - [x] 部署：Vercel（push `main` 自動部署）＋ PWA 加入主畫面
-- [x] 品質：Vitest 單元/邊際測試 104 項＋GitHub Actions CI（build＋test）
-- [x] 行動版體驗：全站字級 1.4x；底部編輯彈窗一律右上關閉鈕＋限高 85dvh 內部捲動（iPhone SE 實測修正，2026-08-20）
+- [x] 品質：Vitest 單元/邊際測試 252 項＋GitHub Actions CI（build＋test）
+- [x] 行動版體驗：全站字級 1.4x；底部編輯彈窗一律右上關閉鈕＋限高 85dvh 內部捲動（iPhone SE 實測修正，2026-08-20）；軟體鍵盤不再遮住彈窗輸入框（`visualViewport`，v15 #2）
+- [x] 全域防溢出（v0.4.1）：`style.css` 三層防線——文字 `overflow-wrap: break-word`、媒體 `max-width: 100%`、`html/body overflow-x: hidden`；起因是教案裡一則 743 字元不可斷行的網址把平板整頁撐破。`src/__tests__/style.test.ts` 把關
+- [x] 正式 App 圖示（v0.4.1）：師母提供 logo，`assets/kll_logo-src.webp` → `scripts/gen-icons.mjs` 產出 favicon／apple-touch-icon／PWA any＋maskable；manifest `theme_color` 改為平台主色 `#7462a2`
 - [x] 聚會日制度化：主日聚會＝**週六下午**；聚會日/截止日皆為設定值（`src/lib/config.ts`，目前截止＝聚會前 1 天週五 23:59）
 - [x] 文件結構：README（僅簡介與索引）＋ docs/（開發指南、規格書、守則、Sprint、本文件）
 
@@ -96,7 +99,6 @@
 - [ ] LINE 登入（Edge Function 自訂 OIDC）、Apple 登入
 - [ ] LINE 機器人推播（出席提醒、歌單通知）
 - [ ] E2E 流程測試（Playwright＋獨立測試資料庫）＋RLS 滲透測試
-- [x] 正式 App icon／Logo（師母提供，`assets/kll_logo-src.webp` → `scripts/gen-icons.mjs` 產出全套；含 maskable 與 apple-touch-icon）
 
 ### 未來預留（資料模型已留欄位，未啟用）
 
@@ -135,4 +137,5 @@
 | 05 | 組長/師母 V4 總反饋 8 項（需求增補 v5）：忘記密碼、服事項目收斂（主責/助教/彈性時間）、教材類別篩選、匯出動線、出席未來週開放、課堂紀錄補寫、服事班別劃分、兒童服事資格逐項授權（migration 08-11）＋追加：聚會流程範本、名單頁籤改版 | ✅ 結案 | `docs/SPRINT_05.md` |
 | 06 | 組長 0827 反饋 7 項（需求增補 v6）：本週歌曲（migration 08-12）、出席文案、課堂紀錄簡化、出席紀錄分班、教案課程流程範本＋時間連動、兒童服事固定六項、老師服事報名總覽｜＋v7 四項：自訂稱呼、取消表情回饋（改口頭鼓勵）、平台更名、老師服事項目五項 | ✅ 結案 | `docs/SPRINT_06.md` |
 | 07 | 8/29 座談會後反饋 10 項＋追加 PWA 更新機制（需求增補 v9）：班別顏色、聚會流程 Sheet 匯入與插入位置、教案範本改依聚會流程、教案複製段落、詩歌連結修正、公告輸入對齊、切換分頁回頂端、日期開放 12 週、版本號 0.2.0、PWA 版本更新機制、教案複製段落、聚會流程插入位置、教案範本依流程 | ✅ 三批結案（migration 09-01 已執行）；追加 v10 家長端兩項＋v11 七項已實作，待組長驗收 | `docs/SPRINT_07.md` |
+| 09 | 需求增補 v13／v15／v16／v17（09-05～09-20，無獨立 Sprint 文件）：兒童部→兒童牧區全域更名、主日→聚會日文案、平板鍵盤遮擋修正、服事表預排主題（migration 09-15 已執行）＋預計出席人數、正式 App 圖示＋主題色、全域防溢出；CLAUDE.md 新增「收尾檢查」三項 | ✅ v0.4.0／v0.4.1 已上線 | `docs/RELEASE_NOTES_v0.4.0.md`、`docs/RELEASE_NOTES_v0.4.1.md` |
 | 08 | 組長反饋 7 項（需求增補 v14）：稱呼建議改直接填名字、手冊移除舊標籤說明、圖文說明書兩張截圖修正＋產圖腳本加落地網址斷言、詩歌頁連結按鈕尺寸與版型、家長版教案白名單（敬拜／信息或主題／背金句／彈性時間，連帶把過濾下放到 RPC）、教案段落跨日期複製貼上 | ✅ 七項全數完成（v0.3.3；migration 09-05 待執行） | `docs/SPRINT_08.md` |
