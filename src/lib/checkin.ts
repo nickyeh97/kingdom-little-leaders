@@ -2,30 +2,21 @@
  * 點名頁的日期切換（v18）。
  *
  * 老師備課時要先估那一週大概幾個孩子會來，也要知道哪些家長還沒填（好去提醒），
- * 所以點名頁比照教案頁開放切換日期：近 3 次＋未來 12 次聚會日。
- * 未來的日期只能「看」家長預填，簽到要等到當天。
+ * 所以點名頁開放切換日期：本週＋未來 11 次聚會日（共 12 次）。
+ * 只有本週能簽到，其他週只能「看」家長預填。
+ * 不含過去的聚會日：暫時不做補簽，而且過去的簽到結果和未來的預填擺在同一列容易混淆（組長裁決）。
  */
-import { recentGatherings, upcomingGatherings } from './gathering'
+import { upcomingGathering, upcomingGatherings } from './gathering'
 import type { AttendancePlan } from '../types'
 
-/** 點名頁可切換的聚會日（舊 → 新），與教案頁相同範圍 */
+/** 點名頁可切換的聚會日（本週 → 更未來） */
 export function checkInDates(from = new Date()): string[] {
-  return [...new Set([...recentGatherings(3, from), ...upcomingGatherings(12, from)])]
+  return upcomingGatherings(12, from)
 }
 
-function toDateString(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-/**
- * 這一天能不能簽到：當天或已經過去的聚會日可以（過去＝補點名），未來只能預覽。
- * 用字串比較就夠——兩邊都是 YYYY-MM-DD。
- */
-export function isCheckInEditable(gatheringDate: string, today = new Date()): boolean {
-  return gatheringDate <= toDateString(today)
+/** 只有本週（下一次）聚會日能簽到——與改版前的點名頁行為相同；其他週只能預覽 */
+export function isCheckInEditable(gatheringDate: string, from = new Date()): boolean {
+  return gatheringDate === upcomingGathering(from)
 }
 
 /**

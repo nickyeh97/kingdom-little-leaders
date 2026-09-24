@@ -6,34 +6,29 @@ import type { AttendancePlan } from '../../types'
 const thu = new Date(2026, 8, 24)
 
 describe('checkInDates', () => {
-  it('近 3 次＋未來 12 次，舊到新、不重複', () => {
+  it('本週起 12 次，不含過去', () => {
     const dates = checkInDates(thu)
-    expect(dates).toHaveLength(15)
-    expect(dates[0]).toBe('2026-09-05')
-    expect(dates[2]).toBe('2026-09-19')
-    expect(dates[3]).toBe('2026-09-26')
-    expect(dates[14]).toBe('2026-12-12')
-    expect(new Set(dates).size).toBe(15)
+    expect(dates).toHaveLength(12)
+    expect(dates[0]).toBe('2026-09-26')
+    expect(dates[11]).toBe('2026-12-12')
   })
 
-  it('聚會日當天：recent 與 upcoming 都含今天，只留一筆', () => {
-    const sat = new Date(2026, 8, 26)
-    const dates = checkInDates(sat)
-    expect(dates.filter((d) => d === '2026-09-26')).toHaveLength(1)
-    expect(dates).toHaveLength(14)
+  it('聚會日當天：第一筆就是今天', () => {
+    expect(checkInDates(new Date(2026, 8, 26))[0]).toBe('2026-09-26')
   })
 })
 
 describe('isCheckInEditable', () => {
-  it('當天可以簽到', () => {
+  it('本週聚會日可以簽到（週間先看、當天再點都算本週）', () => {
+    expect(isCheckInEditable('2026-09-26', thu)).toBe(true)
     expect(isCheckInEditable('2026-09-26', new Date(2026, 8, 26, 14, 30))).toBe(true)
   })
-  it('過去的聚會日可以補點名', () => {
-    expect(isCheckInEditable('2026-09-19', thu)).toBe(true)
-  })
-  it('未來只能預覽', () => {
-    expect(isCheckInEditable('2026-09-26', thu)).toBe(false)
+  it('之後的週只能預覽', () => {
     expect(isCheckInEditable('2026-10-03', thu)).toBe(false)
+  })
+  it('聚會日過了就換下一週', () => {
+    expect(isCheckInEditable('2026-09-26', new Date(2026, 8, 27))).toBe(false)
+    expect(isCheckInEditable('2026-10-03', new Date(2026, 8, 27))).toBe(true)
   })
 })
 

@@ -19,10 +19,10 @@ import { useAuthStore } from '../stores/auth'
 import type { AttendancePlan, CheckIn, CheckInStatus, Child, ClassGroup } from '../types'
 
 const auth = useAuthStore()
-/** 可切換的聚會日（近 3 次＋未來 12 次，與教案頁相同）；預設本週 */
+/** 可切換的聚會日：本週＋未來 11 次；預設本週。不含過去（暫不補簽，也避免與預填混淆） */
 const dates = checkInDates()
 const selectedDate = ref(upcomingGathering())
-/** 未來的日期只能看家長預填，簽到要等到當天（過去可補點名） */
+/** 只有本週能簽到，其他週只能看家長預填 */
 const editable = computed(() => isCheckInEditable(selectedDate.value))
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
@@ -277,7 +277,7 @@ async function pickChild(child: Child) {
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
     </van-tabs>
 
-    <!-- 日期列與教案頁相同：近 3 次＋未來 12 次。未來的日期用來估人數、看誰還沒填 -->
+    <!-- 日期列：本週＋未來 11 次。之後的週用來估人數、看誰還沒填 -->
     <div class="date-row">
       <van-tag
         v-for="d in dates"
@@ -303,7 +303,7 @@ async function pickChild(child: Child) {
       <div class="stat card"><strong>{{ preview.pending }}</strong><span class="hint">待確認</span></div>
     </div>
     <p v-if="!editable" class="hint preview-note">
-      這是未來的聚會日：只顯示家長預填狀況，供備課估人數與提醒還沒填的家長；簽到請到當天再操作。
+      這是之後的聚會日：只顯示家長預填狀況，供備課估人數與提醒還沒填的家長；簽到請在那一週操作。
     </p>
 
     <div v-if="groups.length === 0" class="card hint">
