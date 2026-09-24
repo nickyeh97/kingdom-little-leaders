@@ -13,12 +13,17 @@ import {
 import { listAllChildren } from '../api/records'
 import { updateChild } from '../api/roster'
 import { formatGathering, recordsRangeStart, upcomingGathering } from '../lib/gathering'
+import { checkInDates, isCheckInEditable, planLabel, planStats } from '../lib/checkin'
 import { classColor, classTagStyle } from '../lib/classColor'
 import { useAuthStore } from '../stores/auth'
 import type { AttendancePlan, CheckIn, CheckInStatus, Child, ClassGroup } from '../types'
 
 const auth = useAuthStore()
-const gathering = upcomingGathering()
+/** 可切換的聚會日（近 3 次＋未來 12 次，與教案頁相同）；預設本週 */
+const dates = checkInDates()
+const selectedDate = ref(upcomingGathering())
+/** 未來的日期只能看家長預填，簽到要等到當天（過去可補點名） */
+const editable = computed(() => isCheckInEditable(selectedDate.value))
 const groups = ref<ClassGroup[]>([])
 const activeGroup = ref('')
 /** 班別頁籤依班別上色（v9 #1）：兒童＝太陽色、幼童＝天藍、幼幼＝嫩綠 */
@@ -57,6 +62,8 @@ const stats = computed(() => {
   const leave = ids.filter((id) => checkMap.value.get(id)?.status === 'leave')
   return { planned: planned.length, present: present.length, leave: leave.length }
 })
+/** 預覽未來日期：老師備課估人數、看還有誰沒填 */
+const preview = computed(() => planStats(planMap.value, displayChildren.value.map((c) => c.id)))
 
 /** 排序：預先報名出席在前，再按名字；現場加入者殿後 */
 const sortedChildren = computed(() => {
@@ -76,8 +83,8 @@ async function loadClass() {
   try {
     const [kids, plans, checks] = await Promise.all([
       listClassChildren(activeGroup.value),
-      listPlans(gathering),
-      listCheckIns(gathering),
+      listPlans(selectedDate.value),
+      listCheckIns(selectedDate.value),
     ])
     children.value = kids
     planMap.value = new Map(plans.map((p) => [p.child_id, p]))
@@ -103,7 +110,7 @@ onMounted(async () => {
   }
 })
 
-watch(activeGroup, loadClass)
+watch([activeGroup, selectedDate], loadClass)
 
 function isWalkIn(childId: string): boolean {
   return planMap.value.get(childId)?.status !== 'attending'
@@ -114,7 +121,7 @@ async function setStatus(child: Child, target: CheckInStatus) {
   const current = checkMap.value.get(child.id)
   try {
     if (current?.status === target) {
-      await removeCheckIn(child.id, gathering)
+      await removeCheckIn(child.id, selectedDate.value)
       const next = new Map(checkMap.value)
       next.delete(child.id)
       checkMap.value = next
@@ -122,7 +129,7 @@ async function setStatus(child: Child, target: CheckInStatus) {
       const entry = {
         child_id: child.id,
         class_group_id: current?.class_group_id ?? activeGroup.value,
-        gathering_date: gathering,
+        gathering_date: selectedDate.value,
         status: target,
         note: current?.note ?? null,
         is_walk_in: isWalkIn(child.id),
@@ -158,7 +165,7 @@ async function saveDetail() {
     const entry = {
       child_id: child.id,
       class_group_id: current?.class_group_id ?? activeGroup.value,
-      gathering_date: gathering,
+      gathering_date: selectedDate.value,
       status: current?.status ?? 'present',
       note,
       is_walk_in: current?.is_walk_in ?? isWalkIn(child.id),
@@ -188,7 +195,7 @@ async function openHistory(child: Child) {
   historyLoading.value = true
   historyRows.value = []
   try {
-    const checks = await listChildCheckIns(child.id, historyFrom, gathering)
+    const checks = await listChildCheckIns(child.id, historyFrom, selectedDate.value)
     historyRows.value = [...checks]
       .sort((a, b) => b.gathering_date.localeCompare(a.gathering_date))
       .map((check) => ({ date: check.gathering_date, check }))
@@ -234,7 +241,7 @@ async function pickChild(child: Child) {
     await upsertCheckIn({
       child_id: child.id,
       class_group_id: activeGroup.value, // 點名記在「加入的班」，重載後仍顯示於此班
-      gathering_date: gathering,
+      gathering_date: selectedDate.value,
       status: 'present',
       note: null,
       is_walk_in: true,
@@ -245,7 +252,7 @@ async function pickChild(child: Child) {
       checked_by: '',
       child_id: child.id,
       class_group_id: activeGroup.value,
-      gathering_date: gathering,
+      gathering_date: selectedDate.value,
       status: 'present',
       note: null,
       is_walk_in: true,
@@ -263,18 +270,41 @@ async function pickChild(child: Child) {
   <div class="page">
     <header class="top">
       <h2>聚會日點名</h2>
-      <span class="hint">{{ formatGathering(gathering) }}</span>
+      <span class="hint">{{ formatGathering(selectedDate) }}</span>
     </header>
 
     <van-tabs v-model:active="activeGroup" type="card" class="tabs" :color="activeClassColor">
       <van-tab v-for="g in groups" :key="g.id" :name="g.id" :title="g.name" />
     </van-tabs>
 
-    <div class="stats">
+    <!-- 日期列與教案頁相同：近 3 次＋未來 12 次。未來的日期用來估人數、看誰還沒填 -->
+    <div class="date-row">
+      <van-tag
+        v-for="d in dates"
+        :key="d"
+        round
+        size="large"
+        :type="selectedDate === d ? 'primary' : 'default'"
+        :plain="selectedDate !== d"
+        @click="selectedDate = d"
+      >
+        {{ d.slice(5).replace('-', '/') }}
+      </van-tag>
+    </div>
+
+    <div v-if="editable" class="stats">
       <div class="stat card"><strong>{{ stats.planned }}</strong><span class="hint">預計出席</span></div>
       <div class="stat card"><strong>{{ stats.present }}</strong><span class="hint">已簽到</span></div>
       <div class="stat card"><strong>{{ stats.leave }}</strong><span class="hint">臨時請假</span></div>
     </div>
+    <div v-else class="stats">
+      <div class="stat card"><strong>{{ preview.attending }}</strong><span class="hint">預計出席</span></div>
+      <div class="stat card"><strong>{{ preview.leave }}</strong><span class="hint">已請假</span></div>
+      <div class="stat card"><strong>{{ preview.pending }}</strong><span class="hint">待確認</span></div>
+    </div>
+    <p v-if="!editable" class="hint preview-note">
+      這是未來的聚會日：只顯示家長預填狀況，供備課估人數與提醒還沒填的家長；簽到請到當天再操作。
+    </p>
 
     <div v-if="groups.length === 0" class="card hint">
       您尚未被指派任何班別，請聯繫核心同工於名單頁設定
@@ -294,12 +324,10 @@ async function pickChild(child: Child) {
               ›
             </strong>
             <span class="hint" :class="{ walkin: isWalkIn(c.id) }">
-              {{ planMap.get(c.id)?.status === 'attending' ? '家長已預先勾選出席'
-                : planMap.get(c.id)?.status === 'leave' ? '家長已請假'
-                : '未預先報名' }}
+              {{ planLabel(planMap.get(c.id)) }}
             </span>
           </div>
-          <div class="actions">
+          <div v-if="editable" class="actions">
             <van-button
               size="small"
               :type="checkMap.get(c.id)?.status === 'present' ? 'primary' : 'default'"
@@ -325,11 +353,11 @@ async function pickChild(child: Child) {
         </p>
       </div>
 
-      <van-button round block plain type="primary" class="walkin-btn" @click="openPicker">
+      <van-button v-if="editable" round block plain type="primary" class="walkin-btn" @click="openPicker">
         ＋ 現場加入（從全校名冊挑選）
       </van-button>
 
-      <p v-if="displayChildren.length > 0" class="hint idx-note">
+      <p v-if="editable && displayChildren.length > 0" class="hint idx-note">
         ※「紀錄」內的文字備註僅老師與同工可見。點孩子姓名可看近三個月出席與備註。
       </p>
     </template>
@@ -440,6 +468,16 @@ async function pickChild(child: Child) {
 }
 .tabs {
   margin-bottom: 12px;
+}
+.date-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+}
+.preview-note {
+  margin: 10px 0 0;
 }
 .stats {
   display: grid;
