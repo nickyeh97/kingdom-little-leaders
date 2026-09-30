@@ -10,7 +10,8 @@ const router = useRouter()
 const tabs = computed(() => {
   const items = [{ name: 'home', label: '首頁', icon: 'wap-home-o' }]
   if (auth.can('parent')) items.push({ name: 'attendance', label: '出席', icon: 'todo-list-o' })
-  if (auth.can('teacher')) items.push({ name: 'checkin', label: '點名', icon: 'checked' })
+  // 一律用線框（-o／passed）版本：實心的 checked 在五個線框圖示中間像一顆黑點，反而最難辨認
+  if (auth.can('teacher')) items.push({ name: 'checkin', label: '點名', icon: 'passed' })
   // 審核制：未審核者僅有首頁（公告）與我的（帳號設定）
   if (auth.isApproved) items.push({ name: 'songs', label: '詩歌', icon: 'music-o' })
   if (auth.can('teacher') || auth.can('admin'))
