@@ -447,9 +447,14 @@ h2 {
   border-radius: 10px;
   box-sizing: border-box;
 }
+/* 數字固定 26px 圓形框：選到時填色成徽章，沒選到時透明——高度一致，圓點不會跳位 */
 .cal-cell .num {
   font-size: 18px;
-  line-height: 1.2;
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
+  text-align: center;
+  border-radius: 50%;
 }
 .cal-cell.out .num {
   color: var(--kll-muted);
@@ -465,10 +470,10 @@ h2 {
   outline: 2px solid var(--kll-primary);
   outline-offset: -2px;
 }
-.cal-cell.sel {
-  background: var(--kll-primary);
-}
+/* 選到的那格：只把數字填成圓形徽章，整格不填色——
+   整格填色會把下方的出席圓點蓋成白的，家長看不出到底報名了沒 */
 .cal-cell.sel .num {
+  background: var(--kll-primary);
   color: #fff;
   font-weight: 700;
 }
@@ -485,17 +490,11 @@ h2 {
 .dot-attend {
   background: var(--kll-accent);
 }
-.sel .dot-attend {
-  background: var(--kll-accent-soft);
-}
 .dot-leave {
   background: var(--kll-amber);
 }
 .dot-none {
   background: var(--kll-muted);
-}
-.sel .dot-none {
-  background: #ffffff88;
 }
 .cal-legend {
   margin: 10px 2px 2px;

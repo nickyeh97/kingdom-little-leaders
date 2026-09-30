@@ -63,7 +63,7 @@
   --van-button-mini-font-size: 14px;
   --van-tag-font-size: 15px;
   --van-tabs-card-height: 42px;
-  --van-tabbar-height: 58px;
+  --van-tabbar-height: 62px; /* 圖示加了藥丸底色後多 6px，避免文字貼邊 */
   --van-tabbar-item-font-size: 15px;
   --van-tabbar-item-icon-size: 26px;
   --van-notice-bar-font-size: 17px;
@@ -182,4 +182,19 @@ body {
 /* 彈窗標題置中，兩側留出關閉鈕位置避免重疊 */
 .van-popup--bottom h3 {
   padding: 0 36px;
+}
+
+/* ---- 底部分頁：目前所在的分頁用「底色藥丸」標示 ----
+   只靠圖示變色，組長反饋看不出現在在哪一頁；比照常見 App 的做法，
+   在使用中的圖示後面鋪一塊圓角底色，文字加粗。 */
+.van-tabbar-item__icon {
+  padding: 3px 12px; /* 320px 寬六格時每格 53px，藥丸 50px 剛好放得下 */
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+.van-tabbar-item--active .van-tabbar-item__icon {
+  background: var(--kll-primary-mid);
+}
+.van-tabbar-item--active .van-tabbar-item__text {
+  font-weight: 700;
 }
