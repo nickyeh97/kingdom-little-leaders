@@ -20,10 +20,13 @@ comment on column lesson_segments.parent_visible is
   '內容為空時即使 true 也不顯示（見 parent_lesson_segments）。';
 
 -- 回填：符合 v14 #6 白名單的既有段落視為「老師已決定要給家長看」。
--- 只在欄位剛加上、全部還是 false 時有意義；重跑不會把老師後來關掉的再打開
--- （條件限定 updated_at 早於這支 migration 執行的當下不可靠，改用「尚未有人碰過」的近似：
---  只更新目前仍為 false 且符合白名單者。老師關掉後若再重跑會被打開——
---  這支只該執行一次，重跑前請先確認）。
+-- 這支只該執行一次：老師關掉後若再重跑會被打開。
+--
+-- 先關掉 update 觸發器再回填：trg_touch_lesson_segment 會把 updated_by 改成 auth.uid()，
+-- 在 SQL Editor 裡沒有登入的 JWT → NULL → 撞 not null（第一版就是這樣失敗的）。
+-- 而且回填是系統動作，不該把 updated_at / updated_by 蓋成「現在／空」——
+-- 老師看到的「誰最後改的」要維持原樣。
+alter table lesson_segments disable trigger trg_touch_lesson_segment;
 update lesson_segments s
 set parent_visible = true
 where not s.parent_visible
@@ -32,6 +35,7 @@ where not s.parent_visible
     from unnest(array['敬拜', '信息', '主題', '背金句', '彈性時間']) as w
     where s.item like '%' || w || '%'
   );
+alter table lesson_segments enable trigger trg_touch_lesson_segment;
 
 create or replace function public.parent_lesson_segments(from_date date, to_date date)
 returns table (
