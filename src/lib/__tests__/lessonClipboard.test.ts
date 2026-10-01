@@ -19,6 +19,7 @@ function clip(p: Partial<SegmentClip> = {}): SegmentClip {
     content: '來歡呼，來讚美',
     teacher_text: '小美老師',
     materials_text: '投影片',
+    parent_visible: true,
     ...p,
   }
 }

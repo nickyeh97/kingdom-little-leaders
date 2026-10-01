@@ -275,6 +275,8 @@ export interface LessonSegment {
   materials_text: string
   review_text: string
   sort_order: number
+  /** 老師決定這段要不要顯示給家長（v19）；內容為空時家長端仍不顯示 */
+  parent_visible: boolean
   updated_by_name: string
   updated_at: string
 }

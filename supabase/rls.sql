@@ -289,6 +289,7 @@ grant execute on function public.class_teachers() to authenticated;
 
 -- 家長版簡易教案：只回「已經上過的課」＋孩子所屬班別；幼幼班無教案模組（v4 決議 8）。
 -- 欄位只給「項目 / 內容 / 帶班老師」——時間、教材預備、課後執行屬同工內部欄位，不外流。
+-- 哪些段落給家長看由老師在段落上的 parent_visible 開關決定（v19），且要有填內容。
 create or replace function public.parent_lesson_segments(from_date date, to_date date)
 returns table (
   class_group_id uuid,
@@ -308,6 +309,8 @@ as $$
     and g.name not like '%幼幼%'
     and s.gathering_date >= from_date
     and s.gathering_date <= least(to_date, current_date) -- 未來的課不預告，避免變成進度壓力
+    and s.parent_visible                                 -- 老師開了「顯示給家長」（v19）
+    and btrim(s.content) <> ''                           -- 沒填內容＝老師還沒寫，不顯示空白列
   order by s.gathering_date desc, s.sort_order
 $$;
 grant execute on function public.parent_lesson_segments(date, date) to authenticated;
