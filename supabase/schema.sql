@@ -407,7 +407,8 @@ create or replace function public.touch_lesson_segment()
 returns trigger language plpgsql as $$
 begin
   new.updated_at := now();
-  new.updated_by := auth.uid();
+  -- 沒有 JWT（SQL Editor 做資料整理）時保留原值，不撞 not null
+  new.updated_by := coalesce(auth.uid(), old.updated_by);
   return new;
 end $$;
 create trigger trg_touch_lesson_segment before update on lesson_segments

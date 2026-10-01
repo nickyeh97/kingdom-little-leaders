@@ -26,7 +26,18 @@ comment on column lesson_segments.parent_visible is
 -- 在 SQL Editor 裡沒有登入的 JWT → NULL → 撞 not null（第一版就是這樣失敗的）。
 -- 而且回填是系統動作，不該把 updated_at / updated_by 蓋成「現在／空」——
 -- 老師看到的「誰最後改的」要維持原樣。
-alter table lesson_segments disable trigger trg_touch_lesson_segment;
+--
+-- 順便把觸發器本身改成「沒有 JWT 就保留原值」：以後任何在 SQL Editor 做的資料整理
+-- 都不會再撞這個 not null（class_topics 當初也是同一類問題）。
+create or replace function public.touch_lesson_segment()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  new.updated_by := coalesce(auth.uid(), old.updated_by);
+  return new;
+end $$;
+
+alter table lesson_segments disable trigger user;  -- 這張表上所有使用者觸發器，不靠名稱
 update lesson_segments s
 set parent_visible = true
 where not s.parent_visible
@@ -35,7 +46,7 @@ where not s.parent_visible
     from unnest(array['敬拜', '信息', '主題', '背金句', '彈性時間']) as w
     where s.item like '%' || w || '%'
   );
-alter table lesson_segments enable trigger trg_touch_lesson_segment;
+alter table lesson_segments enable trigger user;
 
 create or replace function public.parent_lesson_segments(from_date date, to_date date)
 returns table (
