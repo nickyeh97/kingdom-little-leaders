@@ -34,19 +34,19 @@ describe('家長版簡易教案（v10 #2）', () => {
     expect(isCourseSegment(seg())).toBe(true)
   })
 
-  it('白名單外的項目不給家長看，就算有填內容也一樣（v14 #6）', () => {
-    expect(isCourseSegment(seg({ item: '環境整理', content: '收拾桌椅' }))).toBe(false)
-    expect(isCourseSegment(seg({ item: '服事分工', content: '小恩負責奉獻' }))).toBe(false)
-    expect(isCourseSegment(seg({ item: '破冰', content: '大風吹' }))).toBe(false)
+  it('前端不再按項目名稱過濾——要不要給家長看由老師的開關決定，RPC 已篩過（v19）', () => {
+    // 老師替自訂項目（如「破冰」）打開開關時，RPC 會回傳它；前端若還按白名單篩就會把它擋掉
+    expect(isCourseSegment(seg({ item: '環境整理', content: '收拾桌椅' }))).toBe(true)
+    expect(isCourseSegment(seg({ item: '破冰', content: '大風吹' }))).toBe(true)
   })
 
-  it('白名單項目沒填內容也不顯示——空白列對家長沒意義，改由教案頁提醒老師（v14 #6）', () => {
+  it('沒填內容不顯示——開關打開也一樣（組長定案），改由教案頁提醒老師', () => {
     expect(isCourseSegment(seg({ item: '背金句', content: '' }))).toBe(false)
     expect(isCourseSegment(seg({ item: '敬拜', content: '  ' }))).toBe(false)
     expect(isCourseSegment(seg({ item: '背金句', content: '約翰一書 4:7' }))).toBe(true)
   })
 
-  it('項目用「包含」比對——item 是老師手打的自由文字（v14 #6）', () => {
+  it('開關預設值用「包含」比對——item 是老師手打的自由文字（v14 #6 → v19 預設值）', () => {
     // 正式資料裡同時存在這三種寫法
     expect(isParentVisibleItem('信息')).toBe(true)
     expect(isParentVisibleItem('信息 但以理在獅子坑')).toBe(true)
@@ -56,9 +56,9 @@ describe('家長版簡易教案（v10 #2）', () => {
     expect(isParentVisibleItem('結束禱告')).toBe(false)
   })
 
-  it('白名單內容必須與 RPC 的 SQL 陣列一致（v14 #6）', () => {
-    // supabase/migrations/2026-09-05_parent_lesson_whitelist.sql 的
-    // unnest(array[...]) 是真正的邊界；這裡照抄一份，改一邊沒改另一邊就會紅
+  it('預設值清單與 migration 回填用的 SQL 陣列一致（v19）', () => {
+    // supabase/migrations/2026-10-01_parent_visible_toggle.sql 的 unnest(array[...])
+    // 決定既有段落切換當下哪些算「已開」；兩邊不一致，切換那一刻家長看到的內容就會變
     expect([...PARENT_VISIBLE_ITEMS]).toEqual(['敬拜', '信息', '主題', '背金句', '彈性時間'])
   })
 

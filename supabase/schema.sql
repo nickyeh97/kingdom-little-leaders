@@ -395,6 +395,8 @@ create table lesson_segments (
   materials_text text not null default '',
   review_text text not null default '',
   sort_order int not null default 0,
+  -- 老師決定這一段要不要顯示給家長（v19）；內容為空時即使 true 也不顯示
+  parent_visible boolean not null default false,
   updated_by uuid not null default auth.uid() references profiles (id),
   updated_by_name text not null default '',
   updated_at timestamptz not null default now()
@@ -405,7 +407,8 @@ create or replace function public.touch_lesson_segment()
 returns trigger language plpgsql as $$
 begin
   new.updated_at := now();
-  new.updated_by := auth.uid();
+  -- 沒有 JWT（SQL Editor 做資料整理）時保留原值，不撞 not null
+  new.updated_by := coalesce(auth.uid(), old.updated_by);
   return new;
 end $$;
 create trigger trg_touch_lesson_segment before update on lesson_segments

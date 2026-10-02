@@ -55,6 +55,7 @@ export interface LessonSegmentInput {
   materials_text: string
   review_text: string
   sort_order: number
+  parent_visible: boolean
   updated_by_name: string
 }
 

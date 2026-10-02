@@ -14,7 +14,9 @@
  * - **只做單段**：不做多選，避免一次貼進一堆重複的段落。
  *
  * `review_text`（課後執行）不進剪貼簿——那是當堂實況，沿用 v9 #5 的既有決定。
+ * `parent_visible`（顯示給家長）會跟著複製；舊格式沒有這個欄位時依項目名稱給預設值。
  */
+import { isParentVisibleItem } from './parentLesson'
 
 const KEY = 'kll.lessonClip.v1'
 
@@ -30,6 +32,8 @@ export interface SegmentClip {
   content: string
   teacher_text: string
   materials_text: string
+  /** 顯示給家長（v19） */
+  parent_visible: boolean
 }
 
 /** localStorage 在無痕視窗／關閉 cookie 時會直接丟例外，所以每次存取都要包起來 */
@@ -70,6 +74,8 @@ export function readClip(): SegmentClip | null {
     content: str('content'),
     teacher_text: str('teacher_text'),
     materials_text: str('materials_text'),
+    parent_visible:
+      typeof c.parent_visible === 'boolean' ? c.parent_visible : isParentVisibleItem(str('item')),
   }
 }
 

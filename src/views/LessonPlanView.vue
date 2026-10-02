@@ -134,7 +134,7 @@ async function exportQuarter() {
     const list = await listLessonSegmentsRange(activeGroup.value, from, to)
     const name = groups.value.find((g) => g.id === activeGroup.value)?.name ?? ''
     const rows: string[][] = [
-      ['日期', '班別', '順序', '時間', '項目', '內容', '老師', '教材預備', '課後執行'],
+      ['日期', '班別', '順序', '時間', '項目', '內容', '老師', '教材預備', '課後執行', '家長可見'],
     ]
     for (const seg of list) {
       rows.push([
@@ -147,6 +147,7 @@ async function exportQuarter() {
         seg.teacher_text,
         seg.materials_text,
         seg.review_text,
+        seg.parent_visible ? '是' : '否',
       ])
     }
     downloadCsv(`教案_${name}_${from}_${to}.csv`, rows)
@@ -177,6 +178,7 @@ async function createFromTemplate() {
         materials_text: '',
         review_text: '',
         sort_order: order++,
+        parent_visible: isParentVisibleItem(t.item),
         updated_by_name: auth.profile?.display_name ?? '',
       })
       start = start && t.minutes != null ? addToClock(start, t.minutes) : null
@@ -200,8 +202,20 @@ const draft = ref({
   teacher_text: '',
   materials_text: '',
   review_text: '',
+  parent_visible: false,
 })
 const saving = ref(false)
+/**
+ * 新段落的「顯示給家長」預設跟著項目名稱走（敬拜／信息…預設開），
+ * 老師一旦自己撥過開關就不再自動改——否則老師關掉後換個項目名又被打開。
+ */
+const visibleTouched = ref(false)
+watch(
+  () => draft.value.item,
+  (item) => {
+    if (editing.value === 'new' && !visibleTouched.value) draft.value.parent_visible = isParentVisibleItem(item)
+  },
+)
 
 /** 編輯中時間預覽：如「10分鐘 14:00-14:10」 */
 const timePreview = computed(() =>
@@ -211,6 +225,7 @@ const timePreview = computed(() =>
 function openEditor(seg: LessonSegment | null) {
   if (!canEdit.value) return
   editing.value = seg ?? 'new'
+  visibleTouched.value = false
   if (seg) {
     const t = parseTimeText(seg.time_text)
     draft.value = {
@@ -221,6 +236,7 @@ function openEditor(seg: LessonSegment | null) {
       teacher_text: seg.teacher_text,
       materials_text: seg.materials_text,
       review_text: seg.review_text,
+      parent_visible: seg.parent_visible,
     }
   } else {
     // 新段落：自動接在最後一段的結束時間之後
@@ -234,6 +250,7 @@ function openEditor(seg: LessonSegment | null) {
       teacher_text: auth.profile?.display_name ?? '',
       materials_text: '',
       review_text: '',
+      parent_visible: false,
     }
   }
 }
@@ -297,6 +314,7 @@ async function save() {
       teacher_text: draft.value.teacher_text,
       materials_text: draft.value.materials_text,
       review_text: draft.value.review_text,
+      parent_visible: draft.value.parent_visible,
       updated_by_name: auth.profile?.display_name ?? '',
     }
     if (editing.value === 'new') {
@@ -347,6 +365,7 @@ function copySegment() {
     content: target.content,
     teacher_text: target.teacher_text,
     materials_text: target.materials_text,
+    parent_visible: target.parent_visible,
   })
   refreshClip()
   editing.value = null
@@ -369,6 +388,7 @@ async function paste() {
       teacher_text: c.teacher_text,
       materials_text: c.materials_text,
       review_text: '',
+      parent_visible: c.parent_visible,
       sort_order: (segments.value[segments.value.length - 1]?.sort_order ?? -1) + 1,
       updated_by_name: auth.profile?.display_name ?? '',
     })
@@ -528,7 +548,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
           <div class="tl-card card">
             <div class="tl-head">
               <strong class="tl-item">{{ seg.item || '未命名段落' }}</strong>
-              <van-tag v-if="isParentVisibleItem(seg.item)" class="parent-tag">家長看得到</van-tag>
+              <van-tag v-if="seg.parent_visible" class="parent-tag">家長看得到</van-tag>
               <van-tag v-if="seg.teacher_text" plain type="primary">{{ seg.teacher_text }}</van-tag>
               <span class="spacer" />
               <template v-if="canEdit">
@@ -543,7 +563,7 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
               </template>
             </div>
             <p v-if="seg.content" class="tl-content">{{ seg.content }}</p>
-            <p v-else-if="isParentVisibleItem(seg.item)" class="tl-content unfilled warn">
+            <p v-else-if="seg.parent_visible" class="tl-content unfilled warn">
               （內容未填寫——這項會顯示給家長，沒填就整段不會出現）
             </p>
             <p v-else class="tl-content unfilled">（內容未填寫）</p>
@@ -598,9 +618,16 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
         </div>
         <van-field v-model="draft.item" label="自訂項目" maxlength="40"
           placeholder="或自行輸入（如：防災演習）" />
-        <p v-if="isParentVisibleItem(draft.item)" class="hint parent-note">
-          👨‍👩‍👧 這個項目會顯示在家長的「孩子上過的課程」，請記得填寫下面的「內容」——
-          沒填內容家長就看不到這一段。老師欄位與課後執行不會給家長看。
+        <!-- v19：由老師決定這段要不要給家長看；新段落依項目名稱給預設值 -->
+        <van-cell class="visible-row" title="👨‍👩‍👧 顯示給家長" center>
+          <template #right-icon>
+            <van-switch v-model="draft.parent_visible" size="24px"
+              @change="visibleTouched = true" />
+          </template>
+        </van-cell>
+        <p v-if="draft.parent_visible" class="hint parent-note">
+          會顯示在家長的「孩子上過的課程」，請記得填寫下面的「內容」——
+          沒填內容家長就看不到這一段。只給家長看項目與內容；老師、教材預備、課後執行不會給家長看。
         </p>
 
         <p class="hint pop-label">
@@ -706,6 +733,12 @@ async function move(seg: LessonSegment, dir: -1 | 1) {
 }
 .tl-content.warn {
   color: var(--kll-pink-text);
+}
+.visible-row {
+  margin-top: 8px;
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
 }
 .parent-note {
   margin: 8px 0 0;

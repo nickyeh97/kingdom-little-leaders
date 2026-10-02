@@ -2,8 +2,9 @@
  * 家長版簡易教案的呈現邏輯（v10 #2）。
  *
  * 需求：「僅查閱、注重在小孩上的課程而非流程」——
- * 家長看到的是「那天上了什麼」，不是同工的時間表，
- * 所以只列出白名單項目（v14 #6：敬拜／信息或主題／背金句／彈性時間）且有填內容的段落。
+ * 家長看到的是「那天上了什麼」，不是同工的時間表。
+ * 哪些段落給家長看，由寫教案的老師在段落上用「顯示給家長」開關決定（v19），
+ * 且要有填內容才顯示；過濾在資料庫的 RPC 完成，前端拿到的已經是家長可看的。
  *
  * 守則檢核（`docs/DESIGN_PRINCIPLES.md`）：這頁是回顧孩子上過什麼課，
  * 不呈現孩子的表現、不做班級之間的比較，也不預告未來進度（避免變成進度壓力）。
@@ -23,31 +24,33 @@ export interface ParentLessonDay {
 }
 
 /**
- * 家長看得到的教案項目（v14 #6）。
+ * 「顯示給家長」開關的**預設值**（v19 起不再是邊界）。
  *
+ * v14 #6 的白名單：新段落的項目名稱含這些字時，開關預設打開；老師可以自己改。
  * 用「包含」而不是完全相等比對——`item` 是老師手打的自由文字，
  * 正式資料同時存在「信息」「信息 但以理在獅子坑」「信息／主題」三種寫法。
  * 「信息」與「主題」是同一件事的兩種叫法，任一符合就算。
  *
- * ⚠️ 這份清單同時存在於 `supabase/migrations/2026-09-05_parent_lesson_whitelist.sql`
- *    的 RPC 裡，**真正的邊界在那邊**（前端只是 UX，家長拿不到清單外的資料）。
- *    要新增項目請兩邊一起改；`__tests__/parentLesson.test.ts` 有對照測試。
+ * 同一份清單也用在 `supabase/migrations/2026-10-01_parent_visible_toggle.sql` 的回填：
+ * 既有段落符合者設為 true，讓切換當下家長看到的內容不變。
  */
 export const PARENT_VISIBLE_ITEMS = ['敬拜', '信息', '主題', '背金句', '彈性時間'] as const
 
-/** 這個項目名稱會顯示給家長嗎？（教案頁用它提醒老師填內容） */
+/** 這個項目名稱預設要給家長看嗎？（新段落的開關預設值） */
 export function isParentVisibleItem(item: string): boolean {
   return PARENT_VISIBLE_ITEMS.some((w) => item.includes(w))
 }
 
 /**
- * 家長看得到的段落：白名單項目**且**有填內容。
+ * 家長看得到的段落：有填內容。
  *
+ * 「老師有沒有開顯示給家長」已經在 RPC 過濾掉了，前端不再按項目名稱篩——
+ * 否則老師替自訂項目打開開關也會被前端擋掉。
  * 沒填內容幾乎等於老師忘了寫（實測「背金句」7 筆全部空白），
  * 顯示一列空白的項目對家長沒有意義，所以不列出；改由教案頁提醒老師填寫。
  */
 export function isCourseSegment(seg: ParentLessonSegment): boolean {
-  return seg.content.trim() !== '' && isParentVisibleItem(seg.item)
+  return seg.content.trim() !== ''
 }
 
 /**
