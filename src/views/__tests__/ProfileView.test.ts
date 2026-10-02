@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import Vant from 'vant'
 import { createPinia, setActivePinia } from 'pinia'
@@ -95,5 +95,28 @@ describe('「我的」選單入口（權限修正）', () => {
     setActivePinia(createPinia())
     loginAs(['parent', 'teacher'])
     expect((await mountMe()).text()).not.toContain('名單與權限')
+  })
+})
+
+describe('「小領袖靈獸」入口', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('設定遊戲網址後，家長看得到入口', async () => {
+    vi.stubEnv('VITE_SPIRIT_GAME_URL', 'https://game.example')
+    loginAs(['parent'])
+    expect((await mountMe()).text()).toContain('小領袖靈獸')
+  })
+
+  it('邊際：尚未設定遊戲網址時不顯示（部署前）', async () => {
+    vi.stubEnv('VITE_SPIRIT_GAME_URL', '')
+    loginAs(['parent'])
+    expect((await mountMe()).text()).not.toContain('小領袖靈獸')
+  })
+
+  it('沒有家長標籤看不到（老師／同工無綁定孩子）', async () => {
+    vi.stubEnv('VITE_SPIRIT_GAME_URL', 'https://game.example')
+    loginAs(['teacher', 'admin'])
+    expect((await mountMe()).text()).not.toContain('小領袖靈獸')
   })
 })

@@ -43,6 +43,7 @@ npm run test:watch           # 開發時監看模式
 3. 展開 **Environment Variables**，加入兩個變數（值同 `.env.local`）：
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_SPIRIT_GAME_URL`（選填）：「小領袖靈獸」遊戲的部署網址；未設定時「我的」不顯示遊戲入口
 4. 按 **Deploy**，完成後會得到 `https://<專案名>.vercel.app` 網址。
 5. 回 Supabase → **Authentication → URL Configuration**，把 **Site URL** 改為上述網址。
 6. 手機瀏覽器開啟網址 → 分享選單 → **加入主畫面**，即可像 App 一樣使用（PWA）。

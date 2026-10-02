@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
+import { showConfirmDialog, showFailToast, showSuccessToast, showToast } from 'vant'
 import { updateDisplayName } from '../api/members'
+import { listMyChildren } from '../api/attendance'
+import { db } from '../lib/supabase'
+import { spiritBeastEligible, spiritGameBaseUrl, spiritGameLink } from '../lib/spiritGame'
+import type { Child } from '../types'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -40,6 +44,40 @@ async function saveName() {
   } finally {
     savingName.value = false
   }
+}
+
+// ---- 小領袖靈獸（服事經歷卡電子版）：部署網址設定後才顯示入口 ----
+const gameUrl = spiritGameBaseUrl()
+const beastSheet = ref(false)
+const beastKids = ref<Child[]>([])
+
+async function openBeast() {
+  try {
+    const kids = (await listMyChildren()).filter(spiritBeastEligible)
+    if (kids.length === 0) {
+      showToast('目前沒有可使用的孩子（幼幼班暫不開放）')
+      return
+    }
+    if (kids.length === 1) return goBeast(kids[0].id)
+    beastKids.value = kids
+    beastSheet.value = true
+  } catch (e) {
+    showFailToast((e as Error).message)
+  }
+}
+
+async function goBeast(childId: string) {
+  const token = (await db().auth.getSession()).data.session?.access_token
+  if (!token) {
+    showFailToast('登入已過期，請重新登入')
+    return
+  }
+  // 同一分頁開啟：iOS 會擋非點擊當下的新視窗；家長按返回即回到平台
+  window.location.href = spiritGameLink(gameUrl, token, childId)
+}
+
+function onBeastSelect(action: { id: string }) {
+  goBeast(action.id)
 }
 
 async function logout() {
@@ -97,7 +135,21 @@ async function logout() {
         is-link
         @click="$router.push({ name: 'my-lessons' })"
       />
+      <van-cell
+        v-if="gameUrl"
+        title="小領袖靈獸"
+        label="孩子的服事經歷卡，和靈獸一起長大"
+        is-link
+        @click="openBeast"
+      />
     </van-cell-group>
+    <van-action-sheet
+      v-model:show="beastSheet"
+      title="要看哪一位孩子的靈獸？"
+      cancel-text="取消"
+      :actions="beastKids.map((k) => ({ name: k.name, id: k.id }))"
+      @select="onBeastSelect"
+    />
     <h3 v-if="auth.can('admin')" class="section-title" style="--sec: var(--kll-orange)">管理</h3>
     <van-cell-group inset v-if="auth.can('admin')">
       <van-cell
