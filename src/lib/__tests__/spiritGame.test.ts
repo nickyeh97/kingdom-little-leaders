@@ -43,9 +43,9 @@ describe('spiritGameBaseUrl', () => {
 })
 
 describe('spiritBeastEligible', () => {
-  it('兒童班、幼童班可用；幼幼班不納入', () => {
+  it('只開放兒童班；幼童班暫不開放、幼幼班不納入', () => {
     expect(spiritBeastEligible({ class_groups: cls('兒童班') })).toBe(true)
-    expect(spiritBeastEligible({ class_groups: cls('幼童班') })).toBe(true)
+    expect(spiritBeastEligible({ class_groups: cls('幼童班') })).toBe(false)
     expect(spiritBeastEligible({ class_groups: cls('幼幼班') })).toBe(false)
   })
 

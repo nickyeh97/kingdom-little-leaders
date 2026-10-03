@@ -20,8 +20,10 @@ export function spiritGameLink(baseUrl: string, accessToken: string, childId: st
   return `${base}#at=${encodeURIComponent(accessToken)}&child=${encodeURIComponent(childId)}`
 }
 
-/** 幼幼班不納入（沒有服事項目；組長裁決 2026-09-17）。班別資料缺漏時一律不顯示 */
+/**
+ * 目前只開放兒童班：幼幼班不納入（沒有服事項目，2026-09-17）、幼童班暫不開放（2026-10-03）。
+ * 與服事頁「兒童服事僅適用兒童班」同一個判斷（班別名稱含「兒童」）。班別資料缺漏時一律不顯示。
+ */
 export function spiritBeastEligible(child: Pick<Child, 'class_groups'>): boolean {
-  const name = child.class_groups?.name
-  return !!name && !name.includes('幼幼')
+  return child.class_groups?.name.includes('兒童') ?? false
 }

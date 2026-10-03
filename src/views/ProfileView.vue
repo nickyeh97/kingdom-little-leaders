@@ -55,7 +55,7 @@ async function openBeast() {
   try {
     const kids = (await listMyChildren()).filter(spiritBeastEligible)
     if (kids.length === 0) {
-      showToast('目前沒有可使用的孩子（幼幼班暫不開放）')
+      showToast('小領袖靈獸目前只開放兒童班')
       return
     }
     if (kids.length === 1) return goBeast(kids[0].id)
