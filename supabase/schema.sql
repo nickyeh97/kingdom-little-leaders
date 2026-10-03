@@ -488,3 +488,55 @@ create table org_units (
   note text not null default '',
   sort_order int not null default 0
 );
+
+-- ===== 服事經歷卡電子版「小領袖靈獸」（2026-10-02；遊戲 repo nickyeh97/kingdom-spirits）=====
+
+-- 鼓勵話語：家長預先寫好、遊戲輪流顯示。1–5 句、每句 1–40 字（GDD §3.5）
+create or replace function public.valid_encouragements(j jsonb)
+returns boolean language sql immutable as $$
+  select jsonb_typeof(j) = 'array'
+     and jsonb_array_length(j) <= 5
+     and not exists (
+       select 1 from jsonb_array_elements(j) e
+       where jsonb_typeof(e) <> 'string'
+          or char_length(btrim(e #>> '{}')) = 0
+          or char_length(e #>> '{}') > 40
+     )
+$$;
+
+-- 服事經歷卡：家長看到紙本卡上老師的簽名後，每登錄一次服事一筆
+create table service_card_entries (
+  id uuid primary key default gen_random_uuid(),
+  child_id uuid not null references children (id) on delete cascade,
+  -- 值同 child_service_items.name。不設 FK：與 child_service_* 各表一致，項目改名不搬移舊紀錄
+  item text not null,
+  -- 聖靈果子反思（加拉太書 5:22–23），孩子可跳過。只給孩子自己回味，不計分、不統計
+  fruit text check (fruit in ('仁愛','喜樂','和平','忍耐','恩慈','良善','信實','溫柔','節制')),
+  recorded_by uuid not null default auth.uid() references profiles (id),
+  created_at timestamptz not null default now()
+);
+create index idx_service_card_child on service_card_entries (child_id, created_at);
+
+comment on table service_card_entries is
+  '服事經歷卡（小領袖靈獸）：每筆＝家長確認紙本卡老師簽名後登錄的一次服事；created_at 即紀錄時間。';
+
+-- 靈獸設定：每孩一筆。外觀由遊戲寫入，鼓勵話語由平台（家長）寫入
+create table beast_profiles (
+  child_id uuid primary key references children (id) on delete cascade,
+  variant text not null check (variant in ('lamb','dove','lion','deer','eagle','fish')),
+  palette text not null default 'p1' check (palette ~ '^p[1-8]$'),
+  encouragements jsonb not null default '[]'::jsonb check (public.valid_encouragements(encouragements)),
+  -- 不加 not null：SQL Editor 整理資料時沒有 JWT
+  updated_by uuid default auth.uid() references profiles (id),
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.touch_beast_profile()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  new.updated_by := coalesce(auth.uid(), old.updated_by);
+  return new;
+end $$;
+create trigger trg_touch_beast_profile before update on beast_profiles
+  for each row execute function public.touch_beast_profile();
