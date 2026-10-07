@@ -50,6 +50,21 @@ async function onGoogle() {
   }
 }
 
+/**
+ * LINE 登入（v15 #1）：**只給已經在「我的」綁定過 LINE 的人用**。
+ *
+ * 沒綁定就按，Supabase 會當成新使用者建一個空帳號（待審核、沒有角色、沒綁孩子），
+ * 本人會以為自己的資料不見了。所以按鈕只出現在登入模式、不出現在註冊模式，
+ * 下面也寫清楚要先綁定；真的誤按了，首頁的審核中提醒會告訴他怎麼救。
+ */
+async function onLine() {
+  try {
+    await auth.signInWithLine()
+  } catch (e) {
+    showFailToast(`LINE 登入失敗：${(e as Error).message}`)
+  }
+}
+
 // ---- 忘記密碼（v5 反饋 #4）----
 const forgotOpen = ref(false)
 const forgotEmail = ref('')
@@ -139,6 +154,15 @@ async function sendReset() {
         <span class="g-icon">G</span> 使用 Google {{ mode === 'login' ? '登入' : '註冊' }}
       </van-button>
 
+      <template v-if="mode === 'login'">
+        <van-button round block class="line-btn" @click="onLine">
+          <span class="l-icon">LINE</span> 使用 LINE 登入
+        </van-button>
+        <p class="hint center line-note">
+          請先用 Email 或 Google 登入後，到「我的 → 登入方式」綁定 LINE，才能從這裡登入
+        </p>
+      </template>
+
       <p v-if="mode === 'register'" class="hint center reg-note">
         註冊後預設為家長身分；老師與同工權限由管理者於名單頁開通
       </p>
@@ -152,7 +176,7 @@ async function sendReset() {
       </p>
     </div>
 
-    <p class="hint center">未來將支援 LINE / Apple 登入</p>
+    <p class="hint center">未來將支援 Apple 登入</p>
 
     <!-- 忘記密碼彈窗 -->
     <van-popup
@@ -252,6 +276,21 @@ async function sendReset() {
   flex: 1;
   height: 1px;
   background: var(--kll-line);
+}
+.line-btn {
+  margin-top: 10px;
+  border: 1px solid var(--kll-green);
+  color: var(--kll-green-text);
+  background: var(--kll-card);
+}
+.l-icon {
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+}
+.line-note {
+  margin-top: 8px;
+  line-height: 1.7;
 }
 .google-btn {
   margin: 0 auto;
