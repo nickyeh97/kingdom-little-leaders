@@ -32,7 +32,7 @@ import {
 } from '../lib/service'
 import { listClassTopics, upsertClassTopic } from '../api/topics'
 import { listPlansRange } from '../api/attendance'
-import { attendingByClass, attendingSummary, topicAt, topicIndex } from '../lib/serviceTopic'
+import { attendingByClass, attendingSummary, topicAt, topicIndex, topicLines } from '../lib/serviceTopic'
 import { useAuthStore } from '../stores/auth'
 import type {
   AttendancePlan,
@@ -161,10 +161,14 @@ function mySignups(date: string): TeacherServiceSignup[] {
 }
 /** 班別劃分（v5 #1）：老師僅見自己被指派班別的內容；同工全視野 */
 const visibleClassIds = computed(() => new Set(myClasses.value.map((g) => g.id)))
-/** 服事表：該日期顯示的班別（同工看全部班別以便建立；老師只看自己班別的已發布） */
-function rosterClasses(date: string): ClassGroup[] {
-  if (auth.can('admin')) return groups.value
-  return myClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published)
+/**
+ * 服事安排的內容（分工／詩歌／彈性時間）要不要給這個人看：同工全部；老師只看已發布的。
+ * 班別卡本身與預排主題**不**受這個限制——v0.6.0 之前整張卡都綁在「已發布」上，
+ * 導致老師在同工發布服事表前看不到主題，v16 #1「不必等發布」實際上只對同工成立。
+ */
+function weekVisible(date: string, classGroupId: string): boolean {
+  const w = weekAt.value.get(`${date}|${classGroupId}`)
+  return !!w && (auth.can('admin') || w.published)
 }
 /** 摺疊卡標題徽章：該日已發布的班數（依可見班別計算） */
 function publishedClassCount(date: string): number {
@@ -327,6 +331,14 @@ const editClassId = ref('')
 const topicMap = computed(() => topicIndex(topics.value))
 function topicOf(date: string, classGroupId: string): string {
   return topicAt(topicMap.value, date, classGroupId)
+}
+/** 總覽表「主題」欄：只列自己的班別（老師＝被指派班、同工＝全部），與發布狀態無關 */
+function topicCell(date: string) {
+  return topicLines(topicMap.value, date, myClasses.value)
+}
+/** 主題可編輯：同工全部、老師自己班（與 RLS class_topics_write 一致，v20） */
+function canEditTopic(classGroupId: string): boolean {
+  return auth.can('admin') || auth.canClass(classGroupId)
 }
 
 /** 那天各班家長已勾出席的人數（v16 #2）；沒人填就回空字串，整行不顯示 */
@@ -653,13 +665,14 @@ function assignmentLines(w: ServiceWeek): string[] {
       <!-- 報名總覽表（v6 #7a → v11 #10 改為表格）：直欄看同一類誰排過，橫列看某週的完整分工 -->
       <div class="card">
         <p class="blk-title ov-title">未來 {{ dates.length }} 週報名總覽</p>
-        <p class="hint ov-tip">直欄看同一類誰排過、橫列看某週的完整分工；表格可左右滑動</p>
+        <p class="hint ov-tip">直欄看同一類誰排過、橫列看某週的完整分工與主題；表格可左右滑動</p>
         <div class="ov-scroll">
           <table class="ov-table">
             <thead>
               <tr>
                 <th class="ov-th-date">聚會日</th>
                 <th v-for="c in SERVICE_COLUMNS" :key="c">{{ c }}</th>
+                <th class="ov-th-topic">主題</th>
               </tr>
             </thead>
             <tbody>
@@ -668,6 +681,13 @@ function assignmentLines(w: ServiceWeek): string[] {
                 <td v-for="c in SERVICE_COLUMNS" :key="c">
                   <span v-if="row.cells[c].length === 0" class="ov-empty">—</span>
                   <span v-for="n in row.cells[c]" :key="n" class="ov-name">{{ n }}</span>
+                </td>
+                <!-- 主題欄（v20）：比照教會原本 Sheet 的「課程安排」欄，一列看完誰服事＋帶什麼 -->
+                <td class="ov-topic">
+                  <span v-if="topicCell(row.date).length === 0" class="ov-empty">—</span>
+                  <span v-for="t in topicCell(row.date)" :key="t.class_group_id" class="ov-name">
+                    <b v-if="myClasses.length > 1" class="ov-cls">{{ t.name }}</b>{{ t.topic }}
+                  </span>
                 </td>
               </tr>
             </tbody>
@@ -703,18 +723,19 @@ function assignmentLines(w: ServiceWeek): string[] {
         <!-- 家長已勾的預先出席（v16 #2）：老師提早知道那天大概幾個孩子會來，好準備材料與分組。
              另起一行不與標題同列——手機 390px 寬放不下，擠在一起會把標題推掉並撐出橫向捲動。 -->
         <p v-if="plannedText(d)" class="hint planned">🙋 預計出席：{{ plannedText(d) }}</p>
-        <div v-for="g in rosterClasses(d)" :key="g.id" class="svc-block">
+        <!-- 班別卡一律列出自己的班別（老師＝被指派班、同工＝全部）；只有服事安排的內容才看發布狀態 -->
+        <div v-for="g in myClasses" :key="g.id" class="svc-block">
           <div class="week-head">
             <strong>{{ g.name }}</strong>
             <van-tag
-              v-if="weekAt.get(`${d}|${g.id}`)"
+              v-if="weekAt.get(`${d}|${g.id}`) && (auth.can('admin') || weekAt.get(`${d}|${g.id}`)!.published)"
               :type="weekAt.get(`${d}|${g.id}`)!.published ? 'success' : 'default'"
               plain
             >
               {{ weekAt.get(`${d}|${g.id}`)!.published ? '已發布' : '草稿' }}
             </van-tag>
             <van-button
-              v-if="auth.can('admin')"
+              v-if="canEditTopic(g.id)"
               size="mini"
               plain
               class="week-edit"
@@ -738,7 +759,7 @@ function assignmentLines(w: ServiceWeek): string[] {
           <p v-if="topicOf(d, g.id)" class="svc-line topic-line">
             📖 主題：{{ topicOf(d, g.id) }}
           </p>
-          <template v-if="weekAt.get(`${d}|${g.id}`)">
+          <template v-if="weekVisible(d, g.id)">
             <p
               v-for="line in assignmentLines(weekAt.get(`${d}|${g.id}`)!)"
               :key="line"
@@ -753,9 +774,9 @@ function assignmentLines(w: ServiceWeek): string[] {
               🎨 彈性時間：{{ weekAt.get(`${d}|${g.id}`)!.flex_text }}
             </p>
           </template>
-          <p v-else class="hint svc-empty">尚未安排</p>
+          <p v-else class="hint svc-empty">{{ auth.can('admin') ? '尚未安排' : '尚未發布' }}</p>
         </div>
-        <p v-if="rosterClasses(d).length === 0" class="hint svc-empty">尚未發布</p>
+        <p v-if="myClasses.length === 0" class="hint svc-empty">您尚未被指派班別，請聯繫同工</p>
 
         <!-- B. 我的報名（T-COM-01） -->
         <template v-if="myClasses.length > 0">
@@ -930,7 +951,7 @@ function assignmentLines(w: ServiceWeek): string[] {
       </div>
     </van-popup>
 
-    <!-- 預排主題彈窗（v16 #1，僅同工） -->
+    <!-- 預排主題彈窗（v16 #1；v20 起老師可編自己班） -->
     <van-popup
       :show="topicOpen"
       round
@@ -941,7 +962,7 @@ function assignmentLines(w: ServiceWeek): string[] {
       <div class="editor">
         <h3>{{ formatGathering(topicDate) }}・{{ groupName.get(topicClassId) }}</h3>
         <p class="hint pop-label">
-          這週要帶的主題。老師在報名服事時就看得到，不必等服事表發布。
+          這週要帶的主題。全體老師在報名服事時就看得到，不必等服事表發布；也會顯示在上方的報名總覽表。
         </p>
         <van-field v-model="topicDraft" label="主題" type="textarea" rows="2" autosize
           maxlength="300" placeholder="例：品格週-分享／油瓶不斷 — 王下 4:1-7" />
@@ -1178,8 +1199,20 @@ h2 {
 .ov-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 460px;
+  min-width: 620px; /* 多了主題欄 */
   font-size: 15px;
+}
+.ov-topic {
+  min-width: 160px;
+  font-size: 14px;
+}
+.ov-cls {
+  color: var(--kll-sub);
+  font-weight: 600;
+  margin-right: 4px;
+}
+.ov-cls::after {
+  content: '：';
 }
 .ov-table th,
 .ov-table td {

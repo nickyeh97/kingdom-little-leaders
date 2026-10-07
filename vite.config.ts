@@ -19,8 +19,9 @@ export default defineConfig({
         short_name: '兒童牧區平台',
         description: 'Kingdom Little Leaders — 出席、簽到、詩歌、公告',
         lang: 'zh-TW',
-        // 與 style.css 的 --kll-primary / --kll-bg 一致；icon 底色 #6f5ba8 與主色只差一點點，直接用主色
-        theme_color: '#7462a2',
+        // theme_color 跟 icon 底色走（獅子 logo 底色 #846fae，與 --kll-primary 色差 24，肉眼分得出，
+        // 狀態列若用主色會跟啟動畫面的 icon 打架）；--kll-primary 維持 #7462a2 以保白字對比
+        theme_color: '#846fae',
         background_color: '#fdf9f7',
         display: 'standalone',
         icons: [
