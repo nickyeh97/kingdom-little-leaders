@@ -1,0 +1,52 @@
+# v0.6.0 更動內容（2026-10-07）
+
+組長兩項：新版 logo、預排主題開放老師編輯並顯示在總覽表（需求增補 v20）。
+**升次版號（`0.5.0` → `0.6.0`）**：有 migration（class_topics 的寫入 policy）。
+
+## ⚠️ 部署前要做的事
+
+在 Supabase SQL Editor 執行 `supabase/migrations/2026-10-07_class_topics_teacher_write.sql`。
+只換 policy、不動資料，**可重跑**。沒跑的話老師按「主題」鈕儲存會被 RLS 擋下（同工不受影響）。
+
+---
+
+## 1｜新版獅子 logo
+
+師母提供的新圖（紫底、奶油色獅子＋王冠）取代 v0.4.1 的版本。
+
+- 原圖進 `assets/kll_logo-src.png`（舊的 webp 移除）；`scripts/gen-icons.mjs` 重跑產出 favicon 32／apple-touch-icon 180／PWA 192、512（any）＋ 512（maskable）；`favicon.ico` 重包
+- 新圖底色實測 `#846fae`，與平台主色 `#7462a2` 的 RGB 距離 24（上次的規則：超過 20 就跟 icon 走）→
+  manifest `theme_color` 與 `index.html` 的 `theme-color` 改成 `#846fae`；**`--kll-primary` 不動**（白字對比 5.24:1，icon 底色只有約 4.4:1）
+
+> ⚠️ 已加到主畫面的 iOS 捷徑不會自己換圖，要移除捷徑重新加一次。
+
+## 2｜預排主題：老師也能編，並顯示在報名總覽表
+
+v16 #1 定案是「同工編輯、老師查看」；組長改裁決老師也能編。
+
+- RLS `class_topics_write` 改為 `is_admin() or has_class_role(class_group_id)`：**老師只能改自己被指派班別**的主題，同工全部；讀取不變
+- 服事頁班別卡的「主題」鈕改依同一條規則顯示（`canEditTopic`）
+- 「未來 12 週報名總覽」表格最右加「**主題**」欄——比照教會 Google Sheet「2026服事表」的「課程安排」欄，
+  一列看完那週誰服事、帶什麼。同一天多個班別時以「兒童班：…／幼童班：…」分行；老師只看到自己班
+- 表格最小寬度 460 → 620px（仍在自己的橫捲容器內，頁面不橫捲）
+- 純邏輯抽到 `serviceTopic.ts#topicLines`，加 3 項測試
+
+## 驗證
+
+`npm test` 29 檔 263 項全綠、`vue-tsc`、`npm run build` 通過；新圖示五張已目視檢查（maskable 內容在安全區內）。
+
+⚠️ **沒有跑測試帳號實機**（此容器沒有 `.env.local`）。migration 跑完後請用**老師帳號**確認：
+1. 服事頁自己班的卡片有「主題」鈕，存得進去；別班的卡片沒有鈕
+2. 總覽表最右欄出現主題，手機上表格左右滑得到
+3. 同工帳號：全部班別都有鈕，總覽表一列顯示多班主題
+
+## 手冊
+
+- `docs/HANDBOOK.md` → **v11**（主題編輯權限、總覽表主題欄、logo）
+- 網頁版 artifact → **v11**（同一個網址；記得把分享的 pin 移到新版）
+- 圖文說明書維持 `v0.4.0`
+
+## 仍待處理
+
+- 兩張美編圖的圖片內容仍印「兒童部」；DB 兩筆「兒主」；一位成員稱呼「怡穎老師」
+- LINE 登入（PR #35）依裁決暫緩
