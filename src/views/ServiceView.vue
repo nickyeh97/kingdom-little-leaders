@@ -161,10 +161,14 @@ function mySignups(date: string): TeacherServiceSignup[] {
 }
 /** 班別劃分（v5 #1）：老師僅見自己被指派班別的內容；同工全視野 */
 const visibleClassIds = computed(() => new Set(myClasses.value.map((g) => g.id)))
-/** 服事表：該日期顯示的班別（同工看全部班別以便建立；老師只看自己班別的已發布） */
-function rosterClasses(date: string): ClassGroup[] {
-  if (auth.can('admin')) return groups.value
-  return myClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published)
+/**
+ * 服事安排的內容（分工／詩歌／彈性時間）要不要給這個人看：同工全部；老師只看已發布的。
+ * 班別卡本身與預排主題**不**受這個限制——v0.6.0 之前整張卡都綁在「已發布」上，
+ * 導致老師在同工發布服事表前看不到主題，v16 #1「不必等發布」實際上只對同工成立。
+ */
+function weekVisible(date: string, classGroupId: string): boolean {
+  const w = weekAt.value.get(`${date}|${classGroupId}`)
+  return !!w && (auth.can('admin') || w.published)
 }
 /** 摺疊卡標題徽章：該日已發布的班數（依可見班別計算） */
 function publishedClassCount(date: string): number {
@@ -328,9 +332,9 @@ const topicMap = computed(() => topicIndex(topics.value))
 function topicOf(date: string, classGroupId: string): string {
   return topicAt(topicMap.value, date, classGroupId)
 }
-/** 總覽表「主題」欄：只列自己看得到的班別（老師＝被指派班、同工＝全部） */
+/** 總覽表「主題」欄：只列自己的班別（老師＝被指派班、同工＝全部），與發布狀態無關 */
 function topicCell(date: string) {
-  return topicLines(topicMap.value, date, rosterClasses(date))
+  return topicLines(topicMap.value, date, myClasses.value)
 }
 /** 主題可編輯：同工全部、老師自己班（與 RLS class_topics_write 一致，v20） */
 function canEditTopic(classGroupId: string): boolean {
@@ -682,7 +686,7 @@ function assignmentLines(w: ServiceWeek): string[] {
                 <td class="ov-topic">
                   <span v-if="topicCell(row.date).length === 0" class="ov-empty">—</span>
                   <span v-for="t in topicCell(row.date)" :key="t.class_group_id" class="ov-name">
-                    <b v-if="rosterClasses(row.date).length > 1" class="ov-cls">{{ t.name }}</b>{{ t.topic }}
+                    <b v-if="myClasses.length > 1" class="ov-cls">{{ t.name }}</b>{{ t.topic }}
                   </span>
                 </td>
               </tr>
@@ -719,11 +723,12 @@ function assignmentLines(w: ServiceWeek): string[] {
         <!-- 家長已勾的預先出席（v16 #2）：老師提早知道那天大概幾個孩子會來，好準備材料與分組。
              另起一行不與標題同列——手機 390px 寬放不下，擠在一起會把標題推掉並撐出橫向捲動。 -->
         <p v-if="plannedText(d)" class="hint planned">🙋 預計出席：{{ plannedText(d) }}</p>
-        <div v-for="g in rosterClasses(d)" :key="g.id" class="svc-block">
+        <!-- 班別卡一律列出自己的班別（老師＝被指派班、同工＝全部）；只有服事安排的內容才看發布狀態 -->
+        <div v-for="g in myClasses" :key="g.id" class="svc-block">
           <div class="week-head">
             <strong>{{ g.name }}</strong>
             <van-tag
-              v-if="weekAt.get(`${d}|${g.id}`)"
+              v-if="weekAt.get(`${d}|${g.id}`) && (auth.can('admin') || weekAt.get(`${d}|${g.id}`)!.published)"
               :type="weekAt.get(`${d}|${g.id}`)!.published ? 'success' : 'default'"
               plain
             >
@@ -754,7 +759,7 @@ function assignmentLines(w: ServiceWeek): string[] {
           <p v-if="topicOf(d, g.id)" class="svc-line topic-line">
             📖 主題：{{ topicOf(d, g.id) }}
           </p>
-          <template v-if="weekAt.get(`${d}|${g.id}`)">
+          <template v-if="weekVisible(d, g.id)">
             <p
               v-for="line in assignmentLines(weekAt.get(`${d}|${g.id}`)!)"
               :key="line"
@@ -769,9 +774,9 @@ function assignmentLines(w: ServiceWeek): string[] {
               🎨 彈性時間：{{ weekAt.get(`${d}|${g.id}`)!.flex_text }}
             </p>
           </template>
-          <p v-else class="hint svc-empty">尚未安排</p>
+          <p v-else class="hint svc-empty">{{ auth.can('admin') ? '尚未安排' : '尚未發布' }}</p>
         </div>
-        <p v-if="rosterClasses(d).length === 0" class="hint svc-empty">尚未發布</p>
+        <p v-if="myClasses.length === 0" class="hint svc-empty">您尚未被指派班別，請聯繫同工</p>
 
         <!-- B. 我的報名（T-COM-01） -->
         <template v-if="myClasses.length > 0">
