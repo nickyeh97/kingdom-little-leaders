@@ -33,6 +33,7 @@ import {
 import { listClassTopics, upsertClassTopic } from '../api/topics'
 import { listPlansRange } from '../api/attendance'
 import { attendingByClass, attendingSummary, topicAt, topicIndex, topicLines } from '../lib/serviceTopic'
+import { ALL_CLASSES, filterByClass } from '../lib/service'
 import { useAuthStore } from '../stores/auth'
 import type {
   AttendancePlan,
@@ -172,13 +173,29 @@ function weekVisible(date: string, classGroupId: string): boolean {
 }
 /** 摺疊卡標題徽章：該日已發布的班數（依可見班別計算） */
 function publishedClassCount(date: string): number {
-  return myClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published).length
+  // 跟著班別篩選走：選了幼童班，徽章就不該還寫「已發布 2 班」
+  return shownClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published).length
 }
-/** 報名總覽（T-COM-02）：老師僅見自己班別的報名 */
+/**
+ * 班別篩選（v21）：同工或帶多班的老師可在「老師服事」頁籤上方選一個班別，
+ * 總覽表、聚會日卡片的服事表與報名清單只留該班；「全部」＝不篩。
+ * 只有一個班的老師不顯示這排（只有「全部」和自己班兩顆沒意義）。
+ * 不存 localStorage：切班通常是臨時看一眼，記住反而讓人下次打開以為資料不見了。
+ * 「我的報名」不受影響——那是自己的，切班別不該讓它消失。
+ */
+const classFilter = ref<string>(ALL_CLASSES)
+const showClassFilter = computed(() => myClasses.value.length > 1)
+/** 目前要顯示的班別：套用篩選後的 myClasses（班別本身用 id 比對，報名才用 class_group_id） */
+const shownClasses = computed(() =>
+  classFilter.value === ALL_CLASSES ? myClasses.value : myClasses.value.filter((g) => g.id === classFilter.value),
+)
+
+/** 報名總覽（T-COM-02）：老師僅見自己班別的報名；再套班別篩選 */
 function signupsShown(date: string): TeacherServiceSignup[] {
-  return (signupsAt.value.get(date) ?? []).filter((s) =>
+  const mine = (signupsAt.value.get(date) ?? []).filter((s) =>
     visibleClassIds.value.has(String(s.class_group_id)),
   )
+  return filterByClass(mine, classFilter.value)
 }
 
 /**
@@ -334,7 +351,7 @@ function topicOf(date: string, classGroupId: string): string {
 }
 /** 總覽表「主題」欄：只列自己的班別（老師＝被指派班、同工＝全部），與發布狀態無關 */
 function topicCell(date: string) {
-  return topicLines(topicMap.value, date, myClasses.value)
+  return topicLines(topicMap.value, date, shownClasses.value)
 }
 /** 主題可編輯：同工全部、老師自己班（與 RLS class_topics_write 一致，v20） */
 function canEditTopic(classGroupId: string): boolean {
@@ -658,6 +675,29 @@ function assignmentLines(w: ServiceWeek): string[] {
 
     <!-- ============ 老師服事：每個聚會日一張摺疊卡 ============ -->
     <template v-else-if="activeTab === 'teacher'">
+      <!-- 班別篩選（v21）：只在老師服事頁籤、且看得到兩個以上班別時出現 -->
+      <div v-if="showClassFilter" class="class-row">
+        <van-tag
+          round
+          size="large"
+          :type="classFilter === ALL_CLASSES ? 'primary' : 'default'"
+          :plain="classFilter !== ALL_CLASSES"
+          @click="classFilter = ALL_CLASSES"
+        >
+          全部
+        </van-tag>
+        <van-tag
+          v-for="g in myClasses"
+          :key="g.id"
+          round
+          size="large"
+          :type="classFilter === g.id ? 'primary' : 'default'"
+          :plain="classFilter !== g.id"
+          @click="classFilter = g.id"
+        >
+          {{ g.name }}
+        </van-tag>
+      </div>
       <van-button size="small" plain type="primary" class="export-btn" :loading="exporting"
         @click="exportTeacherService">
         匯出近一季（12 週）排班與報名
@@ -686,7 +726,7 @@ function assignmentLines(w: ServiceWeek): string[] {
                 <td class="ov-topic">
                   <span v-if="topicCell(row.date).length === 0" class="ov-empty">—</span>
                   <span v-for="t in topicCell(row.date)" :key="t.class_group_id" class="ov-name">
-                    <b v-if="myClasses.length > 1" class="ov-cls">{{ t.name }}</b>{{ t.topic }}
+                    <b v-if="shownClasses.length > 1" class="ov-cls">{{ t.name }}</b>{{ t.topic }}
                   </span>
                 </td>
               </tr>
@@ -724,7 +764,7 @@ function assignmentLines(w: ServiceWeek): string[] {
              另起一行不與標題同列——手機 390px 寬放不下，擠在一起會把標題推掉並撐出橫向捲動。 -->
         <p v-if="plannedText(d)" class="hint planned">🙋 預計出席：{{ plannedText(d) }}</p>
         <!-- 班別卡一律列出自己的班別（老師＝被指派班、同工＝全部）；只有服事安排的內容才看發布狀態 -->
-        <div v-for="g in myClasses" :key="g.id" class="svc-block">
+        <div v-for="g in shownClasses" :key="g.id" class="svc-block">
           <div class="week-head">
             <strong>{{ g.name }}</strong>
             <van-tag
@@ -1165,6 +1205,19 @@ function assignmentLines(w: ServiceWeek): string[] {
 }
 .export-btn {
   margin-bottom: 10px;
+}
+/* 班別篩選列（v21）：與教案／點名頁的日期列同一種長相 */
+.class-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+}
+/* 320px 寬（iPhone SE）放不下四顆時要讓整排橫捲，不能讓標籤縮小把「兒童班」折成兩行 */
+.class-row .van-tag {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 h2 {
   margin: 0 0 4px;
