@@ -173,7 +173,8 @@ function weekVisible(date: string, classGroupId: string): boolean {
 }
 /** 摺疊卡標題徽章：該日已發布的班數（依可見班別計算） */
 function publishedClassCount(date: string): number {
-  return myClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published).length
+  // 跟著班別篩選走：選了幼童班，徽章就不該還寫「已發布 2 班」
+  return shownClasses.value.filter((g) => weekAt.value.get(`${date}|${g.id}`)?.published).length
 }
 /**
  * 班別篩選（v21）：同工或帶多班的老師可在「老師服事」頁籤上方選一個班別，
@@ -1212,6 +1213,11 @@ function assignmentLines(w: ServiceWeek): string[] {
   overflow-x: auto;
   padding-bottom: 4px;
   margin-bottom: 10px;
+}
+/* 320px 寬（iPhone SE）放不下四顆時要讓整排橫捲，不能讓標籤縮小把「兒童班」折成兩行 */
+.class-row .van-tag {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 h2 {
   margin: 0 0 4px;
