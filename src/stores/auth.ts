@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { Session } from '@supabase/supabase-js'
+import type { Session, UserIdentity } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile, UserRole } from '../types'
+import { LINE_PROVIDER, findLineIdentity } from '../lib/lineIdentity'
 
 export const useAuthStore = defineStore('auth', () => {
   const session = ref<Session | null>(null)
@@ -117,6 +118,59 @@ export const useAuthStore = defineStore('auth', () => {
     if (error) throw error
   }
 
+  /**
+   * LINE 綁定／解除（v15 #1）。
+   *
+   * 用 `linkIdentity()` 把 LINE 掛到**現有帳號**上，而不是 `signInWithOAuth()`——
+   * 後者會另外開一個 Supabase user，家長就會看不到自己已綁定的孩子（見 lib/lineIdentity.ts）。
+   * 需要 Supabase 後台打開「Enable Manual Linking」。
+   */
+  const identities = ref<UserIdentity[]>([])
+
+  async function loadIdentities() {
+    if (!supabase || !session.value) {
+      identities.value = []
+      return
+    }
+    const { data, error } = await supabase.auth.getUserIdentities()
+    if (error) throw error
+    identities.value = data?.identities ?? []
+  }
+
+  /**
+   * 用 LINE 登入（登入頁）。
+   *
+   * ⚠️ 只適用**已經綁定過**的帳號。沒綁定過的人按下去，Supabase 會建一個新使用者
+   * （待審核、沒有角色、沒綁孩子）——登入頁的說明與首頁的審核中提醒都會講怎麼救。
+   */
+  async function signInWithLine() {
+    if (!supabase) throw new Error('Supabase 尚未設定')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: LINE_PROVIDER,
+      options: { redirectTo: window.location.origin },
+    })
+    if (error) throw error
+  }
+
+  /** 轉址到 LINE 授權頁；回來後由 onAuthStateChange 接手 */
+  async function linkLine() {
+    if (!supabase) throw new Error('Supabase 尚未設定')
+    const { error } = await supabase.auth.linkIdentity({
+      provider: LINE_PROVIDER,
+      options: { redirectTo: `${window.location.origin}/me` },
+    })
+    if (error) throw error
+  }
+
+  async function unlinkLine() {
+    if (!supabase) throw new Error('Supabase 尚未設定')
+    const line = findLineIdentity(identities.value)
+    if (!line) return
+    const { error } = await supabase.auth.unlinkIdentity(line)
+    if (error) throw error
+    await loadIdentities()
+  }
+
   /** 重設頁：以重設連結建立的 session 設定新密碼 */
   async function updatePassword(password: string) {
     if (!supabase) throw new Error('Supabase 尚未設定')
@@ -143,5 +197,10 @@ export const useAuthStore = defineStore('auth', () => {
     resetPassword,
     updatePassword,
     loadProfile,
+    identities,
+    loadIdentities,
+    signInWithLine,
+    linkLine,
+    unlinkLine,
   }
 })

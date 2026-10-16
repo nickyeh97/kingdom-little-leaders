@@ -14,6 +14,7 @@ import { listSessionLogsRange } from '../api/records'
 import { listServiceWeeks } from '../api/service'
 import { listMeetings } from '../api/meetings'
 import { listLessonSegmentsByDate } from '../api/teaching'
+import { LINE_PROVIDER } from '../lib/lineIdentity'
 import { classHasIndex } from '../lib/performance'
 import { classTagStyle } from '../lib/classColor'
 import { linkifyText } from '../lib/url'
@@ -74,6 +75,20 @@ const annClassOptions = computed<{ id: string | null; name: string }[]>(() => {
 const needPlan = ref(false)
 const gathering = upcomingGathering()
 const deadline = planDeadline(gathering)
+
+/**
+ * 審核中的提醒文字（v15 #1）。
+ *
+ * 一般新人照舊請同工核准即可。但**用 LINE 登入卻沒綁定過**的人會落到同一個狀態——
+ * 那其實是誤開的第二個帳號，本人往往以為自己的孩子與權限不見了。
+ * 這種情況要講的是「怎麼救」，不是「等審核」，所以文案分開。
+ */
+const pendingText = computed(() =>
+  auth.profile?.auth_provider === LINE_PROVIDER
+    ? '這是用 LINE 新開的帳號。若您原本就有帳號，請先登出、改用原本的 Email 或 Google 登入，'
+      + '再到「我的 → 登入方式」綁定 LINE；若您確實是新成員，請通知兒童牧區同工核准'
+    : '帳號審核中——請通知兒童牧區同工核准，通過後即可使用完整功能',
+)
 
 /** 老師：上堂課我點過名、但還沒填課堂紀錄的班別（兩天內提醒；空陣列＝不提醒） */
 const missingLogClasses = ref<{ id: string; name: string }[]>([])
@@ -265,7 +280,7 @@ async function removeAnn() {
       left-icon="clock-o"
       color="var(--kll-primary-text)"
       background="var(--kll-primary-soft)"
-      text="帳號審核中——請通知兒童牧區同工核准，通過後即可使用完整功能"
+      :text="pendingText"
     />
 
     <!-- 指名是哪一班還沒填，並直接跳到該班（v9 驗收回饋：同班已有人填就不該再提醒） -->

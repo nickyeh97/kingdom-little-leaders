@@ -99,7 +99,7 @@
 | 層 | 選型 | 理由 |
 | --- | --- | --- |
 | 前端 | **Vue 3 + Vite + Vant**（SPA / PWA） | mobile-first UI 庫、繁中文件齊全；封閉登入制平台無 SEO 需求，SPA 最簡單 |
-| 後端 | **Supabase**（Postgres + Auth + RLS） | 關聯式資料契合建模；RLS 落實家長資料隔離；Auth 可從 Email 擴充至 Google/Apple（內建）與 LINE（自訂） |
+| 後端 | **Supabase**（Postgres + Auth + RLS） | 關聯式資料契合建模；RLS 落實家長資料隔離；Auth 可從 Email 擴充至 Google/Apple（內建）與 LINE（自訂 OIDC） |
 | 託管 | Vercel / Cloudflare Pages（免費額度） | 總使用者 < 100 人，免費額度長期夠用，避免固定月費 |
 | 影音 | 一律**外連或嵌入 YouTube** | 不自建影音儲存/串流 |
 
@@ -107,8 +107,14 @@
 
 - **已實作**：Email 註冊/登入＋**Google OAuth 註冊/登入**（設定步驟見 README「Google 登入設定」）；session 由 supabase-js 持久化於 localStorage，回訪免重登。
 - **註冊即家長＋審核制**：任何管道註冊的新使用者預設角色 `parent`、`approved=false`（待審核）。**未審核者僅能看公告與帳號設定**——`my_roles()` 對未審核者回空陣列，所有角色權限在資料庫層自動失效；審核與取消核准、刪除成員皆於名單頁操作（防自我審核已入 RLS）。「邀請成員」＝分享平台網址給對方自行註冊。
-- **未來擴充**：Apple（Supabase 內建）、LINE（透過 Edge Function 自訂接入）。
-- `auth_provider` 欄位由 `handle_new_user` 觸發器自動寫入（email / google / …）。
+- **LINE 登入＝綁定式追加管道（v15 #1）**：LINE **不是註冊管道**。已有帳號的人在「我的 → 登入方式」
+  按綁定（`linkIdentity()`），之後即可用 LINE 登入同一個帳號；新人仍走 Email / Google 註冊。
+  **原因**：LINE 的 email scope 需另外申請且使用者可拒絕，拿不到 email 就無法與既有帳號自動合併，
+  會產生沒有角色、沒綁孩子的孤兒帳號。技術上走 **Supabase Custom OIDC Provider**（識別字 `custom:line`，
+  issuer `https://access.line.me`），**不需要 Edge Function**；設定步驟見 `docs/DEVELOPMENT.md`。
+- **未來擴充**：Apple（Supabase 內建）。
+- `auth_provider` 欄位由 `handle_new_user` 觸發器自動寫入（email / google / `custom:line`），
+  記錄的是**第一次註冊時的管道**；之後追加綁定的登入方式要查 `auth.identities`。
 
 ### 注意事項
 

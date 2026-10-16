@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { updateDisplayName } from '../api/members'
+import { canUnlinkLine, findLineIdentity, lineBindingLabel } from '../lib/lineIdentity'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -10,6 +11,58 @@ const router = useRouter()
 
 /** 版本號來自 package.json（vite define 注入），不必兩處手動同步 */
 const appVersion = __APP_VERSION__
+
+/*
+ * LINE 綁定（v15 #1）：綁在**現有帳號**上，不是另開一個帳號登入。
+ * 取不到 identity 清單就整區不顯示——多半是 LINE provider 還沒在 Supabase 設好，
+ * 這時候顯示一顆按不動的按鈕只會讓人以為壞掉。
+ */
+const identitiesReady = ref(false)
+const lineLabel = computed(() => lineBindingLabel(auth.identities))
+const lineLinked = computed(() => findLineIdentity(auth.identities) != null)
+const lineCanUnlink = computed(() => canUnlinkLine(auth.identities))
+const lineBusy = ref(false)
+
+onMounted(async () => {
+  try {
+    await auth.loadIdentities()
+    identitiesReady.value = true
+  } catch {
+    // 靜默：這只是個附加功能，取不到就不顯示，不打擾使用者
+  }
+})
+
+async function bindLine() {
+  if (lineBusy.value) return
+  lineBusy.value = true
+  try {
+    await auth.linkLine()
+    // 成功的話會轉址到 LINE，不會走到這裡
+  } catch (e) {
+    showFailToast((e as Error).message)
+    lineBusy.value = false
+  }
+}
+
+async function unbindLine() {
+  try {
+    await showConfirmDialog({
+      title: '解除 LINE 綁定',
+      message: '解除後就不能用 LINE 登入這個帳號，但仍可用原本的 Email 或 Google 登入。',
+    })
+  } catch {
+    return // 使用者按取消
+  }
+  lineBusy.value = true
+  try {
+    await auth.unlinkLine()
+    showSuccessToast('已解除綁定')
+  } catch (e) {
+    showFailToast((e as Error).message)
+  } finally {
+    lineBusy.value = false
+  }
+}
 
 // ---- 顯示稱呼（v7 #1：使用者可自行設定）----
 const editingName = ref(false)
@@ -64,6 +117,40 @@ async function logout() {
         ✎ 修改稱呼
       </van-button>
     </div>
+    <template v-if="identitiesReady">
+      <h3 class="section-title" style="--sec: var(--kll-green)">登入方式</h3>
+      <van-cell-group inset>
+        <van-cell title="LINE 登入" :label="lineLabel">
+          <template #right-icon>
+            <van-button
+              v-if="!lineLinked"
+              size="small"
+              type="primary"
+              :loading="lineBusy"
+              @click="bindLine"
+            >
+              綁定
+            </van-button>
+            <van-button
+              v-else
+              size="small"
+              plain
+              :disabled="!lineCanUnlink"
+              :loading="lineBusy"
+              @click="unbindLine"
+            >
+              解除
+            </van-button>
+          </template>
+        </van-cell>
+      </van-cell-group>
+      <p class="hint bind-note">
+        綁定後就能用 LINE 登入<strong>同一個帳號</strong>，孩子綁定與角色標籤都不會變。
+        <template v-if="lineLinked && !lineCanUnlink">
+          （這是您唯一的登入方式，解除會登不進來，所以先停用）
+        </template>
+      </p>
+    </template>
     <h3 class="section-title" style="--sec: var(--kll-primary)">關於兒童牧區</h3>
     <van-cell-group inset>
       <van-cell
@@ -176,6 +263,10 @@ async function logout() {
 </template>
 
 <style scoped>
+.bind-note {
+  margin: 8px 16px 0;
+  line-height: 1.7;
+}
 h2 {
   margin: 0 0 12px;
   font-size: 25px;
