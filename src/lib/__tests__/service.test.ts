@@ -90,11 +90,11 @@ describe('serviceGrid：老師服事總覽表（v11 #10）', () => {
     expect([...SERVICE_COLUMNS]).toEqual(['全主責', '助教', '助理', '彈性時間'])
   })
 
-  it('邊際：不屬於四類的自訂項目不硬塞欄位，另外列出', () => {
+  it('不屬於四類的自訂項目進「其他」欄，寫法與其他欄一致：人名（項目）（v22）', () => {
     const rows = serviceGrid(['2026-09-05'], [
       { gathering_date: '2026-09-05', teacher_name: '小樂', item: '場地佈置' },
     ])
-    expect(rows[0].others).toEqual(['場地佈置·小樂'])
+    expect(rows[0].others).toEqual(['小樂（場地佈置）'])
     for (const col of SERVICE_COLUMNS) expect(rows[0].cells[col]).toEqual([])
   })
 

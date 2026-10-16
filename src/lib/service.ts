@@ -75,7 +75,7 @@ export interface ServiceGridRow {
   date: string
   /** 四欄各自的人名（可多人） */
   cells: Record<ServiceColumn, string[]>
-  /** 不屬於四類的報名，原樣保留（「項目·人名」） */
+  /** 不屬於四類的報名，進表格的「其他」欄（v22）：「人名（項目）」，與其他欄的「人名（分工）」同一種寫法 */
   others: string[]
 }
 
@@ -109,7 +109,7 @@ export function serviceGrid(
       if (sg.gathering_date !== date) continue
       const col = serviceColumnOf(sg.item)
       if (col) cells[col].push(cellLabel(sg.teacher_name, sg.item))
-      else others.push(`${sg.item}·${sg.teacher_name}`)
+      else others.push(`${sg.teacher_name}（${sg.item.trim()}）`)
     }
     return { date, cells, others }
   })
