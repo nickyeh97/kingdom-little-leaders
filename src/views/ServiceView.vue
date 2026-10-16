@@ -712,6 +712,7 @@ function assignmentLines(w: ServiceWeek): string[] {
               <tr>
                 <th class="ov-th-date">聚會日</th>
                 <th v-for="c in SERVICE_COLUMNS" :key="c">{{ c }}</th>
+                <th>其他</th>
                 <th class="ov-th-topic">主題</th>
               </tr>
             </thead>
@@ -721,6 +722,11 @@ function assignmentLines(w: ServiceWeek): string[] {
                 <td v-for="c in SERVICE_COLUMNS" :key="c">
                   <span v-if="row.cells[c].length === 0" class="ov-empty">—</span>
                   <span v-for="n in row.cells[c]" :key="n" class="ov-name">{{ n }}</span>
+                </td>
+                <!-- 其他欄（v22）：不屬於四類的報名（如「觀摩」）固定占一欄，不再列在表格下面 -->
+                <td>
+                  <span v-if="row.others.length === 0" class="ov-empty">—</span>
+                  <span v-for="n in row.others" :key="n" class="ov-name">{{ n }}</span>
                 </td>
                 <!-- 主題欄（v20）：比照教會原本 Sheet 的「課程安排」欄，一列看完誰服事＋帶什麼 -->
                 <td class="ov-topic">
@@ -733,10 +739,6 @@ function assignmentLines(w: ServiceWeek): string[] {
             </tbody>
           </table>
         </div>
-        <p v-for="row in overviewRows.filter((r) => r.others.length > 0)" :key="'oth' + row.date"
-          class="hint ov-others">
-          {{ row.date.slice(5).replace('-', '/') }} 其他：{{ row.others.join('、') }}
-        </p>
       </div>
 
     <van-collapse v-model="openDates">
@@ -1252,7 +1254,7 @@ h2 {
 .ov-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 620px; /* 多了主題欄 */
+  min-width: 720px; /* 四類＋其他＋主題 */
   font-size: 15px;
 }
 .ov-topic {
@@ -1292,9 +1294,6 @@ h2 {
 }
 .ov-empty {
   color: var(--kll-muted);
-}
-.ov-others {
-  margin: 8px 2px 0;
 }
 .ov-tip {
   margin: 0 0 8px;
