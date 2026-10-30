@@ -27,6 +27,7 @@ function makeRouter() {
       { path: '/meetings', name: 'meetings', component: Empty },
       { path: '/records', name: 'records', component: Empty },
       { path: '/class-log', name: 'class-log', component: Empty },
+      { path: '/service-card', name: 'service-card', component: Empty },
     ],
   })
 }
@@ -112,6 +113,16 @@ describe('「小領袖靈獸」入口', () => {
     vi.stubEnv('VITE_SPIRIT_GAME_URL', '')
     loginAs(['parent'])
     expect((await mountMe()).text()).not.toContain('小領袖靈獸')
+  })
+
+  it('點入口進到家長的服事卡頁（不直接跳遊戲）', async () => {
+    vi.stubEnv('VITE_SPIRIT_GAME_URL', 'https://game.example')
+    loginAs(['parent'])
+    const w = await mountMe()
+    const cell = w.findAll('.van-cell').find((c) => c.text().includes('小領袖靈獸'))
+    await cell!.trigger('click')
+    await new Promise((r) => setTimeout(r))
+    expect(w.vm.$router.currentRoute.value.name).toBe('service-card')
   })
 
   it('沒有家長標籤看不到（老師／同工無綁定孩子）', async () => {

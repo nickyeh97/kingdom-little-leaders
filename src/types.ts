@@ -348,3 +348,22 @@ export interface OrgUnit {
   note: string
   sort_order: number
 }
+
+/** 服事經歷卡（小領袖靈獸）：家長確認紙本卡老師簽名後登錄的一次服事；created_at 即紀錄時間 */
+export interface ServiceCardEntry {
+  id: string
+  child_id: string
+  item: string
+  /** 聖靈果子反思（可空） */
+  fruit: string | null
+  recorded_by: string
+  created_at: string
+}
+
+/** 靈獸設定（每孩一筆）：外觀由遊戲寫入；鼓勵的話由家長在平台寫入 */
+export interface BeastProfile {
+  child_id: string
+  variant: string
+  palette: string
+  encouragements: string[]
+}
