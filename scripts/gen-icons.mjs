@@ -2,7 +2,7 @@
  * 從一張原圖產生全套 PWA / favicon 圖示。
  *
  *   npm i -D playwright && npx playwright install chromium   # 只在換 logo 時裝，跑完可移除
- *   node scripts/gen-icons.mjs assets/kll_logo-src.webp public
+ *   node scripts/gen-icons.mjs assets/kll_logo-src.png public
  *
  * playwright 刻意不列為專案相依：換 logo 很少發生，產出的圖已進版控，平常建置用不到這支。
  *
@@ -20,7 +20,7 @@ import path from 'node:path'
 
 const SRC = process.argv[2]
 const OUT = process.argv[3] || '.'
-if (!SRC) throw new Error('用法: node scripts/gen-icons.mjs assets/kll_logo-src.webp public')
+if (!SRC) throw new Error('用法: node scripts/gen-icons.mjs assets/kll_logo-src.png public')
 
 // 預設用 playwright install 裝的 Chromium；環境另有瀏覽器時可用 CHROMIUM_PATH 指定
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })

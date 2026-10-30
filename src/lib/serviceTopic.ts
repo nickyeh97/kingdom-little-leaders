@@ -24,6 +24,26 @@ export function topicAt(
   return index.get(`${gatheringDate}|${classGroupId}`) ?? ''
 }
 
+export interface TopicLine {
+  class_group_id: string
+  name: string
+  topic: string
+}
+
+/**
+ * 報名總覽表「主題」欄（v20）：某聚會日各班的主題，照 `groups` 順序、只列有填的班。
+ * 教會原本的 Google Sheet 就是「日期 × 老師 × 課程安排」一列看完，老師反饋要把主題擺回表格裡。
+ */
+export function topicLines(
+  index: Map<string, string>,
+  gatheringDate: string,
+  groups: ClassGroup[],
+): TopicLine[] {
+  return groups
+    .map((g) => ({ class_group_id: g.id, name: g.name, topic: topicAt(index, gatheringDate, g.id) }))
+    .filter((l) => l.topic !== '')
+}
+
 export interface ClassPlanCount {
   class_group_id: string
   name: string

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attendingByClass, attendingSummary, topicAt, topicIndex } from '../serviceTopic'
+import { attendingByClass, attendingSummary, topicAt, topicIndex, topicLines } from '../serviceTopic'
 import type { AttendancePlan, Child, ClassGroup, ClassTopic } from '../../types'
 
 function topic(p: Partial<ClassTopic> = {}): ClassTopic {
@@ -126,5 +126,34 @@ describe('預計出席人數（v16 #2）', () => {
       ]),
     ).toBe('兒童班 10、幼童班 5')
     expect(attendingSummary([])).toBe('')
+  })
+})
+
+describe('topicLines（總覽表主題欄，v20）', () => {
+  const groups = [
+    { id: 'kid', name: '兒童班' },
+    { id: 'tod', name: '幼童班' },
+    { id: 'baby', name: '幼幼班' },
+  ] as Parameters<typeof topicLines>[2]
+  const index = topicIndex([
+    { id: '1', gathering_date: '2026-10-10', class_group_id: 'tod', topic: '聖經人物-亞伯拉罕', updated_by_name: '', updated_at: '' },
+    { id: '2', gathering_date: '2026-10-10', class_group_id: 'kid', topic: '品格週-分享', updated_by_name: '', updated_at: '' },
+    { id: '3', gathering_date: '2026-10-17', class_group_id: 'kid', topic: '  ', updated_by_name: '', updated_at: '' },
+  ] as Parameters<typeof topicIndex>[0])
+
+  it('照班別順序、只列有填的班', () => {
+    expect(topicLines(index, '2026-10-10', groups).map((l) => `${l.name}:${l.topic}`)).toEqual([
+      '兒童班:品格週-分享',
+      '幼童班:聖經人物-亞伯拉罕',
+    ])
+  })
+
+  it('只看傳入的班別——老師只會拿到自己的班', () => {
+    expect(topicLines(index, '2026-10-10', groups.slice(1, 2)).map((l) => l.name)).toEqual(['幼童班'])
+  })
+
+  it('沒主題或只有空白就是空陣列（畫面顯示 —）', () => {
+    expect(topicLines(index, '2026-10-17', groups)).toEqual([])
+    expect(topicLines(index, '2026-10-24', groups)).toEqual([])
   })
 })

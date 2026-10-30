@@ -75,8 +75,24 @@ export interface ServiceGridRow {
   date: string
   /** 四欄各自的人名（可多人） */
   cells: Record<ServiceColumn, string[]>
-  /** 不屬於四類的報名，原樣保留（「項目·人名」） */
+  /** 不屬於四類的報名，進表格的「其他」欄（v22）：「人名（項目）」，與其他欄的「人名（分工）」同一種寫法 */
   others: string[]
+}
+
+/** 班別篩選用的特殊值：顯示全部班別 */
+export const ALL_CLASSES = 'all'
+
+/**
+ * 服事頁班別篩選（v21）：同工（或帶多班的老師）在頁面上方選一個班別，
+ * 總覽表與聚會日卡片只留該班的報名；選「全部」就不篩。
+ * `class_group_id` 歷史上有 number／string 兩種型別，統一轉字串比對。
+ */
+export function filterByClass<T extends { class_group_id: string | number }>(
+  rows: T[],
+  classFilter: string,
+): T[] {
+  if (classFilter === ALL_CLASSES) return rows
+  return rows.filter((r) => String(r.class_group_id) === classFilter)
 }
 
 export function serviceGrid(
@@ -93,7 +109,7 @@ export function serviceGrid(
       if (sg.gathering_date !== date) continue
       const col = serviceColumnOf(sg.item)
       if (col) cells[col].push(cellLabel(sg.teacher_name, sg.item))
-      else others.push(`${sg.item}·${sg.teacher_name}`)
+      else others.push(`${sg.teacher_name}（${sg.item.trim()}）`)
     }
     return { date, cells, others }
   })

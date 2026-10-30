@@ -7,6 +7,8 @@ import {
   serviceGrid,
   SERVICE_ITEM_PRESETS,
   SIGNUP_WEEKS_AHEAD,
+  ALL_CLASSES,
+  filterByClass,
 } from '../service'
 
 describe('服事排班設定', () => {
@@ -88,11 +90,11 @@ describe('serviceGrid：老師服事總覽表（v11 #10）', () => {
     expect([...SERVICE_COLUMNS]).toEqual(['全主責', '助教', '助理', '彈性時間'])
   })
 
-  it('邊際：不屬於四類的自訂項目不硬塞欄位，另外列出', () => {
+  it('不屬於四類的自訂項目進「其他」欄，寫法與其他欄一致：人名（項目）（v22）', () => {
     const rows = serviceGrid(['2026-09-05'], [
       { gathering_date: '2026-09-05', teacher_name: '小樂', item: '場地佈置' },
     ])
-    expect(rows[0].others).toEqual(['場地佈置·小樂'])
+    expect(rows[0].others).toEqual(['小樂（場地佈置）'])
     for (const col of SERVICE_COLUMNS) expect(rows[0].cells[col]).toEqual([])
   })
 
@@ -115,5 +117,23 @@ describe('serviceGrid：老師服事總覽表（v11 #10）', () => {
     ])
     expect(rows[0].cells['全主責']).toEqual(['小美'])
     expect(rows[0].others).toEqual([])
+  })
+})
+
+describe('filterByClass（服事頁班別篩選，v21）', () => {
+  const rows = [
+    { id: 'a', class_group_id: 'kid' },
+    { id: 'b', class_group_id: 'tod' },
+    { id: 'c', class_group_id: 'kid' },
+  ]
+  it('選「全部」原樣回傳', () => {
+    expect(filterByClass(rows, ALL_CLASSES)).toEqual(rows)
+  })
+  it('選班別只留該班', () => {
+    expect(filterByClass(rows, 'kid').map((r) => r.id)).toEqual(['a', 'c'])
+    expect(filterByClass(rows, 'baby')).toEqual([])
+  })
+  it('class_group_id 是數字也能比對（歷史型別）', () => {
+    expect(filterByClass([{ id: 'n', class_group_id: 7 }], '7').map((r) => r.id)).toEqual(['n'])
   })
 })
