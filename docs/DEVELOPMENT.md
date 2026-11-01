@@ -68,6 +68,9 @@ npm run dev:staging     # 平台連測試資料庫；手機連同一個 Wi-Fi �
 
 - 畫面最上方要看到黃色的「🧪 測試資料庫：jyfog….supabase.co」。**沒看到就是連到正式資料庫**（多半是跑成 `npm run dev`，
   或檔名不是 `.env.staging.local`——Mac 可能偷偷加了 `.txt`），先停下來檢查。
+- 測試模式讀到的仍是正式資料庫時，平台會**直接拒絕連線**（頂端紅條「已停止連線」）。常見原因：
+  `.env.staging.local` 不在 repo 根目錄、檔名不對，或**建立／修改檔案後沒有重開** `npm run dev:staging`（Vite 只在啟動時讀設定）。
+  用 `ls -a | grep env` 看檔名、`env | grep VITE_` 確認終端機沒有另外設定同名變數（它會蓋過檔案）。
 - 測試站**只用 Email 登入／註冊，不要按「使用 Google 登入」**：測試專案沒開 Google；
   若平台其實連到正式資料庫，Google 登入完會被導回正式網站（正式專案只允許 `localhost:5173` 回到本機，用區網 IP 開的不在名單內）。
 

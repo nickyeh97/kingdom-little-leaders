@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
-import { isConfigured } from '../lib/supabase'
+import { isConfigured, stagingBlocked } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -144,6 +144,13 @@ async function sendReset() {
       </p>
     </div>
 
+    <div class="card" v-else-if="stagingBlocked">
+      <p><strong>測試站連到了正式資料庫，已停止連線</strong></p>
+      <p class="hint">
+        沒有讀到 <code>.env.staging.local</code>（檔名、位置不對，或建立檔案後沒有重開
+        <code>npm run dev:staging</code>）。見 <code>docs/DEVELOPMENT.md</code>「測試資料庫」。
+      </p>
+    </div>
     <div class="card" v-else>
       <p><strong>尚未連接後端</strong></p>
       <p class="hint">

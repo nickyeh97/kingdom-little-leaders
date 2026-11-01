@@ -17,6 +17,14 @@ describe('測試資料庫提示列', () => {
     expect((await mountApp()).text()).toContain('測試資料庫：test-ref.supabase.co')
   })
 
+  it('測試模式卻設定成正式資料庫 → 紅色警告', async () => {
+    vi.stubEnv('MODE', 'staging')
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://bazvzaqetvjpnanabkox.supabase.co')
+    const w = await mountApp()
+    expect(w.find('.danger').exists()).toBe(true)
+    expect(w.text()).toContain('已停止連線')
+  })
+
   it('邊際：正式建置與一般開發不顯示', async () => {
     vi.stubEnv('MODE', 'production')
     expect((await mountApp()).find('.staging-banner').exists()).toBe(false)
