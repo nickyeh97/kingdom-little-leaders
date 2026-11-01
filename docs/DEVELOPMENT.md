@@ -62,7 +62,7 @@ npm run test:watch           # 開發時監看模式
    VITE_SUPABASE_ANON_KEY=<測試專案的 anon key>
    VITE_SPIRIT_GAME_URL=http://<電腦的區網 IP>:3000
    ```
-5. 遊戲 repo：照該 repo `docs/DEVELOPMENT.md`「測試資料庫」放 `supabase.local.json`、建置、`npx --yes serve Builds/Web`。
+5. 遊戲 repo：照該 repo `docs/DEVELOPMENT.md`「測試資料庫」放 `Assets/Resources/supabase_test.json`、建置、`npx --yes serve Builds/Web`。
 
 **每次測試**
 
