@@ -36,6 +36,47 @@ npm run test:watch           # 開發時監看模式
 4. Project Settings → API 取得 URL 與 anon key，填入 `.env.local`。
 5. 建議：Authentication → Sign In / Providers → Email 關閉「Confirm email」（教會內部使用，省去收確認信）。
 
+## 測試資料庫（測完整流程，不碰正式環境）
+
+要從「第 0 次服事」一路測到「小領袖」，又不想動到正式資料，就開一個**測試用的 Supabase 專案**，
+平台與遊戲都在自己電腦上跑、連到它。正式網站、正式資料庫完全不受影響。
+
+**一次性準備（約 15 分鐘）**
+
+1. Supabase 建第二個免費專案（例：`kll-test`；免費方案可有兩個專案。7 天沒用會暫停，回後台按 Restore 即可）。
+2. 測試專案的 SQL Editor 依序執行：`supabase/schema.sql` → `supabase/rls.sql` →
+   `supabase/test/mark_as_test_database.sql`（**只在測試專案跑**，它是測試工具的「這是測試庫」標記）。
+3. 測試專案 → Authentication → Sign In / Providers → Email：關掉 **Confirm email**（測試帳號不用收驗證信）。
+4. 平台：根目錄新增 `.env.staging.local`（已被 `.gitignore` 排除），填測試專案的值：
+   ```
+   VITE_SUPABASE_URL=https://<測試專案>.supabase.co
+   VITE_SUPABASE_ANON_KEY=<測試專案的 anon key>
+   VITE_SPIRIT_GAME_URL=http://<電腦的區網 IP>:3000
+   ```
+5. 遊戲 repo：照該 repo `docs/DEVELOPMENT.md`「測試資料庫」放 `supabase.local.json`、建置、`npx --yes serve Builds/Web`。
+
+**每次測試**
+
+```bash
+npm run dev:staging     # 平台連測試資料庫；手機連同一個 Wi-Fi 開 http://<電腦 IP>:5173
+```
+
+1. 在測試平台用 Email 註冊一個測試家長（例：`test-parent@example.com`）。
+2. 測試專案的 SQL Editor 貼上 `supabase/test/spirit_beast_testkit.sql`，改開頭三個值後 Run：
+   它會建假名孩子「測試小明」（兒童班）、綁定測試家長、把服事次數直接設成 N。
+3. 到「我的 → 小領袖靈獸 → 去看靈獸」按一次「＋1 服事」，就看到那一次的進化：
+
+| 要看的畫面 | N | 再按幾次 ＋1 |
+| --- | --- | --- |
+| 第一次相遇（選靈獸） | 0，`reset_beast = true` | 不用 |
+| 初生 → 成長 | 3 | 1 |
+| 成長 → 茁壯 | 11 | 1 |
+| 茁壯 → 小領袖 | 23 | 1 |
+| 真的從頭按到小領袖 | 0，`reset_beast = true` | 24（約 20 分鐘） |
+
+- 測試工具有兩道防呆：找不到 `zz_test_database` 標記、或孩子超過 20 位（像正式資料庫）就拒絕執行。
+- 正式資料庫**不要**執行 `supabase/test/` 底下任何檔案。
+
 ## 部署（Vercel，一次性設定約 5 分鐘）
 
 1. 到 [vercel.com](https://vercel.com) 以 GitHub 帳號登入 → **Add New → Project** → 選 `kingdom-little-leaders` repo（首次需授權 Vercel 存取此 repo）。

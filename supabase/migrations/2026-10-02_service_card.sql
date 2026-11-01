@@ -41,8 +41,10 @@ comment on table service_card_entries is
 -- 靈獸設定：每孩一筆。外觀由遊戲寫入，鼓勵話語由平台（家長）寫入
 create table if not exists beast_profiles (
   child_id uuid primary key references children (id) on delete cascade,
-  variant text not null check (variant in ('lamb','dove','lion','deer','eagle','fish')),
-  palette text not null default 'p1' check (palette ~ '^p[1-8]$'),
+  -- 只檢查格式、不列舉清單：之後新增靈獸或配色只要更新遊戲，不必再跑 migration（2026-11-01）。
+  -- 遊戲遇到不認得的值會退回預設外觀（靈獸用占位造型、配色用 p1），不會壞掉
+  variant text not null check (variant ~ '^[a-z][a-z0-9_]{1,23}$'),
+  palette text not null default 'p1' check (palette ~ '^p[0-9]{1,3}$'),
   encouragements jsonb not null default '[]'::jsonb check (public.valid_encouragements(encouragements)),
   -- 不加 not null：SQL Editor 整理資料時沒有 JWT
   updated_by uuid default auth.uid() references profiles (id),

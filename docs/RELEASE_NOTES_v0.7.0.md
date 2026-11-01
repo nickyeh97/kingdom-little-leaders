@@ -22,6 +22,12 @@
 
 - `service_card_entries`、`beast_profiles` 兩表＋RLS：家長讀寫自己孩子、該班老師唯讀（無畫面）、同工全權
 - `ServiceCardEntry`、`BeastProfile` 型別；`src/api/serviceCard.ts`
+- 靈獸與配色欄位只檢查格式（`variant` 小寫英數、`palette` 為 p＋數字），不列舉清單：之後新增靈獸／配色只要更新遊戲，不必再跑 migration（2026-11-01）
+
+## 測試資料庫（2026-11-01）
+
+- `supabase/test/mark_as_test_database.sql`（只在測試專案跑的標記）＋`spirit_beast_testkit.sql`（把測試孩子的服事次數快轉到 N，測每一次進化）；兩道防呆：沒有標記或孩子超過 20 位就拒絕
+- `npm run dev:staging`：讀 `.env.staging.local`，平台連測試資料庫；步驟見 `docs/DEVELOPMENT.md`「測試資料庫」
 
 ## 測試
 
