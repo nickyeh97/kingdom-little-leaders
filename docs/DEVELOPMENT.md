@@ -51,7 +51,11 @@ npm run test:watch           # 開發時監看模式
      2026-08-11 以後的還沒合進去（例如 `class_topics`、`child_service_permissions` 兩張表只在 migration 裡）
    - 2026-11-01 用這個順序建 `kll-spirits` 測試專案，欄位、權限規則、函式、觸發器四類都和正式資料庫逐項比對一致
    - 服事項目：舊 migration 會放進 09 月的六個舊名稱；測試庫請改成正式環境目前的七項（快轉工具會自動補上）
-3. 測試專案 → Authentication → Sign In / Providers → Email：關掉 **Confirm email**（測試帳號不用收驗證信）。
+3. 測試專案 → Authentication：
+   - **URL Configuration → Site URL** 改成 `http://localhost:5173`，**Redirect URLs** 加入 `http://<電腦的區網 IP>:5173`。
+     新專案預設的 Site URL 是 `http://localhost:3000`，剛好是本機遊戲的埠號——驗證信、重設密碼信的連結會跳到遊戲
+     （2026-11-01 實際遇到；驗證其實已經成功，回平台用 Email 登入即可）。
+   - **Sign In / Providers → Email**：關掉 **Confirm email**（測試帳號不用收驗證信）。
 4. 平台：根目錄新增 `.env.staging.local`（已被 `.gitignore` 排除），填測試專案的值：
    ```
    VITE_SUPABASE_URL=https://<測試專案>.supabase.co
