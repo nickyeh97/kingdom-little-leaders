@@ -45,7 +45,12 @@ npm run test:watch           # 開發時監看模式
 
 1. Supabase 建第二個免費專案（例：`kll-test`；免費方案可有兩個專案。7 天沒用會暫停，回後台按 Restore 即可）。
 2. 測試專案的 SQL Editor 依序執行：`supabase/schema.sql` → `supabase/rls.sql` →
+   `supabase/migrations/` 裡 **2026-08-11 以後**的檔案（依檔名順序）→
    `supabase/test/mark_as_test_database.sql`（**只在測試專案跑**，它是測試工具的「這是測試庫」標記）。
+   - 2026-08-10 以前的 migration 已經合進 `schema.sql`／`rls.sql`，**不要再跑**（會刪掉一條權限規則、加回已廢棄的欄位）；
+     2026-08-11 以後的還沒合進去（例如 `class_topics`、`child_service_permissions` 兩張表只在 migration 裡）
+   - 2026-11-01 用這個順序建 `kll-spirits` 測試專案，欄位、權限規則、函式、觸發器四類都和正式資料庫逐項比對一致
+   - 服事項目：舊 migration 會放進 09 月的六個舊名稱；測試庫請改成正式環境目前的七項（快轉工具會自動補上）
 3. 測試專案 → Authentication → Sign In / Providers → Email：關掉 **Confirm email**（測試帳號不用收驗證信）。
 4. 平台：根目錄新增 `.env.staging.local`（已被 `.gitignore` 排除），填測試專案的值：
    ```
