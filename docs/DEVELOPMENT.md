@@ -66,6 +66,11 @@ npm run test:watch           # 開發時監看模式
 npm run dev:staging     # 平台連測試資料庫；手機連同一個 Wi-Fi 開 http://<電腦 IP>:5173
 ```
 
+- 畫面最上方要看到黃色的「🧪 測試資料庫：jyfog….supabase.co」。**沒看到就是連到正式資料庫**（多半是跑成 `npm run dev`，
+  或檔名不是 `.env.staging.local`——Mac 可能偷偷加了 `.txt`），先停下來檢查。
+- 測試站**只用 Email 登入／註冊，不要按「使用 Google 登入」**：測試專案沒開 Google；
+  若平台其實連到正式資料庫，Google 登入完會被導回正式網站（正式專案只允許 `localhost:5173` 回到本機，用區網 IP 開的不在名單內）。
+
 1. 在測試平台用 Email 註冊一個測試家長（例：`test-parent@example.com`）。
 2. 測試專案的 SQL Editor 貼上 `supabase/test/spirit_beast_testkit.sql`，改開頭三個值後 Run：
    它會建假名孩子「測試小明」（兒童班）、綁定測試家長、把服事次數直接設成 N。
