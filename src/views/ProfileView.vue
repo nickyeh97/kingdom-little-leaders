@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { updateDisplayName } from '../api/members'
+import { spiritGameBaseUrl } from '../lib/spiritGame'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -41,6 +42,9 @@ async function saveName() {
     savingName.value = false
   }
 }
+
+// ---- 小領袖靈獸（服事經歷卡電子版）：遊戲部署、網址設定後才顯示入口（資料表也要先建好）----
+const gameUrl = spiritGameBaseUrl()
 
 async function logout() {
   try {
@@ -96,6 +100,13 @@ async function logout() {
         label="最近 4 次聚會，孩子班上教了什麼"
         is-link
         @click="$router.push({ name: 'my-lessons' })"
+      />
+      <van-cell
+        v-if="gameUrl"
+        title="小領袖靈獸"
+        label="孩子的服事經歷卡，和靈獸一起長大"
+        is-link
+        @click="$router.push({ name: 'service-card' })"
       />
     </van-cell-group>
     <h3 v-if="auth.can('admin')" class="section-title" style="--sec: var(--kll-orange)">管理</h3>

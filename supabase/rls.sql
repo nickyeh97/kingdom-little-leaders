@@ -492,3 +492,47 @@ create policy "org_units_read" on org_units
 create policy "org_units_write" on org_units
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+-- service_card_entries／beast_profiles（小領袖靈獸，2026-10-02）：遊戲以家長 token 直呼 REST，邊界在此
+alter table service_card_entries enable row level security;
+
+-- 讀：綁定家長、該班老師（唯讀關懷）、同工
+create policy "service_card_read" on service_card_entries
+  for select to authenticated
+  using (
+    child_id in (select public.my_child_ids())
+    or public.child_in_my_class(child_id)
+    or public.is_admin()
+  );
+
+-- 新增：綁定家長（或同工），只能記成自己，且項目必須是字典裡啟用中的項目
+create policy "service_card_insert" on service_card_entries
+  for insert to authenticated
+  with check (
+    (child_id in (select public.my_child_ids()) or public.is_admin())
+    and recorded_by = auth.uid()
+    and exists (select 1 from child_service_items i where i.name = item and i.active)
+  );
+
+-- 刪除（誤登更正）：家長只能刪自己登錄的；同工可刪全部。不開放修改
+create policy "service_card_delete" on service_card_entries
+  for delete to authenticated
+  using (
+    (child_id in (select public.my_child_ids()) and recorded_by = auth.uid())
+    or public.is_admin()
+  );
+
+alter table beast_profiles enable row level security;
+
+create policy "beast_profiles_read" on beast_profiles
+  for select to authenticated
+  using (child_id in (select public.my_child_ids()) or public.is_admin());
+
+create policy "beast_profiles_insert" on beast_profiles
+  for insert to authenticated
+  with check (child_id in (select public.my_child_ids()));
+
+create policy "beast_profiles_update" on beast_profiles
+  for update to authenticated
+  using (child_id in (select public.my_child_ids()))
+  with check (child_id in (select public.my_child_ids()));

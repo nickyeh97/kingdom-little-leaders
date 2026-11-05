@@ -97,6 +97,13 @@ const router = createRouter({
           meta: { roles: ['parent'] },
         },
         {
+          // 小領袖靈獸（服事經歷卡電子版）：家長的服事卡、鼓勵的話、去看靈獸
+          path: 'service-card',
+          name: 'service-card',
+          component: () => import('../views/ServiceCardView.vue'),
+          meta: { roles: ['parent'] },
+        },
+        {
           path: 'records',
           name: 'records',
           component: () => import('../views/RecordsView.vue'),
