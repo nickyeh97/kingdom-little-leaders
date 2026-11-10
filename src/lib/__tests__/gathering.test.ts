@@ -13,6 +13,7 @@ import {
   recentGatherings,
   upcomingGatherings,
   shortDate,
+  isGatheringDate,
 } from '../gathering'
 import { GATHERING_WEEKDAY, PLAN_DEADLINE_DAYS_BEFORE } from '../config'
 
@@ -230,5 +231,51 @@ describe('upcomingGatherings（服事報名日期清單）', () => {
     const dates = upcomingGatherings(5, D(2026, 8, 29), 6)
     expect(dates[0]).toBe('2026-08-29')
     expect(dates[4]).toBe('2026-09-26')
+  })
+})
+
+describe('單次改期（GATHERING_OVERRIDES）', () => {
+  it('設定：12/5 園遊會，該週改到 12/6；其他週不受影響', async () => {
+    const { GATHERING_OVERRIDES } = await import('../config')
+    expect(GATHERING_OVERRIDES['2026-12-05']).toBe('2026-12-06')
+    expect(upcomingGathering(D(2026, 11, 25))).toBe('2026-11-28')
+    expect(upcomingGathering(D(2026, 12, 7))).toBe('2026-12-12')
+  })
+
+  it('upcoming：改期那週（含原定日 12/5 與改到的 12/6 當天）都指向 12/6', () => {
+    expect(upcomingGathering(D(2026, 12, 2))).toBe('2026-12-06')
+    expect(upcomingGathering(D(2026, 12, 5))).toBe('2026-12-06')
+    expect(upcomingGathering(D(2026, 12, 6))).toBe('2026-12-06')
+  })
+
+  it('last：12/5 當天上一次聚會仍是 11/28；12/6 起是 12/6', () => {
+    expect(lastGathering(D(2026, 12, 5))).toBe('2026-11-28')
+    expect(lastGathering(D(2026, 12, 6))).toBe('2026-12-06')
+    expect(lastGathering(D(2026, 12, 11))).toBe('2026-12-06')
+  })
+
+  it('截止時間依實際聚會日重算：12/6 聚會 → 12/5 23:59 截止', () => {
+    expect(planDeadline('2026-12-06').getDate()).toBe(5)
+  })
+
+  it('日期清單與 next 一併套用', () => {
+    expect(upcomingGatherings(3, D(2026, 11, 30))).toEqual(['2026-12-06', '2026-12-12', '2026-12-19'])
+    expect(recentGatherings(3, D(2026, 12, 13))).toEqual(['2026-11-28', '2026-12-06', '2026-12-12'])
+    expect(nextGathering(D(2026, 11, 28))).toBe('2026-12-06')
+    expect(nextGathering(D(2026, 11, 29))).toBe('2026-12-12')
+  })
+
+  it('改期可往前挪（自訂 overrides）', () => {
+    const ov = { '2026-08-01': '2026-07-31' }
+    expect(upcomingGathering(D(2026, 7, 26), 6, ov)).toBe('2026-07-31')
+    expect(upcomingGathering(D(2026, 8, 1), 6, ov)).toBe('2026-08-08')
+    expect(lastGathering(D(2026, 8, 1), 6, ov)).toBe('2026-07-31')
+  })
+
+  it('isGatheringDate：原定日不算、改到的日期算', () => {
+    expect(isGatheringDate('2026-12-05')).toBe(false)
+    expect(isGatheringDate('2026-12-06')).toBe(true)
+    expect(isGatheringDate('2026-12-12')).toBe(true)
+    expect(isGatheringDate('2026-12-13')).toBe(false)
   })
 })
