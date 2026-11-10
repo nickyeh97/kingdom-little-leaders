@@ -278,4 +278,39 @@ describe('單次改期（GATHERING_OVERRIDES）', () => {
     expect(isGatheringDate('2026-12-12')).toBe(true)
     expect(isGatheringDate('2026-12-13')).toBe(false)
   })
+
+  it('平日改期：週六 11/14 → 下週二 11/17（國定假日），原定日到新日期之間的空檔也正確', () => {
+    const ov = { '2026-11-14': '2026-11-17' }
+    expect(upcomingGathering(D(2026, 11, 14), 6, ov)).toBe('2026-11-17')
+    expect(upcomingGathering(D(2026, 11, 18), 6, ov)).toBe('2026-11-21') // 改期後下週六照常
+    // 11/15～11/16：原定日已過、新日期未到 → 上一次仍是 11/07（修正前會回傳 undefined）
+    expect(lastGathering(D(2026, 11, 15), 6, ov)).toBe('2026-11-07')
+    expect(lastGathering(D(2026, 11, 16), 6, ov)).toBe('2026-11-07')
+    expect(recentGatherings(3, D(2026, 11, 16), 6, ov)).toEqual(['2026-10-24', '2026-10-31', '2026-11-07'])
+    expect(recentGatherings(3, D(2026, 11, 22), 6, ov)).toEqual(['2026-11-07', '2026-11-17', '2026-11-21'])
+    expect(nextGathering(D(2026, 11, 15), 6, ov)).toBe('2026-11-21')
+    expect(isGatheringDate('2026-11-14', 6, ov)).toBe(false)
+    expect(isGatheringDate('2026-11-17', 6, ov)).toBe(true)
+    // 週二聚會 → 前一天（週一）23:59 截止
+    const dl = planDeadline('2026-11-17')
+    expect([dl.getMonth() + 1, dl.getDate(), dl.getHours(), dl.getMinutes()]).toEqual([11, 16, 23, 59])
+  })
+
+  it('改期挪超過一週（跨過下一個週六）也不漏、順序正確', () => {
+    const later = { '2026-11-14': '2026-11-24' }
+    expect(upcomingGatherings(3, D(2026, 11, 11), 6, later)).toEqual(['2026-11-21', '2026-11-24', '2026-11-28'])
+    expect(lastGathering(D(2026, 11, 18), 6, later)).toBe('2026-11-07')
+    expect(recentGatherings(3, D(2026, 11, 24), 6, later)).toEqual(['2026-11-07', '2026-11-21', '2026-11-24'])
+    const earlier = { '2026-11-28': '2026-11-16' }
+    expect(upcomingGatherings(3, D(2026, 11, 15), 6, earlier)).toEqual(['2026-11-16', '2026-11-21', '2026-12-05'])
+    expect(upcomingGathering(D(2026, 11, 22), 6, earlier)).toBe('2026-12-05')
+    expect(lastGathering(D(2026, 11, 28), 6, earlier)).toBe('2026-11-21')
+  })
+
+  it('同時多筆改期互不干擾', () => {
+    const ov = { '2026-11-14': '2026-11-17', '2026-12-05': '2026-12-06' }
+    expect(upcomingGatherings(5, D(2026, 11, 12), 6, ov)).toEqual([
+      '2026-11-17', '2026-11-21', '2026-11-28', '2026-12-06', '2026-12-12',
+    ])
+  })
 })

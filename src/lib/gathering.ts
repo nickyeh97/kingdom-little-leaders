@@ -27,19 +27,33 @@ function regularUpcoming(from: Date, weekday: number): Date {
   return d
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** 改期最多挪了幾週（往前或往後皆算，無條件進位）— 決定要多看前後幾週才不會漏 */
+function overrideSpanWeeks(overrides: Overrides): number {
+  let max = 0
+  for (const [from, to] of Object.entries(overrides)) {
+    const diff = Math.abs(new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime())
+    max = Math.max(max, Math.ceil(Math.round(diff / DAY_MS) / 7))
+  }
+  return max
+}
+
 /**
- * 以 base 為起點、每 7 天一次、共 n 次的固定聚會日，套上單次改期（GATHERING_OVERRIDES）後排序。
- * 改期只會挪動幾天，呼叫端多抓前後一週即可涵蓋。
+ * from 前後各 weeks 週的固定聚會日，套上單次改期（GATHERING_OVERRIDES）後去重、排序。
+ * 改期可往前或往後挪任意天數（如週六 → 下週二的國定假日），範圍會依挪動幅度自動放寬。
  */
-function actualSeries(base: Date, n: number, overrides: Overrides): string[] {
-  const d = new Date(base)
-  const out: string[] = []
-  for (let i = 0; i < n; i++) {
+function actualAround(from: Date, weekday: number, weeks: number, overrides: Overrides): string[] {
+  const span = weeks + overrideSpanWeeks(overrides) + 1
+  const d = regularUpcoming(from, weekday)
+  d.setDate(d.getDate() - 7 * span)
+  const out = new Set<string>()
+  for (let i = 0; i <= 2 * span; i++) {
     const r = toDateString(d)
-    out.push(overrides[r] ?? r)
+    out.add(overrides[r] ?? r)
     d.setDate(d.getDate() + 7)
   }
-  return out.sort()
+  return [...out].sort()
 }
 
 /** 下一個聚會日（若今天就是聚會日，回傳今天）— 供點名、出席勾選共用 */
@@ -122,9 +136,7 @@ export function upcomingGatherings(
   overrides: Overrides = GATHERING_OVERRIDES,
 ): string[] {
   const today = toDateString(from)
-  const base = regularUpcoming(from, weekday)
-  base.setDate(base.getDate() - 7) // 上週原定日可能被改到今天之後
-  return actualSeries(base, count + 2, overrides)
+  return actualAround(from, weekday, count, overrides)
     .filter((d) => d >= today)
     .slice(0, count)
 }
@@ -137,9 +149,7 @@ export function recentGatherings(
   overrides: Overrides = GATHERING_OVERRIDES,
 ): string[] {
   const today = toDateString(from)
-  const base = regularUpcoming(from, weekday)
-  base.setDate(base.getDate() - 7 * count) // 往前 count 週，再往後多抓一週（可能被改到今天以前）
-  return actualSeries(base, count + 2, overrides)
+  return actualAround(from, weekday, count, overrides)
     .filter((d) => d <= today)
     .slice(-count)
 }

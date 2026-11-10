@@ -12,7 +12,7 @@ export const PLAN_DEADLINE_DAYS_BEFORE = 1
 
 /**
  * 單次改期：「原定聚會日 → 實際聚會日」（YYYY-MM-DD）。
- * 遇到園遊會等特殊活動時加一筆即可，出席行事曆、點名、截止時間、歌單日期都會跟著改；
+ * 遇到園遊會等特殊活動時加一筆即可（不限週末，如週六 → 下週二國定假日；可往前/往後、可超過一週），出席行事曆、點名、截止時間、歌單日期都會跟著改；
  * 截止時間依實際聚會日重算（仍是前 PLAN_DEADLINE_DAYS_BEFORE 天）。活動過後可留著當紀錄。
  */
 export const GATHERING_OVERRIDES: Readonly<Record<string, string>> = {
