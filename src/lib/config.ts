@@ -10,6 +10,15 @@ export const GATHERING_WEEKDAY = 6
 /** 預先出席截止：聚會日前 N 天的 23:59:59。目前：前 1 天（週六聚會 → 週五截止） */
 export const PLAN_DEADLINE_DAYS_BEFORE = 1
 
+/**
+ * 單次改期：「原定聚會日 → 實際聚會日」（YYYY-MM-DD）。
+ * 遇到園遊會等特殊活動時加一筆即可（不限週末，如週六 → 下週二國定假日；可往前/往後、可超過一週），出席行事曆、點名、截止時間、歌單日期都會跟著改；
+ * 截止時間依實際聚會日重算（仍是前 PLAN_DEADLINE_DAYS_BEFORE 天）。活動過後可留著當紀錄。
+ */
+export const GATHERING_OVERRIDES: Readonly<Record<string, string>> = {
+  '2026-12-05': '2026-12-06', // 12/5 園遊會，該週聚會改到 12/6
+}
+
 /** 老師課後反饋填寫期限：上完課後 N 天內（當天起算，含當天，至第 N 天 23:59:59） */
 export const FEEDBACK_DUE_DAYS = 2
 

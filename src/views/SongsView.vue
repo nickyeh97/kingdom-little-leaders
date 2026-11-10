@@ -380,6 +380,7 @@ async function removePl() {
       <div>
         <h2>敬拜詩歌</h2>
         <p class="hint">各班歌單依期間發布（如雙月更新）；曲庫可一次上傳整學期 🎵</p>
+        <p class="weekly-notice">📣 當週詩歌於週一發布，請家長週間常放給孩子聽</p>
       </div>
       <van-button v-if="auth.can('admin')" size="small" type="primary" plain @click="openEditor(null)">
         ＋新增歌曲
@@ -756,6 +757,12 @@ h2 {
 .center {
   text-align: center;
   margin-bottom: 10px;
+}
+.weekly-notice {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kll-orange);
 }
 .pl-hint {
   margin: 12px 16px 8px;

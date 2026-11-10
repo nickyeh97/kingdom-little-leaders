@@ -3,6 +3,7 @@
  * 週從週日起排（台灣月曆慣例）；聚會日由 config 決定，不寫死週幾。
  */
 import { GATHERING_WEEKDAY } from './config'
+import { isGatheringDate } from './gathering'
 
 export interface CalendarCell {
   /** YYYY-MM-DD */
@@ -61,7 +62,7 @@ export function monthGrid(anchor: string, weekday = GATHERING_WEEKDAY): Calendar
       date: toDateString(d),
       day: d.getDate(),
       inMonth: d.getMonth() === m - 1,
-      isGathering: d.getDay() === weekday,
+      isGathering: isGatheringDate(toDateString(d), weekday),
     })
   }
   return cells
